@@ -80,7 +80,9 @@ const isMember = async (userId: string, serverId: string) =>
   !!(await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId } } }));
 const touch = (serverId: string) => io.to(`server:${serverId}`).emit("server:updated", { serverId });
 
-app.get("/health", async () => ({ ok: true, name: "cohle" }));
+// `boot` identifies this process and `up` is its age in seconds: a changing `boot` means restarts, two values at once mean two copies.
+const BOOT = randomBytes(3).toString("hex"), STARTED = Date.now();
+app.get("/health", async () => ({ ok: true, name: "cohle", boot: BOOT, up: Math.round((Date.now() - STARTED) / 1000), mb: Math.round(process.memoryUsage().rss / 1048576) }));
 
 // ---- auth ----
 app.post("/auth/register", authLimit, async (req, reply) => {

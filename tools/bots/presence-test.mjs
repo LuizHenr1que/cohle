@@ -2,10 +2,11 @@
 import { io } from "socket.io-client";
 import { Room } from "@livekit/rtc-node";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const API = "http://localhost:3001";
+const API = process.env.API ?? "http://localhost:3001";
+const PW = [process.env.T1_PW ?? "teste12345", process.env.T2_PW ?? "teste12345"];
 let pass = 0, fail = 0; const ok = (l, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${l}${x ? "  — " + x : ""}`); return c; };
 const http = async (p, m = "GET", b, t) => { const r = await fetch(API + p, { method: m, headers: { ...(b ? { "Content-Type": "application/json" } : {}), ...(t ? { Authorization: "Bearer " + t } : {}) }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, d: await r.json().catch(() => ({})) }; };
-const login = async (n) => (await http("/auth/login", "POST", { email: `teste${n}@cohle.dev`, password: "teste12345" })).d;
+const login = async (n) => (await http("/auth/login", "POST", { email: `teste${n}@cohle.dev`, password: PW[n - 1] })).d;
 const a = await login(1), b = await login(2);
 const voiceCh = (await http("/servers", "GET", undefined, a.token)).d.find((s) => s.name === "Servidor de Teste").channels.find((c) => c.type === "VOICE");
 const sock = async (who) => { const s = io(API, { auth: { token: who.token }, forceNew: true }); await new Promise((r) => s.on("connect", r)); return s; };
