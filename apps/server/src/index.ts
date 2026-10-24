@@ -80,10 +80,9 @@ const isMember = async (userId: string, serverId: string) =>
   !!(await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId } } }));
 const touch = (serverId: string) => io.to(`server:${serverId}`).emit("server:updated", { serverId });
 
-app.get("/debug/voice", { preHandler: auth }, async () => reconcileLog);   // TEMPORARY, remove after the investigation
 // `boot` identifies this process and `up` is its age in seconds: a changing `boot` means restarts, two values at once mean two copies.
 const BOOT = randomBytes(3).toString("hex"), STARTED = Date.now();
-app.get("/health", async () => ({ ok: true, name: "cohle", boot: BOOT, up: Math.round((Date.now() - STARTED) / 1000), mb: Math.round(process.memoryUsage().rss / 1048576) }));
+app.get("/health", async () => ({ ok: true, name: "cohle", boot: BOOT, up: Math.round((Date.now() - STARTED) / 1000) }));
 
 // ---- auth ----
 app.post("/auth/register", authLimit, async (req, reply) => {
@@ -411,30 +410,34 @@ function leaveVoice(userId: string) {
 // The in-memory list above is fed by app messages, which are lost when the server restarts/sleeps or a socket blips.
 // Every few seconds we ask LiveKit who is really in each room and fix the list: add who is missing, drop who is gone.
 let reconciling = false;
-const reconcileLog: unknown[] = [];                                            // TEMPORARY diagnostics: last passes
-const logPass = (e: Record<string, unknown>) => { reconcileLog.push({ t: new Date().toISOString().slice(11, 19), ...e }); if (reconcileLog.length > 14) reconcileLog.shift(); };
 async function reconcileVoice(forceUser?: string) {
   if (reconciling) return;
   reconciling = true;
   try {
-    const live = new Map<string, Map<string, { name: string; sharing: boolean }>>();      // channelId -> userId -> info
+    const live = new Map<string, Map<string, { name: string; sharing: boolean; joined: number }>>();   // channelId -> userId -> info
     const lkRooms = await rooms.listRooms();
     await Promise.all(lkRooms.map(async (r) => {
       const ps = await rooms.listParticipants(r.name).catch(() => []);
-      live.set(r.name, new Map(ps.map((p) => [p.identity, { name: p.name, sharing: p.tracks.some((t) => t.source === TrackSource.SCREEN_SHARE) }])));
+      live.set(r.name, new Map(ps.map((p) => [p.identity, { name: p.name, sharing: p.tracks.some((t) => t.source === TrackSource.SCREEN_SHARE), joined: Number(p.joinedAt) }])));
     }));
 
     const changed = new Set<string>();
     const now = Date.now();
-    const dbg: Record<string, unknown> = { lkRooms: lkRooms.length, live: Object.fromEntries([...live].map(([c, m]) => [c.slice(0, 6), [...m.keys()].map((k) => k.slice(0, 5))])), list: [...voice].map(([c, v]) => [c.slice(0, 6), [...v.users.keys()].map((k) => k.slice(0, 5))]), added: [] as string[], removed: [] as string[] };
 
     // 1) who LiveKit has but we do not (or have in another channel)
     const channelIds = [...live.keys()].filter((c) => live.get(c)!.size);
     const known = channelIds.length ? await prisma.channel.findMany({ where: { id: { in: channelIds }, type: "VOICE" }, select: { id: true, serverId: true } }) : [];
     const serverOf = new Map(known.map((c) => [c.id, c.serverId]));
+    // A person can be connected to two rooms at once (two devices, a leftover session). Our list holds ONE room per person, so be stable:
+    // keep the room they are already listed in as long as LiveKit still has them there; otherwise pick the one they joined last.
+    const byUser = new Map<string, { channelId: string; joined: number }[]>();
+    for (const [channelId, people] of live) if (serverOf.has(channelId)) for (const [userId, info] of people) byUser.set(userId, [...(byUser.get(userId) ?? []), { channelId, joined: info.joined }]);
     const missing: { channelId: string; userId: string }[] = [];
-    for (const [channelId, people] of live) for (const userId of people.keys())
-      if (serverOf.has(channelId) && voiceOf.get(userId) !== channelId) missing.push({ channelId, userId });
+    for (const [userId, where] of byUser) {
+      const current = voiceOf.get(userId);
+      if (current && where.some((w) => w.channelId === current)) continue;
+      missing.push({ channelId: where.sort((a, b) => b.joined - a.joined)[0].channelId, userId });
+    }
     if (missing.length) {
       const users = await prisma.user.findMany({ where: { id: { in: missing.map((m) => m.userId) } }, ...lightUser });
       const members = await prisma.member.findMany({ where: { OR: missing.map((m) => ({ userId: m.userId, serverId: serverOf.get(m.channelId)! })) } });
@@ -446,7 +449,7 @@ async function reconcileVoice(forceUser?: string) {
         if (prev && prev !== m.channelId) { leaveVoice(m.userId); }
         let v = voice.get(m.channelId); if (!v) { v = { serverId: sid, users: new Map() }; voice.set(m.channelId, v); }
         v.users.set(m.userId, { ...toUser(u), sharing: live.get(m.channelId)!.get(m.userId)!.sharing, muted: mem.muted });
-        voiceOf.set(m.userId, m.channelId); absent.delete(m.userId); changed.add(m.channelId); (dbg.added as string[]).push(m.userId.slice(0, 5));
+        voiceOf.set(m.userId, m.channelId); absent.delete(m.userId); changed.add(m.channelId);
       }
     }
 
@@ -462,12 +465,11 @@ async function reconcileVoice(forceUser?: string) {
         const grace = userId === forceUser ? 0 : 20_000;                  // right after "voice:join" the app is still connecting to LiveKit
         if (now - (joinedAt.get(userId) ?? 0) < grace) continue;
         const n = (absent.get(userId) ?? 0) + 1; absent.set(userId, n);
-        if (n >= (userId === forceUser ? 1 : 2)) { leaveVoice(userId); (dbg.removed as string[]).push(`${userId.slice(0, 5)} (ausente ${n}x)`); }
+        if (n >= (userId === forceUser ? 1 : 2)) { leaveVoice(userId); }
       }
     }
-    logPass(dbg);
     for (const channelId of changed) { const v = voice.get(channelId); if (v) io.to(`server:${v.serverId}`).emit("voice:state", voiceDTO(channelId)); }
-  } catch (e: any) { logPass({ erro: String(e?.message ?? e).slice(0, 160) }); /* LiveKit unreachable for a moment: keep what we have */ }
+  } catch { /* LiveKit unreachable for a moment: keep what we have */ }
   finally { reconciling = false; }
 }
 setInterval(() => { if (io.engine.clientsCount > 0) void reconcileVoice(); }, 5000).unref();
