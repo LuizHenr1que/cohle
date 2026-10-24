@@ -17,3 +17,4 @@ Histórico:
 - **Versão de teste 1:** prévia da sua tela ao compartilhar.
 - **Versão de teste 2:** widget de chamada em segundo plano e app mais leve.
 - **Versão de teste 3:** chat durante a chamada e supressão de ruído.
+- **Versão de teste 4:** lista de quem está na sala de voz sempre correta.
