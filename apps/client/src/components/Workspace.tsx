@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { MessageCircle, Download, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu } from "lucide-react";
+import { MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu } from "lucide-react";
 import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO } from "@cohle/shared";
 import { api, connectSocket } from "../api";
 // The call UI (and the LiveKit SDK, the heaviest dependency) loads only when you join a voice channel.
 import type { VoiceApi } from "./VoiceRoom";
 import { PersonRow } from "./PersonRow";
 import { useUpdate } from "../lib/update";
+import { UpdateBadge } from "./UpdateBadge";
 import { DmChat, DmSidebar, useDms } from "./DirectMessages";
 const VoiceRoom = lazy(() => import("./VoiceRoom").then((m) => ({ default: m.VoiceRoom })));
 import { Avatar } from "./Avatar";
@@ -233,12 +234,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           <MessageCircle size={20} />
           {dms.unread > 0 && <span className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center border-2 border-surface">{dms.unread > 99 ? "99+" : dms.unread}</span>}
         </button>
-        {update && (
-          <button onClick={() => window.cohle?.openExternal(update.url)} title={`Versão de teste ${update.n}: ${update.note.replace(/^Versão de teste \d+\s*[·-]\s*/, "")}. Clique para baixar e atualizar`}
-            className="shrink-0 w-14 flex flex-col items-center gap-0.5 rounded-xl bg-accent text-white text-[9px] font-bold leading-tight py-1.5 animate-pulse hover:animate-none">
-            <Download size={14} /> Nova versão
-          </button>
-        )}
+        {update && <UpdateBadge n={update.n} note={update.note} url={update.url} />}
         {servers.map((s) => (
           <button key={s.id} title={s.name}
             onClick={() => { setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
