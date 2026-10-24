@@ -9,6 +9,7 @@
   "dependencies": {
     "@livekit/rtc-ffi-bindings": "^0.13.2",
     "@livekit/rtc-node": "^0.13.0",
+    "livekit-server-sdk": "^2.19.2",
     "socket.io-client": "^4.8.0"
   }
 }

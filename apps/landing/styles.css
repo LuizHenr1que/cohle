@@ -59,6 +59,11 @@ h1, h2, h3 { margin: 0; letter-spacing: -.025em; line-height: 1.1; }
 .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
 .other-dl { margin: 14px 0 0; font-size: 14px; color: var(--muted); min-height: 22px; }
 .other-dl a { color: #ffb48f; text-decoration: underline; text-underline-offset: 3px; }
+.ver-line { display: inline-flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+.ver-line[hidden] { display: none; }
+.ver-line .i { color: var(--accent2); } .ver-line b { color: #e6d6dc; font-weight: 600; }
+.ver-center { justify-content: center; margin-top: 16px; }
+.sec-head .ver-line { margin-top: 16px; }
 .trust { list-style: none; padding: 0; margin: 22px 0 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; color: #cdbcc3; }
 .trust li { display: inline-flex; align-items: center; gap: 7px; }
 .trust .i { color: var(--green); }

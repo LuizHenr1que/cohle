@@ -278,6 +278,9 @@ importers:
       '@livekit/rtc-node':
         specifier: ^0.13.0
         version: 0.13.35
+      livekit-server-sdk:
+        specifier: ^2.19.2
+        version: 2.19.2
       socket.io-client:
         specifier: ^4.8.0
         version: 4.8.4(supports-color@7.2.0)

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Mic, MonitorUp, MessagesSquare } from "lucide-react";
+import { Mic, MonitorUp, MessagesSquare, FlaskConical } from "lucide-react";
 import { Logo } from "./Logo";
+import { BUILD, BUILD_LABEL } from "../version";
 import { api, API, checkServer, normalizeServerUrl, switchServer } from "../api";
 import type { UserDTO } from "@cohle/shared";
 
@@ -156,6 +157,10 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
               </div>
             </div>
           )}
+          <p className="flex items-start justify-center gap-2 text-center text-xs text-muted pt-1" title="Versão deste aplicativo">
+            <FlaskConical size={14} className="mt-px shrink-0 text-accent2" />
+            <span><b className="text-ink/80 font-semibold">{BUILD_LABEL}</b> <span aria-hidden="true">·</span> {BUILD.note}</span>
+          </p>
         </form>
       </section>
     </div>

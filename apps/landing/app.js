@@ -82,6 +82,22 @@ async function setupDownloads() {
   }
 }
 
+/* ---------- current version (title of the latest public release) ---------- */
+async function showLatestRelease() {
+  try {
+    const r = await fetch("https://api.github.com/repos/LuizHenr1que/cohle-releases/releases/latest", { headers: { Accept: "application/vnd.github+json" } });
+    if (!r.ok) return;
+    const j = await r.json(); if (!j.name) return;
+    const when = j.published_at ? ` · publicada em ${new Date(j.published_at).toLocaleDateString("pt-BR")}` : "";
+    $$("[data-release]").forEach((el) => {
+      el.replaceChildren();
+      el.insertAdjacentHTML("afterbegin", ic("flask-conical"));
+      const b = document.createElement("b"); b.textContent = j.name;     // textContent: the title is data, never HTML
+      el.append(b, document.createTextNode(when)); el.hidden = false;
+    });
+  } catch { /* offline or rate limited: the page simply does not show the line */ }
+}
+
 /* ---------- small page behaviours ---------- */
 function setupPage() {
   $("#year").textContent = `© ${new Date().getFullYear()} Cohle.`;
@@ -359,5 +375,5 @@ function setupDemo() {
 
 /* ---------- boot ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  setupPage(); setupDownloads(); setupTilt(); setupDots(); setupDemo(); setupGallery();
+  setupPage(); showLatestRelease(); setupDownloads(); setupTilt(); setupDots(); setupDemo(); setupGallery();
 });

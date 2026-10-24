@@ -6,7 +6,7 @@ import {
 } from "livekit-client";
 import {
   Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, Volume2, VolumeX, Headphones, HeadphoneOff,
-  ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, Ban, UserX, PhoneMissed, ShieldAlert, Menu,
+  ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, Ban, UserX, PhoneMissed, ShieldAlert, Menu, Eye, EyeOff,
 } from "lucide-react";
 import type { ChannelDTO, UserDTO } from "@cohle/shared";
 import { api } from "../api";
@@ -101,14 +101,16 @@ function PersonMenu({ name, vol, onVol, sharing, mod }: { name: string; vol: Vol
 
 // One participant. Sizes come from the tile itself (container queries), so it adapts in a 1-person view,
 // a 12-person grid or the small strip next to a stage.
-function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMuted, onWatch, onOpen }: {
-  p: Participant; user: UserLike; speaking: boolean; watching: boolean; compact?: boolean;
+function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMuted, onWatch, onOpen, preview, onTogglePreview }: {
+  p: Participant; user: UserLike; speaking: boolean; watching: boolean; compact?: boolean; preview: boolean; onTogglePreview: () => void;
   vol: Vol; onVol: (patch: Partial<Vol>) => void; mod?: Moderation; serverMuted: boolean;
   onWatch: () => void; onOpen: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const sharing = p.isScreenShareEnabled;
-  const screenTrack = !p.isLocal && watching ? p.getTrackPublication(Track.Source.ScreenShare)?.track : undefined;
+  // Remote screen: only while I am watching it. My own screen: a preview, so I can see that it is really being shared.
+  const showScreen = p.isLocal ? preview : watching;
+  const screenTrack = showScreen ? p.getTrackPublication(Track.Source.ScreenShare)?.track : undefined;
   const camTrack = p.getTrackPublication(Track.Source.Camera)?.track;
   const track = screenTrack ?? camTrack;
 
@@ -148,11 +150,20 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
       {unwatched && compact && (
         <button onClick={onWatch} title="Assistir transmissão" className="absolute top-1.5 right-1.5 grad rounded-full p-1.5 text-white"><MonitorPlay size={13} /></button>
       )}
-      {p.isLocal && sharing && !compact && <span className="absolute bottom-9 inset-x-0 mx-auto w-fit text-[11px] text-muted bg-black/40 rounded-full px-3 py-1">Você está compartilhando a tela</span>}
+      {p.isLocal && sharing && !compact && (
+        <span className="absolute bottom-9 inset-x-0 mx-auto w-fit text-[11px] text-muted bg-black/55 rounded-full px-3 py-1">
+          {screenTrack ? "Prévia da sua tela: só você vê isso" : "Você está compartilhando a tela"}
+        </span>
+      )}
 
       {!compact && (
         <div className="absolute top-2 right-2 @sm:top-3 @sm:right-3 flex gap-1.5 items-start">
           {!p.isLocal && <PersonMenu name={user.username} vol={vol} onVol={onVol} sharing={sharing} mod={mod} />}
+          {p.isLocal && sharing && (
+            <button onClick={onTogglePreview} className="bg-black/50 hover:bg-black/70 rounded-full p-1.5 @sm:p-2" title={preview ? "Esconder a prévia da minha tela" : "Mostrar a prévia da minha tela"}>
+              {preview ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          )}
           {watching && <button onClick={onOpen} className="bg-black/50 hover:bg-black/70 rounded-full p-1.5 @sm:p-2" title="Abrir em tela maior"><Maximize2 size={14} /></button>}
         </div>
       )}
@@ -240,6 +251,8 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   const [watching, setWatching] = useState<Set<string>>(new Set());   // whose screen share I'm downloading
   const [focusId, setFocusId] = useState<string>();                    // spotlighted participant
   const [vols, setVols] = useState<Record<string, Vol>>(loadVols);
+  const [preview, setPreview] = useState(() => { try { return localStorage.getItem("cohle:preview") !== "off"; } catch { return true; } });
+  const togglePreview = () => setPreview((v) => { try { localStorage.setItem("cohle:preview", v ? "off" : "on"); } catch { /* ignore */ } return !v; });
   const deafRef = useRef(false);
   const micBeforeDeaf = useRef(true);
   const watchRef = useRef(watching);
@@ -423,6 +436,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     <Tile key={p.identity} p={p} user={userOf(p)} speaking={speakers.includes(p.identity)} compact={compact}
       watching={watching.has(p.identity)} vol={vols[p.identity] ?? DEFAULT_VOL} onVol={(patch) => setVol(p.identity, patch)}
       mod={moderation(p)} serverMuted={mutedByOwner(p.identity)}
+      preview={preview} onTogglePreview={togglePreview}
       onWatch={() => watch(p.identity)} onOpen={() => setFocusId(p.identity)} />
   );
 
