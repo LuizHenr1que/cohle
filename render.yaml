@@ -5,6 +5,7 @@ services:
     name: cohle-api
     runtime: docker
     plan: free
+    region: ohio               # same region as the Neon database (AWS us-east-2): fewer ms per query
     dockerfilePath: ./apps/server/Dockerfile
     dockerContext: .
     healthCheckPath: /health
