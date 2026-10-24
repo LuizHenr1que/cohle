@@ -68,7 +68,8 @@ app.whenReady().then(async () => {
   await run(`${q('.shot-tabs [data-shot="ao-vivo"]')}.click()`); await sleep(900);
   ok("aba da galeria troca a imagem", /ao-vivo\.jpg/.test(await run(`${q('#shotImg')}.src`)) && (await run(`${q('#shotImg')}.naturalWidth`)) > 1000);
   // lazy images below the fold are not loaded until scrolled to, so ask the server for each one instead
-  ok("todas as imagens da página existem (sem 404)", await run(`Promise.all([...document.querySelectorAll('img')].map(i=>fetch(i.currentSrc||i.src).then(r=>r.ok).catch(()=>false))).then(a=>a.length>=10&&a.every(Boolean))`));
+  ok("as 7 imagens da página existem (sem 404)", await run(`Promise.all([...document.querySelectorAll('img')].map(i=>fetch(i.currentSrc||i.src).then(r=>r.ok).catch(()=>false))).then(a=>a.length===7&&a.every(Boolean))`));
+  ok("as 7 telas da galeria existem (sem 404)", await run(`Promise.all(['voz','ao-vivo','dono','chat','criar','membros','login'].map(k=>fetch('shots/'+k+'.jpg').then(r=>r.ok).catch(()=>false))).then(a=>a.every(Boolean))`));
   ok("sem emojis na página", !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(await run(`document.body.innerText`)));
   ok("sem rolagem horizontal", await run(`document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1`));
   console.log(`\n${pass} passaram, ${fail} falharam`);
