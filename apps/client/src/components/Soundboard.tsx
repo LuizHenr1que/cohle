@@ -17,8 +17,7 @@ export function Soundboard({ onPlay, btnCls, disabled }: { onPlay: (id: SoundId)
   }, [open]);
   return (
     <div ref={box} className="relative">
-      <button title="Sons para a sala: susto, fogos, risos..." aria-expanded={open} onClick={() => setOpen((v) => !v)}
-        className={`h-11 sm:h-12 px-3 sm:px-4 rounded-2xl flex items-center gap-2 text-sm font-semibold transition ring-1 ring-accent/40 ${open ? "grad text-white" : "bg-accent/20 text-accent hover:bg-accent/30"}`}><Music size={20} /> Sons</button>
+      <button title="Sons para a sala" aria-expanded={open} className={btnCls} onClick={() => setOpen((v) => !v)}><Music size={20} /></button>
       {open && (
         <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-64 max-w-[88vw] glass bg-surface rounded-2xl p-3 z-40 border border-line shadow-2xl">
           <p className="text-[11px] uppercase tracking-widest text-muted mb-2">Sons para a sala</p>
