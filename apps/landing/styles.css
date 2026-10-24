@@ -351,3 +351,6 @@ h1, h2, h3 { margin: 0; letter-spacing: -.025em; line-height: 1.1; }
   .float, .glow, .shot-glow, .phone, .chip, .demo-hint, .marquee-track, .av.speak, .meter i, .m-code u, .m-cur, .m-game i { animation: none !important; }
   .js .reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* the app preview on the hero is only a picture: nothing in it reacts to the mouse */
+.m-app { pointer-events: none; user-select: none; }

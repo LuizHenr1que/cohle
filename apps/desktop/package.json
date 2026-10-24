@@ -1,6 +1,6 @@
 {
   "name": "@cohle/desktop",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {
@@ -52,7 +52,8 @@
           ]
         }
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": true,
+      "icon": "build/icon.ico"
     },
     "directories": {
       "output": "release",

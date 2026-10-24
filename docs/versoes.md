@@ -33,3 +33,4 @@ Histórico (antes da Versão 1 eram "versões de teste" 1 a 13, numeração `0.1
 - **Versão de teste 13:** atualização automática (baixa sozinha e instala ao abrir), instalador do Windows e login sem o endereço do servidor.
 - **Versão 1 (0.0.1):** primeira versão oficial, com atualização automática.
 - **Versão 2 (0.0.2):** tela de atualização moderna (card com progresso ao abrir, card "Cohle atualizado" depois) e download direto do instalador.
+- **Versão 3 (0.0.3):** o Cohle.exe agora leva o ícone e o nome do Cohle (antes aparecia "Electron" no Windows) e a prévia da landing deixou de ser interativa.
