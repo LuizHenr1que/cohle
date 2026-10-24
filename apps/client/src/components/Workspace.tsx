@@ -92,7 +92,11 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
     s.on("voice:disconnected", () => { setVoice(undefined); setNotice("O dono do servidor desconectou você da chamada."); });
     s.on("voice:snapshot", (l: VoiceStateDTO[]) => setVoiceUsers(Object.fromEntries(l.map((v) => [v.channelId, v.users]))));
     s.on("voice:state", (v: VoiceStateDTO) => setVoiceUsers((o) => ({ ...o, [v.channelId]: v.users })));
-    return () => { s.disconnect(); };
+    // keep the voice-room lists honest even if a push was missed: ask again when the window comes back and every 30 s
+    const sync = () => { if (!document.hidden && s.connected) s.emit("voice:sync"); };
+    const timer = setInterval(sync, 30_000);
+    window.addEventListener("focus", sync); document.addEventListener("visibilitychange", sync);
+    return () => { clearInterval(timer); window.removeEventListener("focus", sync); document.removeEventListener("visibilitychange", sync); s.disconnect(); };
   }, []);
 
   useEffect(() => {

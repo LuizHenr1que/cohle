@@ -328,6 +328,9 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     room.on(RoomEvent.Disconnected, () => setStatus((s) => (s === "error" ? s : "connecting")));
     const onVis = () => { applyAll(); bump(); };
     document.addEventListener("visibilitychange", onVis);
+    // closing/reloading the window: say goodbye to LiveKit now, so the room list does not keep a ghost until it times out
+    const bye = () => { try { void room.disconnect(true); } catch { /* already gone */ } };
+    window.addEventListener("pagehide", bye);
 
     (async () => {
       try {
@@ -343,7 +346,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         bump();
       } catch (e: any) { setStatus("error"); setErr(e.message ?? "falha ao conectar"); sounds.error(); }
     })();
-    return () => { document.removeEventListener("visibilitychange", onVis); room.disconnect(); sounds.leaveSelf(); };
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", bye); room.disconnect(); sounds.leaveSelf(); };
   }, [channel.id]);
 
   useEffect(() => { onSpeakers(speakers); }, [speakers]);

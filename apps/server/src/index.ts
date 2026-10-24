@@ -7,7 +7,7 @@ import jwt from "@fastify/jwt";
 import { Server as IOServer } from "socket.io";
 import { PrismaClient } from "@prisma/client";
 import { hash, verify } from "@node-rs/argon2";
-import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
+import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import {
   registerSchema, loginSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
   type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
@@ -388,7 +388,12 @@ const voice = new Map<string, { serverId: string; users: Map<string, UserDTO> }>
 const voiceOf = new Map<string, string>(); // userId -> channelId
 const voiceDTO = (channelId: string) => ({ channelId, users: [...(voice.get(channelId)?.users.values() ?? [])] });
 
+const joinedAt = new Map<string, number>();   // userId -> when we last heard "voice:join" (grace while the app is still connecting to LiveKit)
+const sharingAt = new Map<string, number>();  // userId -> last time the app told us it started/stopped sharing
+const absent = new Map<string, number>();     // userId -> consecutive checks in which LiveKit did not list them
+
 function leaveVoice(userId: string) {
+  absent.delete(userId);
   const channelId = voiceOf.get(userId);
   if (!channelId) return;
   voiceOf.delete(userId);
@@ -399,6 +404,67 @@ function leaveVoice(userId: string) {
   if (v.users.size === 0) voice.delete(channelId);
 }
 
+// ---- LiveKit is the source of truth for "who is in which voice room" ----
+// The in-memory list above is fed by app messages, which are lost when the server restarts/sleeps or a socket blips.
+// Every few seconds we ask LiveKit who is really in each room and fix the list: add who is missing, drop who is gone.
+let reconciling = false;
+async function reconcileVoice(forceUser?: string) {
+  if (reconciling) return;
+  reconciling = true;
+  try {
+    const live = new Map<string, Map<string, { name: string; sharing: boolean }>>();      // channelId -> userId -> info
+    const lkRooms = await rooms.listRooms();
+    await Promise.all(lkRooms.map(async (r) => {
+      const ps = await rooms.listParticipants(r.name).catch(() => []);
+      live.set(r.name, new Map(ps.map((p) => [p.identity, { name: p.name, sharing: p.tracks.some((t) => t.source === TrackSource.SCREEN_SHARE) }])));
+    }));
+
+    const changed = new Set<string>();
+    const now = Date.now();
+
+    // 1) who LiveKit has but we do not (or have in another channel)
+    const channelIds = [...live.keys()].filter((c) => live.get(c)!.size);
+    const known = channelIds.length ? await prisma.channel.findMany({ where: { id: { in: channelIds }, type: "VOICE" }, select: { id: true, serverId: true } }) : [];
+    const serverOf = new Map(known.map((c) => [c.id, c.serverId]));
+    const missing: { channelId: string; userId: string }[] = [];
+    for (const [channelId, people] of live) for (const userId of people.keys())
+      if (serverOf.has(channelId) && voiceOf.get(userId) !== channelId) missing.push({ channelId, userId });
+    if (missing.length) {
+      const users = await prisma.user.findMany({ where: { id: { in: missing.map((m) => m.userId) } }, ...lightUser });
+      const members = await prisma.member.findMany({ where: { OR: missing.map((m) => ({ userId: m.userId, serverId: serverOf.get(m.channelId)! })) } });
+      for (const m of missing) {
+        const u = users.find((x) => x.id === m.userId); const sid = serverOf.get(m.channelId)!;
+        const mem = members.find((x) => x.userId === m.userId && x.serverId === sid);
+        if (!u || !mem) continue;                                     // not a member of that server: never show them
+        const prev = voiceOf.get(m.userId);
+        if (prev && prev !== m.channelId) { leaveVoice(m.userId); }
+        let v = voice.get(m.channelId); if (!v) { v = { serverId: sid, users: new Map() }; voice.set(m.channelId, v); }
+        v.users.set(m.userId, { ...toUser(u), sharing: live.get(m.channelId)!.get(m.userId)!.sharing, muted: mem.muted });
+        voiceOf.set(m.userId, m.channelId); absent.delete(m.userId); changed.add(m.channelId);
+      }
+    }
+
+    // 2) who we list but LiveKit does not have (after a short grace, and only if it repeats)
+    for (const [channelId, v] of [...voice]) {
+      for (const [userId, u] of [...v.users]) {
+        const info = live.get(channelId)?.get(userId);
+        if (info) {
+          absent.delete(userId);
+          if (u.sharing !== info.sharing && now - (sharingAt.get(userId) ?? 0) > 10_000) { v.users.set(userId, { ...u, sharing: info.sharing }); changed.add(channelId); }
+          continue;
+        }
+        const grace = userId === forceUser ? 0 : 20_000;                  // right after "voice:join" the app is still connecting to LiveKit
+        if (now - (joinedAt.get(userId) ?? 0) < grace) continue;
+        const n = (absent.get(userId) ?? 0) + 1; absent.set(userId, n);
+        if (n >= (userId === forceUser ? 1 : 2)) { leaveVoice(userId); }
+      }
+    }
+    for (const channelId of changed) { const v = voice.get(channelId); if (v) io.to(`server:${v.serverId}`).emit("voice:state", voiceDTO(channelId)); }
+  } catch { /* LiveKit unreachable for a moment: keep what we have */ }
+  finally { reconciling = false; }
+}
+setInterval(() => { if (io.engine.clientsCount > 0) void reconcileVoice(); }, 5000).unref();
+
 io.use((socket, next) => {
   try {
     const payload: any = app.jwt.verify(String(socket.handshake.auth.token));
@@ -407,19 +473,24 @@ io.use((socket, next) => {
   } catch { next(new Error("unauthorized")); }
 });
 
-io.on("connection", async (socket) => {
+io.on("connection", (socket) => {
   const userId: string = socket.data.userId;
   socket.join(`user:${userId}`);
-  const memberships = await prisma.member.findMany({ where: { userId }, select: { serverId: true } });
-  const serverIds = new Set(memberships.map((m) => m.serverId));
-  serverIds.forEach((id) => socket.join(`server:${id}`));
-  socket.emit("voice:snapshot", [...voice.entries()].filter(([, v]) => serverIds.has(v.serverId)).map(([id]) => voiceDTO(id)));
-
   online.set(userId, (online.get(userId) ?? 0) + 1);
   io.emit("presence", { userId, online: true });
   socket.emit("presence:snapshot", [...online.keys()]);
 
+  // The app emits events (voice:join, channel:join...) the very instant it connects, so every handler below is registered
+  // RIGHT NOW. Only the database lookup of this user's servers is asynchronous; handlers that need it wait for `ready`.
+  const serverIds = new Set<string>();
+  const ready = (async () => {
+    const memberships = await prisma.member.findMany({ where: { userId }, select: { serverId: true } });
+    memberships.forEach((m) => { serverIds.add(m.serverId); socket.join(`server:${m.serverId}`); });
+    socket.emit("voice:snapshot", [...voice.entries()].filter(([, v]) => serverIds.has(v.serverId)).map(([id]) => voiceDTO(id)));
+  })().catch(() => {});
+
   socket.on("channel:join", async (channelId: string) => {
+    await ready;
     if (await memberOfChannel(userId, channelId)) socket.join(channelId);
   });
   socket.on("message:send", async (data: { channelId: string; content: string }, ack?: Function) => {
@@ -435,7 +506,13 @@ io.on("connection", async (socket) => {
     const m = await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId } } });
     if (m) { serverIds.add(serverId); socket.join(`server:${serverId}`); }
   });
+  // the app asks for the current voice rooms again (window focus / periodic): heals any push it may have missed
+  socket.on("voice:sync", async () => {
+    await ready;
+    socket.emit("voice:snapshot", [...voice.entries()].filter(([, v]) => serverIds.has(v.serverId)).map(([id]) => voiceDTO(id)));
+  });
   socket.on("voice:join", async (channelId: string) => {
+    await ready;
     const ch = await memberOfChannel(userId, channelId);
     if (!ch || ch.type !== "VOICE") return;
     const user = await prisma.user.findUnique({ where: { id: userId }, ...lightUser });
@@ -446,12 +523,14 @@ io.on("connection", async (socket) => {
     const member = await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId: ch.serverId } } });
     v.users.set(userId, { ...toUser(user), sharing: !!socket.data.sharing, muted: !!member?.muted });
     voiceOf.set(userId, channelId);
+    joinedAt.set(userId, Date.now()); absent.delete(userId);
     socket.data.voice = true;
     io.to(`server:${ch.serverId}`).emit("voice:state", voiceDTO(channelId));
   });
   socket.on("voice:leave", () => { socket.data.sharing = false; leaveVoice(userId); });
   socket.on("voice:sharing", (on: boolean) => {
     socket.data.sharing = !!on;   // remembered even if voice:join is still being processed (reconnect race)
+    sharingAt.set(userId, Date.now());
     const channelId = voiceOf.get(userId);
     const v = channelId ? voice.get(channelId) : undefined;
     const u = v?.users.get(userId);
@@ -464,7 +543,12 @@ io.on("connection", async (socket) => {
   });
   socket.on("disconnect", () => {
     const n = (online.get(userId) ?? 1) - 1;
-    if (n <= 0) { leaveVoice(userId); online.delete(userId); io.emit("presence", { userId, online: false }); }
+    if (n <= 0) {
+      online.delete(userId); io.emit("presence", { userId, online: false });
+      // do NOT drop them from the voice list now: the chat socket may just have blipped while the call is fine.
+      // LiveKit decides; the check is forced only if they did not already reconnect in the meantime.
+      setTimeout(() => void reconcileVoice((online.get(userId) ?? 0) === 0 ? userId : undefined), 2500);
+    }
     else online.set(userId, n);
   });
 });
