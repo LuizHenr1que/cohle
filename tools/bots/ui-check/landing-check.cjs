@@ -14,7 +14,7 @@ async function page(ua) {
   const win = new BrowserWindow({ width: 1280, height: 800, show: true, focusable: false, x: 20, y: 20, webPreferences: { backgroundThrottling: false } });
   if (ua) win.webContents.setUserAgent(ua);
   const run = (c) => win.webContents.executeJavaScript(c, true);
-  for (let i = 0; i < 4; i++) { try { await win.loadURL("http://localhost:5174/"); break; } catch (e) { await sleep(700); } }
+  for (let i = 0; i < 4; i++) { try { await win.loadURL((process.env.BASE ?? "http://localhost:5174/")); break; } catch (e) { await sleep(700); } }
   await sleep(1800);
   return { win, run };
 }
@@ -32,8 +32,9 @@ app.whenReady().then(async () => {
   const { win, run } = await page(UAS.mac);
   ok('UA mac: "Baixar para macOS" + instalador Apple Silicon/Intel destacado', (await run(`document.querySelector('.hero [data-dl-primary] [data-dl-label]').textContent`)) === "Baixar para macOS" && /^mac-/.test(await run(`document.querySelector('.dl.me')?.dataset.os ?? ''`)));
   ok("3 botões de download (mac arm64, mac intel, windows)", (await run(`document.querySelectorAll('.dl [data-dl]').length`)) === 3);
-  await run(`document.querySelector('.hero [data-dl-primary]').click()`); await sleep(500);
-  ok("sem instaladores publicados: clique mostra aviso e não quebra", await run(`document.getElementById('toast').classList.contains('show')`));
+  const hrefs = await run(`[...document.querySelectorAll('.dl [data-dl]')].map(a=>a.getAttribute('href'))`);
+  ok("botões apontam para a Release pública (latest/download)", hrefs.length === 3 && hrefs.every((h) => /^https:\/\/github\.com\/LuizHenr1que\/cohle-releases\/releases\/latest\/download\/Cohle-(mac-arm64\.dmg|mac-x64\.dmg|win-x64\.zip)$/.test(h)), hrefs.map((h) => h.split("/").pop()).join(", "));
+  ok("botão principal leva ao instalador do sistema detectado", /Cohle-mac-(arm64|x64)\.dmg$/.test(await run(`document.querySelector('.hero [data-dl-primary]').getAttribute('href')`)));
 
   // ---- 3D card ----
   const tf = await run(`getComputedStyle(document.getElementById('tilt')).transform`);

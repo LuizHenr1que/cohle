@@ -3,9 +3,9 @@
 
 /* ---------- config: flip `live` once the installers are published ---------- */
 const DOWNLOADS = {
-  live: false,                                   // true => buttons start the real download
-  base: "",                                      // e.g. "https://github.com/<user>/<repo>/releases/latest/download/"
-  files: { "mac-arm64": "Cohle-0.1.0-mac-arm64.dmg", "mac-x64": "Cohle-0.1.0-mac-x64.dmg", "win-x64": "Cohle-0.1.0-win-x64.zip" },
+  live: true,                                    // installers are published as a public GitHub Release
+  base: "https://github.com/LuizHenr1que/cohle-releases/releases/latest/download/",
+  files: { "mac-arm64": "Cohle-mac-arm64.dmg", "mac-x64": "Cohle-mac-x64.dmg", "win-x64": "Cohle-win-x64.zip" },   // stable names: /latest/ always resolves
 };
 const OS_NAME = { "mac-arm64": "macOS", "mac-x64": "macOS (Intel)", "win-x64": "Windows" };
 

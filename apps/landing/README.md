@@ -12,19 +12,16 @@ pnpm dev:landing        # http://localhost:5174
 2. **Root Directory:** `apps/landing`. **Framework Preset:** `Other`. Deixe **Build Command** e **Output Directory** vazios.
 3. Deploy. O `vercel.json` já define os cabeçalhos de segurança e de cache.
 
-## Ligar os botões de download
-Hoje os botões mostram um aviso ("em breve"), porque os instaladores ainda não têm um endereço público. Quando publicá-los, edite o topo de `app.js`:
+## Download dos instaladores
+Os botões apontam para a Release pública do repositório **LuizHenr1que/cohle-releases** (o código do Cohle continua privado). Os nomes dos arquivos não levam a versão, então `releases/latest/download/` sempre entrega a versão mais nova.
 
-```js
-const DOWNLOADS = {
-  live: true,
-  base: "https://github.com/SEU-USUARIO/cohle-releases/releases/latest/download/",
-  files: { "mac-arm64": "Cohle-0.1.0-mac-arm64.dmg", "mac-x64": "Cohle-0.1.0-mac-x64.dmg", "win-x64": "Cohle-0.1.0-win-x64.zip" },
-};
+Para lançar uma nova versão:
+```sh
+VITE_API_URL=https://cohle-api.onrender.com pnpm --filter @cohle/desktop dist:mac:prod -- --config.directories.output=release-x
+VITE_API_URL=https://cohle-api.onrender.com pnpm --filter @cohle/desktop dist:win:prod -- --config.directories.output=release-x
+gh release create v0.2.0 apps/desktop/release-x/Cohle-*.dmg apps/desktop/release-x/Cohle-*.zip --repo LuizHenr1que/cohle-releases --latest
 ```
-Este repositório é **privado**, então os arquivos precisam ficar em outro lugar público (por exemplo, um repositório só de releases no GitHub, ou um bucket). Os instaladores têm de 97 a 107 MB, perto do limite de arquivo da Vercel, por isso não os coloque na pasta do site.
-
-O botão principal já reconhece o sistema de quem visita (macOS, Windows, celular) e destaca o instalador certo.
+O botão principal já reconhece o sistema de quem visita (macOS, Windows, celular) e destaca o instalador certo. Se mudar o nome dos arquivos, ajuste `DOWNLOADS` no topo de `app.js`. Os .dmg saem com assinatura ad-hoc válida (passo `build/adhoc-sign.cjs`), o que evita o aviso de "app danificado".
 
 ## Regenerar as imagens
 ```sh

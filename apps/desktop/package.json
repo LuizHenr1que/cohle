@@ -47,7 +47,8 @@
       "output": "release",
       "buildResources": "build"
     },
-    "artifactName": "Cohle-${version}-${os}-${arch}.${ext}"
+    "artifactName": "Cohle-${os}-${arch}.${ext}",
+    "afterPack": "build/adhoc-sign.cjs"
   },
   "description": "Cohle - chat, voz e compartilhamento de tela",
   "author": "Cohle"
