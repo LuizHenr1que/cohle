@@ -4,12 +4,15 @@ import { Crown, ScreenShare, Volume2, MicOff, HeadphoneOff, MessageCircle } from
 import type { UserDTO } from "@cohle/shared";
 import { Avatar } from "./Avatar";
 import type { VoiceApi } from "./VoiceRoom";
+import { PersonPanel, panelAt, saveVol, loadVols, DEFAULT_VOL, type Moderation, type PanelPos, type Vol } from "./PersonPanel";
 
 /** A person in a voice channel on the sidebar: hover shows a quick card (with a tiny live preview when they are sharing), click goes to their live. */
-export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking, getApi, onClick, onMessage }: {
+export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking, getApi, onClick, onMessage, mod }: {
   user: UserDTO; isSelf: boolean; isOwner: boolean; channelName: string; inCall: boolean; speaking: boolean;
-  getApi: () => VoiceApi | null; onClick: () => void; onMessage?: () => void;
+  getApi: () => VoiceApi | null; onClick: () => void; onMessage?: () => void; mod?: Moderation;
 }) {
+  const [ctx, setCtx] = useState<PanelPos>();
+  const [vol, setVolState] = useState<Vol>(DEFAULT_VOL);
   const row = useRef<HTMLDivElement>(null);
   const [rect, setRect] = useState<DOMRect>();
   const timer = useRef<number>();
@@ -32,7 +35,8 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
   const top = rect ? Math.max(8, Math.min(rect.top - 8, window.innerHeight - (live ? 280 : 150))) : 0;
 
   return (
-    <div ref={row} onMouseEnter={show} onMouseLeave={hide} onClick={() => { hide(); onClick(); }}
+    <div ref={row} onContextMenu={(e) => { if (isSelf) return; e.preventDefault(); hide(); setVolState(loadVols()[user.id] ?? DEFAULT_VOL); setCtx(panelAt(e.clientX, e.clientY)); }}
+      onMouseEnter={show} onMouseLeave={hide} onClick={() => { hide(); onClick(); }}
       className="group flex items-center gap-2 pl-9 pr-2 py-1 text-xs text-muted rounded-lg cursor-pointer hover:bg-white/5 hover:text-ink">
       <Avatar user={user} size={20} speaking={speaking} />
       <span className="truncate">{isSelf ? `${user.username} (você)` : user.username}</span>
@@ -44,6 +48,9 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
           <ScreenShare size={10} /> AO VIVO
         </span>
       )}
+      {ctx && <PersonPanel name={user.username} vol={vol} sharing={live && inCall} mod={mod} pos={ctx} onClose={() => setCtx(undefined)}
+        onVol={(patch) => { setVolState((v) => ({ ...v, ...patch })); if (inCall) getApi()?.setVol(user.id, patch); else saveVol(user.id, patch); }}
+        onExpand={live || inCall ? onClick : undefined} expandLabel={live ? "Assistir ao vivo" : "Ir para a chamada"} onMessage={onMessage} />}
       {rect && createPortal(
         <div style={{ left, top, width: W }} className="fixed z-[80] pointer-events-none rounded-2xl border border-line bg-surface-2/95 shadow-2xl p-3 text-ink">
           <div className="flex items-center gap-3">

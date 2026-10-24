@@ -15,6 +15,7 @@ import { sounds } from "../sounds";
 import { CameraConfirm } from "./CameraConfirm";
 import { friendlyMediaError } from "../lib/mediaErrors";
 import { Soundboard } from "./Soundboard";
+import { PersonPanel, panelAt, Slider, DEFAULT_VOL, loadVols, VOL_KEY, type Vol, type Moderation, type PanelPos } from "./PersonPanel";
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
 import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
@@ -25,103 +26,38 @@ export type VoiceApi = {
   watch: (userId: string) => void;                                       // switch to this person's live (replaces any other one)
   watching: () => string | undefined;
   preview: (userId: string, el: HTMLVideoElement) => (() => void) | null;  // tiny live preview; returns the cleanup
+  setVol: (userId: string, patch: Partial<Vol>) => void;                   // volume / mute-for-me, applied live and saved
 };
-// Per-person listening settings (only affect me). v/s: 0..2 = 0%..200%; m: muted for me.
-type Vol = { v: number; s: number; m: boolean };
-const DEFAULT_VOL: Vol = { v: 1, s: 1, m: false };
-const VOL_KEY = "cohle:volumes";
-const loadVols = (): Record<string, Vol> => { try { return JSON.parse(localStorage.getItem(VOL_KEY) ?? "{}"); } catch { return {}; } };
-
-type Moderation = { muted: boolean; toggleMute: () => void; disconnect: () => void; kick: () => void; ban: () => void };
-
-function Slider({ label, value, onChange, compact }: { label: string; value: number; onChange: (v: number) => void; compact?: boolean }) {
-  return (
-    <label className={compact ? "flex items-center gap-2" : "block space-y-1"}>
-      <span className={`flex justify-between text-xs text-muted ${compact ? "gap-2" : ""}`}><span>{label}</span><span className="tabular-nums">{Math.round(value * 100)}%</span></span>
-      <input type="range" min={0} max={200} step={5} value={Math.round(value * 100)} onChange={(e) => onChange(Number(e.target.value) / 100)}
-        className={`accent-[#ff3b5c] ${compact ? "w-28 sm:w-40" : "w-full"}`} />
-    </label>
-  );
-}
-
-// Listening controls for one remote person + (for the server owner) moderation actions.
-// Rendered in a portal with fixed positioning so tiles/scroll areas can never clip it.
-function PersonMenu({ name, vol, onVol, sharing, mod }: { name: string; vol: Vol; onVol: (patch: Partial<Vol>) => void; sharing: boolean; mod?: Moderation }) {
-  const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState<string>();
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 256 });
+function PersonMenu({ name, vol, onVol, sharing, mod, onExpand, onMessage }: { name: string; vol: Vol; onVol: (patch: Partial<Vol>) => void; sharing: boolean; mod?: Moderation; onExpand?: () => void; onMessage?: () => void }) {
+  const [pos, setPos] = useState<PanelPos>();
   const btn = useRef<HTMLButtonElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
   const silent = vol.m || vol.v === 0;
-
-  const toggle = () => {
-    if (!open && btn.current) {
-      const r = btn.current.getBoundingClientRect();
-      const width = Math.min(256, window.innerWidth - 16);
-      setPos({
-        width,
-        left: Math.max(8, Math.min(r.right - width, window.innerWidth - width - 8)),
-        top: Math.max(8, Math.min(r.bottom + 8, window.innerHeight - 380)),
-      });
-    }
-    setConfirm(undefined); setOpen((o) => !o);
-  };
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => { if (!pop.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    const close = () => setOpen(false);
-    document.addEventListener("mousedown", away); window.addEventListener("keydown", esc); window.addEventListener("resize", close);
-    return () => { document.removeEventListener("mousedown", away); window.removeEventListener("keydown", esc); window.removeEventListener("resize", close); };
-  }, [open]);
-
-  const act = (key: string, label: string, Icon: typeof Ban, run: () => void, danger = true) => (
-    <button key={key} onClick={() => (confirm === key ? (run(), setConfirm(undefined), setOpen(false)) : setConfirm(key))}
-      className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-left transition ${confirm === key ? "bg-red-600 text-white" : danger ? "text-red-300 hover:bg-red-500/15" : "hover:bg-white/10"}`}>
-      <Icon size={14} /> {confirm === key ? `Confirmar: ${label}` : label}
-    </button>
-  );
+  const toggle = () => { if (pos) return setPos(undefined); const r = btn.current?.getBoundingClientRect(); if (r) setPos(panelAt(r.right, r.bottom + 8, true)); };
   return (
     <div onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
-      <button ref={btn} onClick={toggle} className="bg-black/50 hover:bg-black/70 rounded-full p-1.5 @sm:p-2" title="Volume e opções">
+      <button ref={btn} onClick={toggle} className="bg-black/50 hover:bg-black/70 rounded-full p-1.5 @sm:p-2" title="Volume e opções (ou clique com o botão direito)">
         {silent ? <VolumeX size={14} className="text-accent" /> : <Volume2 size={14} />}
       </button>
-      {open && createPortal(
-        <div ref={pop} style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-          className="z-[60] max-h-[min(70vh,430px)] overflow-y-auto rounded-2xl bg-surface border border-line shadow-2xl p-3 space-y-3 text-sm">
-          <div className="font-medium truncate">{name}</div>
-          <label className="flex items-center gap-2 text-xs text-muted cursor-pointer">
-            <input type="checkbox" checked={vol.m} onChange={(e) => onVol({ m: e.target.checked })} className="accent-[#ff3b5c]" /> Mutar para mim
-          </label>
-          <Slider label="Volume da voz" value={vol.v} onChange={(v) => onVol({ v })} />
-          {sharing && <Slider label="Volume do ao vivo" value={vol.s} onChange={(s) => onVol({ s })} />}
-          {mod && (
-            <div className="pt-2 border-t border-line space-y-1">
-              <p className="text-[10px] uppercase tracking-widest text-muted flex items-center gap-1"><ShieldAlert size={11} /> Ações do dono</p>
-              {act("mute", mod.muted ? "Liberar o microfone" : "Silenciar para todos", mod.muted ? Mic : MicOff, mod.toggleMute, false)}
-              {act("dc", "Desconectar da chamada", PhoneMissed, mod.disconnect)}
-              {act("kick", "Expulsar do servidor", UserX, mod.kick)}
-              {act("ban", "Banir do servidor", Ban, mod.ban)}
-            </div>
-          )}
-        </div>, document.body)}
+      {pos && <PersonPanel name={name} vol={vol} onVol={onVol} sharing={sharing} mod={mod} pos={pos} onClose={() => setPos(undefined)} onExpand={onExpand} onMessage={onMessage} ignore={btn} />}
     </div>
   );
 }
 
 // One participant. Sizes come from the tile itself (container queries), so it adapts in a 1-person view,
 // a 12-person grid or the small strip next to a stage.
-function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMuted, onWatch, onOpen, preview, onTogglePreview }: {
+function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMuted, onWatch, onOpen, onMessage, preview, onTogglePreview }: {
   p: Participant; user: UserLike; speaking: boolean; watching: boolean; compact?: boolean; preview: boolean; onTogglePreview: () => void;
   vol: Vol; onVol: (patch: Partial<Vol>) => void; mod?: Moderation; serverMuted: boolean;
-  onWatch: () => void; onOpen: () => void;
+  onWatch: () => void; onOpen: () => void; onMessage?: () => void;
 }) {
+  const [ctx, setCtx] = useState<PanelPos>();
   const ref = useRef<HTMLVideoElement>(null);
   const sharing = p.isScreenShareEnabled;
   // Remote screen: only while I am watching it. My own screen: a preview, so I can see that it is really being shared.
   const showScreen = p.isLocal ? preview : watching;
   const screenTrack = showScreen ? p.getTrackPublication(Track.Source.ScreenShare)?.track : undefined;
-  const camTrack = p.getTrackPublication(Track.Source.Camera)?.track;
+  const camPub = p.getTrackPublication(Track.Source.Camera);
+  const camTrack = camPub && !camPub.isMuted ? camPub.track : undefined;      // a switched-off camera keeps its (muted) track: showing it would be a black frame
   const track = screenTrack ?? camTrack;
 
   // Attach only when the actual track changes (not on every render).
@@ -136,7 +72,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
   const avatarSize = compact ? "clamp(26px, 38cqmin, 44px)" : unwatched ? "clamp(34px, 24cqmin, 96px)" : "clamp(40px, 34cqmin, 120px)";
 
   return (
-    <div onClick={compact && unwatched ? onWatch : undefined} className={`@container relative rounded-2xl @sm:rounded-3xl bg-surface-2 border border-line w-full h-full min-h-0 select-none ${compact && unwatched ? "cursor-pointer hover:border-accent/60" : ""} ${speaking ? "speaking" : ""}`}>
+    <div onClick={(e) => { if (!e.currentTarget.contains(e.target as Node) || (e.target as HTMLElement).closest("button,input,select,a")) return; if (compact && unwatched) onWatch(); else onOpen(); }} onContextMenu={(e) => { if (p.isLocal) return; e.preventDefault(); setCtx(panelAt(e.clientX, e.clientY)); }} title="Clique para ampliar · botão direito: volume e opções" className={`@container relative rounded-2xl @sm:rounded-3xl bg-surface-2 border border-line w-full h-full min-h-0 select-none cursor-pointer hover:border-accent/60 ${speaking ? "speaking" : ""}`}>
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         <video ref={ref} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-contain bg-black/40 ${track ? "" : "hidden"}`} />
       </div>
@@ -168,7 +104,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
 
       {!compact && (
         <div className="absolute top-2 right-2 @sm:top-3 @sm:right-3 flex gap-1.5 items-start">
-          {!p.isLocal && <PersonMenu name={user.username} vol={vol} onVol={onVol} sharing={sharing} mod={mod} />}
+          {!p.isLocal && <PersonMenu name={user.username} vol={vol} onVol={onVol} sharing={sharing} mod={mod} onExpand={onOpen} onMessage={onMessage} />}
           {p.isLocal && sharing && (
             <button onClick={onTogglePreview} className="bg-black/50 hover:bg-black/70 rounded-full p-1.5 @sm:p-2" title={preview ? "Esconder a prévia da minha tela" : "Mostrar a prévia da minha tela"}>
               {preview ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -189,17 +125,21 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
             : !p.isMicrophoneEnabled && <span title="Microfone desativado" className="shrink-0 bg-black/55 rounded-full p-1"><MicOff size={13} className="text-accent" /></span>}
         <span className="flex-1" />
       </div>
+      {ctx && <PersonPanel name={user.username} vol={vol} onVol={onVol} sharing={sharing} mod={mod} pos={ctx} onClose={() => setCtx(undefined)} onExpand={compact ? undefined : onOpen} onMessage={onMessage} />}
     </div>
   );
 }
 
 // The watched live stream: big picture + its own control bar (so nothing is drawn over the video).
-function Stage({ p, user, vol, onVol, speaking, stageRef, onStop }: {
+function Stage({ p, user, vol, onVol, speaking, stageRef, onStop, isScreen, mod, onMessage }: {
   p: Participant; user: UserLike; vol: Vol; onVol: (patch: Partial<Vol>) => void; speaking: boolean;
-  stageRef: React.RefObject<HTMLDivElement>; onStop: () => void;
+  stageRef: React.RefObject<HTMLDivElement>; onStop: () => void; isScreen: boolean; mod?: Moderation; onMessage?: () => void;
 }) {
+  const [ctx, setCtx] = useState<PanelPos>();
   const ref = useRef<HTMLVideoElement>(null);
-  const track = p.getTrackPublication(Track.Source.ScreenShare)?.track;
+  // expanded person: their watched live, else their camera (only while it is really on), else a big avatar
+  const camPub = p.getTrackPublication(Track.Source.Camera);
+  const track = isScreen ? p.getTrackPublication(Track.Source.ScreenShare)?.track : camPub && !camPub.isMuted ? camPub.track : undefined;
   useEffect(() => {
     const el = ref.current;
     if (!el || !track) return;
@@ -216,26 +156,29 @@ function Stage({ p, user, vol, onVol, speaking, stageRef, onStop }: {
   const toggleFs = () => { const el = stageRef.current; if (!el) return; document.fullscreenElement ? void document.exitFullscreen() : el.requestFullscreen().catch(() => {}); };
 
   return (
-    <div ref={stageRef} className={`flex-1 min-h-0 min-w-0 flex flex-col rounded-2xl sm:rounded-3xl bg-bg border border-line overflow-hidden ${speaking ? "speaking" : ""}`}>
+    <div ref={stageRef} onContextMenu={(e) => { if (p.isLocal) return; e.preventDefault(); setCtx(panelAt(e.clientX, e.clientY)); }} className={`flex-1 min-h-0 min-w-0 flex flex-col rounded-2xl sm:rounded-3xl bg-bg border border-line overflow-hidden ${speaking ? "speaking" : ""}`}>
       <div className="relative flex-1 min-h-0 bg-black" onDoubleClick={toggleFs}>
-        <video ref={ref} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain" />
-        {!track && <div className="absolute inset-0 grid place-items-center text-sm text-muted">Carregando transmissão…</div>}
-        <span className="absolute top-3 left-3 flex items-center gap-1.5 bg-accent px-2.5 py-1 rounded-full text-[11px] font-semibold shadow-[0_0_16px_rgba(255,59,92,0.6)]"><ScreenShare size={13} /> AO VIVO</span>
+        <video ref={ref} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-contain ${track ? "" : "hidden"}`} />
+        {!track && (isScreen
+          ? <div className="absolute inset-0 grid place-items-center text-sm text-muted">Carregando transmissão…</div>
+          : <div className="absolute inset-0 grid place-items-center"><Avatar user={user} size="clamp(80px, 30cqmin, 220px)" speaking={speaking} /></div>)}
+        {isScreen && <span className="absolute top-3 left-3 flex items-center gap-1.5 bg-accent px-2.5 py-1 rounded-full text-[11px] font-semibold shadow-[0_0_16px_rgba(255,59,92,0.6)]"><ScreenShare size={13} /> AO VIVO</span>}
       </div>
       <div className="shrink-0 flex flex-wrap items-center gap-x-4 gap-y-2 px-3 sm:px-4 py-2 bg-surface border-t border-line">
         <div className="flex items-center gap-2 min-w-0 flex-1 basis-32">
           <Avatar user={user} size={26} />
           <span className="truncate text-sm font-medium">{user.username}</span>
         </div>
-        <div className="flex items-center gap-2">
+        {!p.isLocal && <div className="flex items-center gap-2">
           {vol.m || vol.s === 0 ? <VolumeX size={16} className="text-accent shrink-0" /> : <Volume2 size={16} className="text-muted shrink-0" />}
           <Slider compact label="Som" value={vol.m ? 0 : vol.s} onChange={(s) => onVol({ s, m: false })} />
-        </div>
+        </div>}
         <div className="flex items-center gap-2">
           <button onClick={toggleFs} className="bg-white/10 hover:bg-white/15 rounded-full p-2" title={fs ? "Sair da tela cheia" : "Tela cheia"}>{fs ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
-          <button onClick={onStop} className="bg-white/10 hover:bg-red-500/30 rounded-full p-2" title="Parar de assistir"><X size={16} /></button>
+          <button onClick={onStop} className="bg-white/10 hover:bg-red-500/30 rounded-full p-2" title={isScreen ? "Parar de assistir" : "Voltar à grade"}><X size={16} /></button>
         </div>
       </div>
+      {ctx && <PersonPanel name={user.username} vol={vol} onVol={onVol} sharing={p.isScreenShareEnabled} mod={mod} pos={ctx} onClose={() => setCtx(undefined)} onMessage={onMessage} />}
     </div>
   );
 }
@@ -244,10 +187,10 @@ type Status = "connecting" | "connected" | "error";
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const GAP = 12;
 
-export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia, onSound }: {
+export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia, onSound, onMessage }: {
   channel: ChannelDTO; users: UserDTO[]; serverId: string; isOwner: boolean;
   chat?: React.ReactNode; chatOpen?: boolean; unread?: number; onToggleChat?: () => void; channelName?: string;
-  onApi?: (api: VoiceApi | null) => void; autoWatch?: string; onAutoWatched?: () => void; onMedia?: (micOff: boolean, deaf: boolean) => void; onSound?: (id: string) => void;
+  onApi?: (api: VoiceApi | null) => void; autoWatch?: string; onAutoWatched?: () => void; onMedia?: (micOff: boolean, deaf: boolean) => void; onSound?: (id: string) => void; onMessage?: (userId: string) => void;
   onLeave: () => void; onSpeakers: (ids: string[]) => void; onSharing: (on: boolean) => void; onMenu?: () => void;
 }) {
   const roomRef = useRef<Room>();
@@ -390,7 +333,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     if (!room) return;
     const gone = [...watching].filter((id) => !room.remoteParticipants.get(id)?.isScreenShareEnabled);
     if (gone.length) setWatching((w) => { const n = new Set(w); gone.forEach((id) => n.delete(id)); return n; });
-    if (focusId && !room.remoteParticipants.get(focusId)?.isScreenShareEnabled) setFocusId(undefined);
+    if (focusId && focusId !== room.localParticipant.identity && !room.remoteParticipants.get(focusId)) setFocusId(undefined);   // they left
   });
 
   // Watching is exclusive: clicking another live switches to it at once and lets go of the previous one (saves bandwidth too).
@@ -398,6 +341,11 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     const n = new Set([id]);
     watchRef.current = n; setWatching(n);
     applyAll();
+    setFocusId(id);
+  }
+  // Expand anybody (camera or avatar); a different person than the watched live lets that stream go.
+  function expand(id: string) {
+    if (!watchRef.current.has(id) && watchRef.current.size) { watchRef.current = new Set(); setWatching(new Set()); applyAll(); }
     setFocusId(id);
   }
   function stopWatch(id: string) {
@@ -412,6 +360,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     onApi({
       watch: (id) => watch(id),
       watching: () => [...watchRef.current][0],
+      setVol: (id, patch) => setVol(id, patch),
       preview: (id, el) => {
         const p = roomRef.current?.remoteParticipants.get(id);
         if (!p || !p.isScreenShareEnabled) return null;
@@ -554,7 +503,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
       watching={watching.has(p.identity)} vol={vols[p.identity] ?? DEFAULT_VOL} onVol={(patch) => setVol(p.identity, patch)}
       mod={moderation(p)} serverMuted={mutedByOwner(p.identity)}
       preview={preview} onTogglePreview={togglePreview}
-      onWatch={() => watch(p.identity)} onOpen={() => setFocusId(p.identity)} />
+      onWatch={() => watch(p.identity)} onOpen={() => expand(p.identity)} onMessage={onMessage ? () => onMessage(p.identity) : undefined} />
   );
 
   const focused = focusId ? parts.find((p) => p.identity === focusId) : undefined;
@@ -590,7 +539,9 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
           {focused ? (
             <div className={`flex-1 min-h-0 min-w-0 flex gap-2 sm:gap-3 ${sideStrip ? "flex-row" : "flex-col"}`}>
               <Stage p={focused} user={userOf(focused)} vol={vols[focused.identity] ?? DEFAULT_VOL} onVol={(patch) => setVol(focused.identity, patch)}
-                speaking={speakers.includes(focused.identity)} stageRef={stageRef} onStop={() => stopWatch(focused.identity)} />
+                speaking={speakers.includes(focused.identity)} stageRef={stageRef} isScreen={watching.has(focused.identity) && focused.isScreenShareEnabled}
+                mod={moderation(focused)} onMessage={onMessage ? () => onMessage(focused.identity) : undefined}
+                onStop={() => (watching.has(focused.identity) ? stopWatch(focused.identity) : setFocusId(undefined))} />
               {others.length > 0 && (
                 <div className={sideStrip ? "w-44 shrink-0 flex flex-col gap-2 overflow-y-auto no-scrollbar p-1" : "h-[6.5rem] sm:h-[7.5rem] shrink-0 flex gap-2 overflow-x-auto no-scrollbar p-1"}>
                   {others.map((p) => <div key={p.identity} className={sideStrip ? "w-full aspect-video shrink-0" : "h-full aspect-video shrink-0"}>{tile(p, true)}</div>)}

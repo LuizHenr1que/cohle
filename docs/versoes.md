@@ -25,3 +25,4 @@ Histórico:
 - **Versão de teste 9:** botão de sons da sala com nome e destaque na barra da chamada.
 - **Versão de teste 10:** botão de sons volta a ser só o ícone na barra da chamada.
 - **Versão de teste 11:** câmera com prévia antes de ligar e mensagens de erro claras em português (câmera, microfone e tela).
+- **Versão de teste 12:** clique na pessoa amplia (câmera, avatar ou transmissão), botão direito na sala e na lista com volume, mutar só para mim, mensagem e ações do dono; corrigida a tela preta ao desligar a câmera.
