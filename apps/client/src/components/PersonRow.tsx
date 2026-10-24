@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Crown, ScreenShare, Volume2, MicOff, HeadphoneOff } from "lucide-react";
+import { Crown, ScreenShare, Volume2, MicOff, HeadphoneOff, MessageCircle } from "lucide-react";
 import type { UserDTO } from "@cohle/shared";
 import { Avatar } from "./Avatar";
 import type { VoiceApi } from "./VoiceRoom";
 
 /** A person in a voice channel on the sidebar: hover shows a quick card (with a tiny live preview when they are sharing), click goes to their live. */
-export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking, getApi, onClick }: {
+export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking, getApi, onClick, onMessage }: {
   user: UserDTO; isSelf: boolean; isOwner: boolean; channelName: string; inCall: boolean; speaking: boolean;
-  getApi: () => VoiceApi | null; onClick: () => void;
+  getApi: () => VoiceApi | null; onClick: () => void; onMessage?: () => void;
 }) {
   const row = useRef<HTMLDivElement>(null);
   const [rect, setRect] = useState<DOMRect>();
@@ -33,10 +33,12 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
 
   return (
     <div ref={row} onMouseEnter={show} onMouseLeave={hide} onClick={() => { hide(); onClick(); }}
-      className="flex items-center gap-2 pl-9 pr-2 py-1 text-xs text-muted rounded-lg cursor-pointer hover:bg-white/5 hover:text-ink">
+      className="group flex items-center gap-2 pl-9 pr-2 py-1 text-xs text-muted rounded-lg cursor-pointer hover:bg-white/5 hover:text-ink">
       <Avatar user={user} size={20} speaking={speaking} />
       <span className="truncate">{isSelf ? `${user.username} (você)` : user.username}</span>
       {user.deaf ? <HeadphoneOff size={12} className="shrink-0 text-accent" aria-label="Áudio desativado" /> : (user.micOff || user.muted) && <MicOff size={12} className="shrink-0 text-accent" aria-label="Microfone desativado" />}
+      {onMessage && !isSelf && <button onClick={(e) => { e.stopPropagation(); hide(); onMessage(); }} title="Enviar mensagem" aria-label="Enviar mensagem"
+        className={`${live ? "" : "ml-auto"} shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition`}><MessageCircle size={13} /></button>}
       {live && (
         <span title="Compartilhando a tela" className="ml-auto flex items-center gap-1 bg-accent text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
           <ScreenShare size={10} /> AO VIVO

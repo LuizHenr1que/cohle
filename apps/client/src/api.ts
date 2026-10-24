@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -78,6 +78,11 @@ export const api = {
   createChannel: (serverId: string, name: string, type: "TEXT" | "VOICE") =>
     req(`/servers/${serverId}/channels`, "POST", { name, type }),
   messages: (channelId: string) => req<MessageDTO[]>(`/channels/${channelId}/messages`),
+  dms: () => req<DmConversationDTO[]>("/dms"),
+  dmPeople: () => req<UserDTO[]>("/dms/people"),
+  dmMessages: (peerId: string, before?: string) =>
+    req<{ messages: DirectMessageDTO[]; more: boolean }>(`/dms/${peerId}/messages${before ? `?before=${before}` : ""}`),
+  dmRead: (peerId: string) => req(`/dms/${peerId}/read`, "POST"),
   voiceToken: (channelId: string) => req<{ token: string; url: string }>(`/channels/${channelId}/voice-token`, "POST"),
 };
 

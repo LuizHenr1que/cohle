@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Crown, Hash, Volume2, Trash2, RefreshCw, Copy, Check, LogOut, UserMinus, Plus, MicOff, Mic, Ban, Undo2 } from "lucide-react";
-import type { ServerDTO, MemberDTO, BanDTO } from "@cohle/shared";
+import { Crown, Hash, Volume2, Trash2, RefreshCw, Copy, Check, LogOut, UserMinus, Plus, MicOff, Mic, Ban, Undo2, MessageCircle } from "lucide-react";
+import type { ServerDTO, MemberDTO, BanDTO, UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { Modal, inputCls, primaryCls, ghostCls } from "./Modal";
 import { IconPicker } from "./IconPicker";
@@ -8,8 +8,8 @@ import { Avatar } from "./Avatar";
 
 type Tab = "general" | "channels" | "members" | "bans";
 
-export function ServerSettings({ server, selfId, online, rev, onClose, onAddChannel }: {
-  server: ServerDTO; selfId: string; online: Set<string>; rev: number; onClose: () => void; onAddChannel: (t: "TEXT" | "VOICE") => void;
+export function ServerSettings({ server, selfId, online, rev, onClose, onAddChannel, onMessage }: {
+  server: ServerDTO; selfId: string; online: Set<string>; rev: number; onClose: () => void; onAddChannel: (t: "TEXT" | "VOICE") => void; onMessage?: (u: UserDTO) => void;
 }) {
   const owner = server.ownerId === selfId;
   const [tab, setTab] = useState<Tab>(owner ? "general" : "members");
@@ -133,6 +133,7 @@ export function ServerSettings({ server, selfId, online, rev, onClose, onAddChan
                 <div className="relative"><Avatar user={m.user} size={34} />
                   <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(m.user.id) ? "bg-emerald-400" : "bg-muted"}`} /></div>
                 <span className="flex-1 truncate">{m.user.username}{m.user.id === selfId && <span className="text-muted text-xs"> (você)</span>}</span>
+                {m.user.id !== selfId && onMessage && <button className="text-muted hover:text-accent" title="Enviar mensagem" onClick={() => { onClose(); onMessage(m.user); }}><MessageCircle size={16} /></button>}
                 {m.role === "OWNER" && <span className="text-xs text-accent2 inline-flex items-center gap-1"><Crown size={13} /> Dono</span>}
                 {owner && m.user.id !== selfId && (<>
                   <button className={m.muted ? "text-accent" : "text-muted hover:text-ink"} title={m.muted ? "Liberar o microfone" : "Silenciar nas chamadas"}

@@ -12,6 +12,8 @@ import type { ChannelDTO, UserDTO } from "@cohle/shared";
 import { api, assetUrl } from "../api";
 import { Avatar } from "./Avatar";
 import { sounds } from "../sounds";
+import { CameraConfirm } from "./CameraConfirm";
+import { Soundboard } from "./Soundboard";
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
 import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
@@ -241,10 +243,10 @@ type Status = "connecting" | "connected" | "error";
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const GAP = 12;
 
-export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia }: {
+export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia, onSound }: {
   channel: ChannelDTO; users: UserDTO[]; serverId: string; isOwner: boolean;
   chat?: React.ReactNode; chatOpen?: boolean; unread?: number; onToggleChat?: () => void; channelName?: string;
-  onApi?: (api: VoiceApi | null) => void; autoWatch?: string; onAutoWatched?: () => void; onMedia?: (micOff: boolean, deaf: boolean) => void;
+  onApi?: (api: VoiceApi | null) => void; autoWatch?: string; onAutoWatched?: () => void; onMedia?: (micOff: boolean, deaf: boolean) => void; onSound?: (id: string) => void;
   onLeave: () => void; onSpeakers: (ids: string[]) => void; onSharing: (on: boolean) => void; onMenu?: () => void;
 }) {
   const roomRef = useRef<Room>();
@@ -256,6 +258,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   const [status, setStatus] = useState<Status>("connecting");
   const [err, setErr] = useState("");
   const [picking, setPicking] = useState(false);
+  const [askCam, setAskCam] = useState(false);              // confirm before the webcam turns on
   const [deafened, setDeafened] = useState(false);
   const [watching, setWatching] = useState<Set<string>>(new Set());   // whose screen share I'm downloading
   const [focusId, setFocusId] = useState<string>();                    // spotlighted participant
@@ -500,7 +503,10 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         if (deafRef.current) { micBeforeDeaf.current = true; await toggleDeafen(); return; }
         const on = !lp.isMicrophoneEnabled; await lp.setMicrophoneEnabled(on); on ? sounds.unmute() : sounds.mute();
       }
-      if (what === "cam") await lp.setCameraEnabled(!lp.isCameraEnabled);
+      if (what === "cam") {
+        if (!lp.isCameraEnabled) { setAskCam(true); return; }       // turning on needs a confirmation; turning off is immediate
+        await lp.setCameraEnabled(false);
+      }
       if (what === "screen") {
         if (!lp.isScreenShareEnabled && window.cohle) { setPicking(true); return; } // desktop: ask what to share first
         const on = !lp.isScreenShareEnabled; await lp.setScreenShareEnabled(on); onSharing(on); on ? sounds.screenOn() : sounds.screenOff();
@@ -633,6 +639,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
           </div>
           <button title={noise === "off" ? "Ligar a supressão de ruído" : "Desligar a supressão de ruído"} aria-pressed={noise !== "off"} className={`${btn(true)} ${noise !== "off" ? "text-accent2 ring-1 ring-accent2/50" : ""}`} onClick={toggleNoise}><AudioLines size={20} /></button>
           <button title={deafened ? "Desativar ensurdecer" : "Ensurdecer"} className={btn(!deafened)} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}</button>
+          {onSound && <Soundboard onPlay={onSound} disabled={meMuted} btnCls={btn(true)} />}
           <button title="Câmera" className={btn(!!lp?.isCameraEnabled)} onClick={() => toggle("cam")}>{lp?.isCameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}</button>
           <button title="Compartilhar tela" className={`size-11 sm:size-12 rounded-2xl grid place-items-center ${lp?.isScreenShareEnabled ? "grad text-white" : "bg-white/10"}`} onClick={() => toggle("screen")}><MonitorUp size={20} /></button>
           <button title="Sair da chamada" className="size-11 sm:size-12 rounded-2xl grid place-items-center bg-red-600" onClick={onLeave}><PhoneOff size={20} /></button>
@@ -640,6 +647,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
       </div>
       {chat && <aside className="max-sm:absolute max-sm:inset-0 max-sm:z-30 sm:w-80 lg:w-96 shrink-0 flex flex-col min-h-0 bg-bg sm:border-l border-line">{chat}</aside>}
       </div>
+      {askCam && <CameraConfirm onCancel={() => setAskCam(false)} onConfirm={async () => { setAskCam(false); try { await lp?.setCameraEnabled(true); setErr(""); } catch (e: any) { setErr(`Câmera: ${e.message}`); sounds.error(); } tick((n) => n + 1); }} />}
       {picking && <ScreenPicker onCancel={() => setPicking(false)} onConfirm={startShare} />}
     </div>
   );

@@ -20,3 +20,4 @@ Histórico:
 - **Versão de teste 4:** lista de quem está na sala de voz sempre correta.
 - **Versão de teste 5:** cartão ao passar o mouse, troca de transmissão com um clique, aviso de nova versão e ícones de microfone/áudio desativado ao lado do nome.
 - **Versão de teste 6:** widget da chamada arrastável pela tela e sem nomes fantasmas de quem saiu.
+- **Versão de teste 7:** mensagens diretas com histórico, confirmação antes de ligar a câmera e sons (susto, fogos, risos, chamando, tatakae) para toda a sala.

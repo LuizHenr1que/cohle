@@ -23,6 +23,8 @@ model User {
   members      Member[]
   messages     Message[]
   bans         Ban[]
+  dmSent       DirectMessage[] @relation("DmSender")
+  dmReceived   DirectMessage[] @relation("DmRecipient")
 }
 
 model Server {
@@ -77,4 +79,27 @@ model Ban {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([serverId, userId])
+}
+
+// Private 1:1 messages (history is kept). Only people who share a server can start a conversation.
+model DirectMessage {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String
+  createdAt   DateTime @default(now())
+  sender      User     @relation("DmSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User     @relation("DmRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, senderId, createdAt])
+}
+
+// How far userId has read the conversation with peerId (drives the unread badges).
+model DmRead {
+  userId String
+  peerId String
+  readAt DateTime @default(now())
+
+  @@id([userId, peerId])
 }

@@ -44,6 +44,8 @@ export interface MemberDTO { user: UserDTO; role: "OWNER" | "MEMBER"; muted: boo
 export interface BanDTO { user: UserDTO; createdAt: string; }
 export const banSchema = z.object({ userId: z.string().min(1) });
 export const muteSchema = z.object({ muted: z.boolean() });
+export interface DirectMessageDTO { id: string; fromId: string; toId: string; content: string; createdAt: string; }
+export interface DmConversationDTO { peer: UserDTO; last: DirectMessageDTO; unread: number; }
 export interface MessageDTO {
   id: string; channelId: string; content: string; createdAt: string; author: UserDTO;
 }

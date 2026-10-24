@@ -11,6 +11,7 @@ import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk"
 import {
   registerSchema, loginSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
   type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
+  type DirectMessageDTO, type DmConversationDTO,
 } from "@cohle/shared";
 
 const prisma = new PrismaClient();
@@ -369,6 +370,61 @@ app.get("/channels/:id/messages", { preHandler: auth }, async (req: any, reply) 
   return msgs.reverse().map(toMessage);
 });
 
+// ---- direct messages (1:1, with history) ----
+const toDm = (m: any): DirectMessageDTO => ({ id: m.id, fromId: m.senderId, toId: m.recipientId, content: m.content, createdAt: m.createdAt.toISOString() });
+/** people may start a conversation only when they share a server (or already talked): no cold messages to strangers */
+async function canDm(a: string, b: string) {
+  if (a === b) return false;
+  const mine = await prisma.member.findMany({ where: { userId: a }, select: { serverId: true } });
+  if (mine.length && await prisma.member.findFirst({ where: { userId: b, serverId: { in: mine.map((m) => m.serverId) } }, select: { userId: true } })) return true;
+  return !!(await prisma.directMessage.findFirst({ where: { OR: [{ senderId: a, recipientId: b }, { senderId: b, recipientId: a }] }, select: { id: true } }));
+}
+const unreadFrom = async (me: string, peer: string) => {
+  const r = await prisma.dmRead.findUnique({ where: { userId_peerId: { userId: me, peerId: peer } } });
+  return prisma.directMessage.count({ where: { senderId: peer, recipientId: me, ...(r ? { createdAt: { gt: r.readAt } } : {}) } });
+};
+
+// conversations I have, newest first, with the unread count
+app.get("/dms", { preHandler: auth }, async (req: any) => {
+  const me = uid(req);
+  const recent = await prisma.directMessage.findMany({ where: { OR: [{ senderId: me }, { recipientId: me }] }, orderBy: { createdAt: "desc" }, take: 400 });
+  const lastBy = new Map<string, any>();
+  for (const m of recent) { const peer = m.senderId === me ? m.recipientId : m.senderId; if (!lastBy.has(peer)) lastBy.set(peer, m); }
+  const peers = [...lastBy.keys()].slice(0, 50);
+  const users = await prisma.user.findMany({ where: { id: { in: peers } }, ...lightUser });
+  const out: DmConversationDTO[] = await Promise.all(peers.map(async (id) => ({
+    peer: toUser(users.find((u) => u.id === id)!), last: toDm(lastBy.get(id)), unread: await unreadFrom(me, id),
+  })));
+  return out.filter((c) => c.peer.id);
+});
+
+// people I can message (members of my servers)
+app.get("/dms/people", { preHandler: auth }, async (req: any) => {
+  const me = uid(req);
+  const mine = await prisma.member.findMany({ where: { userId: me }, select: { serverId: true } });
+  const ms = await prisma.member.findMany({ where: { serverId: { in: mine.map((m) => m.serverId) }, userId: { not: me } }, include: { user: lightUser } });
+  const seen = new Map<string, UserDTO>(); ms.forEach((m) => seen.set(m.userId, toUser(m.user)));
+  return [...seen.values()].sort((a, b) => a.username.localeCompare(b.username));
+});
+
+// history, 50 per page; pass ?before=<message id> for older ones
+app.get("/dms/:peerId/messages", { preHandler: auth }, async (req: any, reply) => {
+  const me = uid(req), peer = String(req.params.peerId);
+  const before = req.query?.before ? await prisma.directMessage.findUnique({ where: { id: String(req.query.before) } }) : null;
+  const msgs = await prisma.directMessage.findMany({
+    where: { OR: [{ senderId: me, recipientId: peer }, { senderId: peer, recipientId: me }], ...(before ? { createdAt: { lt: before.createdAt } } : {}) },
+    orderBy: { createdAt: "desc" }, take: 50,
+  });
+  return { messages: msgs.reverse().map(toDm), more: msgs.length === 50 };
+});
+
+app.post("/dms/:peerId/read", { preHandler: auth }, async (req: any) => {
+  const me = uid(req), peer = String(req.params.peerId);
+  await prisma.dmRead.upsert({ where: { userId_peerId: { userId: me, peerId: peer } }, update: { readAt: new Date() }, create: { userId: me, peerId: peer } });
+  io.to(`user:${me}`).emit("dm:read", { peerId: peer });                        // other windows/devices clear their badge too
+  return { ok: true };
+});
+
 // ---- voice (LiveKit token) ----
 app.post("/channels/:id/voice-token", { preHandler: auth }, async (req: any, reply) => {
   const ch = await memberOfChannel(uid(req), req.params.id);
@@ -391,6 +447,8 @@ const voiceOf = new Map<string, string>(); // userId -> channelId
 const voiceDTO = (channelId: string) => ({ channelId, users: [...(voice.get(channelId)?.users.values() ?? [])] });
 
 const joinedAt = new Map<string, number>();   // userId -> when we last heard "voice:join" (grace while the app is still connecting to LiveKit)
+const SOUND_IDS = new Set(["scare", "fireworks", "laugh", "call", "tatakae"]);
+const soundAt = new Map<string, number>();
 const sharingAt = new Map<string, number>();  // userId -> last time the app told us it started/stopped sharing
 const absent = new Map<string, number>();     // userId -> consecutive checks in which LiveKit did not list them
 
@@ -511,6 +569,24 @@ io.on("connection", (socket) => {
     io.to(data.channelId).emit("message:new", toMessage(m));
     ack?.({ ok: true });
   });
+  socket.on("dm:send", async (data: { toId: string; content: string }, ack?: Function) => {
+    const p = sendMessageSchema.safeParse({ content: data?.content });
+    if (!p.success || typeof data?.toId !== "string" || !(await canDm(userId, data.toId))) return ack?.({ error: true });
+    const m = await prisma.directMessage.create({ data: { senderId: userId, recipientId: data.toId, content: p.data.content } });
+    const dto = toDm(m);
+    io.to(`user:${data.toId}`).to(`user:${userId}`).emit("dm:new", dto);
+    ack?.({ ok: true, message: dto });
+  });
+  // soundboard: a short sound for everybody in my call (allow-list, 2.5 s cooldown, owner-muted people can't)
+  socket.on("voice:sound", (id: string) => {
+    if (!SOUND_IDS.has(id)) return;
+    const channelId = voiceOf.get(userId); const v = channelId ? voice.get(channelId) : undefined; const me = v?.users.get(userId);
+    if (!channelId || !v || !me || me.muted) return;
+    const now = Date.now(); if (now - (soundAt.get(userId) ?? 0) < 2500) return;
+    soundAt.set(userId, now);
+    for (const uid2 of v.users.keys()) io.to(`user:${uid2}`).emit("voice:sound", { id, name: me.username, channelId });
+  });
+  socket.on("dm:typing", (toId: string) => { if (typeof toId === "string") io.to(`user:${toId}`).emit("dm:typing", { fromId: userId }); });
   socket.on("server:join", async (serverId: string) => {
     const m = await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId } } });
     if (m) { serverIds.add(serverId); socket.join(`server:${serverId}`); }
