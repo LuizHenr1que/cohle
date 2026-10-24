@@ -4,7 +4,9 @@ import type { DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDT
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 const SERVER_KEY = "cohle:server";
-export const API: string = (() => { try { return localStorage.getItem(SERVER_KEY) || DEFAULT_API; } catch { return DEFAULT_API; } })();
+/** Release builds are locked to their server: no address on screen, no way to point the app elsewhere (nothing to phish). */
+export const SERVER_LOCKED = !!import.meta.env.VITE_API_URL && !import.meta.env.VITE_TEST_LOGIN;
+export const API: string = SERVER_LOCKED ? DEFAULT_API : (() => { try { return localStorage.getItem(SERVER_KEY) || DEFAULT_API; } catch { return DEFAULT_API; } })();
 
 export const normalizeServerUrl = (raw: string) => {
   let u = raw.trim().replace(/\/+$/, "");
@@ -45,7 +47,7 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<T> 
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new Error(`Não consegui falar com o servidor (${API}). Confira o endereço e se ele está ligado.`);
+    throw new Error(SERVER_LOCKED ? "Não foi possível conectar ao Cohle. Verifique sua internet e tente novamente." : `Não consegui falar com o servidor (${API}). Confira o endereço e se ele está ligado.`);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? "erro");

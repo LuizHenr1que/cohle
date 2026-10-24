@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Mic, MonitorUp, MessagesSquare, FlaskConical } from "lucide-react";
 import { Logo } from "./Logo";
 import { BUILD, BUILD_LABEL } from "../version";
-import { api, API, checkServer, normalizeServerUrl, switchServer } from "../api";
+import { api, API, SERVER_LOCKED, checkServer, normalizeServerUrl, switchServer } from "../api";
 import type { UserDTO } from "@cohle/shared";
 
 const SLIDES = [
@@ -130,7 +130,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
             {mode === "login" ? "Não tem conta? Cadastre-se" : "Já tem conta? Entrar"}
           </button>
 
-          <div className="pt-3 border-t border-line text-xs text-muted space-y-2">
+          {!SERVER_LOCKED && <div className="pt-3 border-t border-line text-xs text-muted space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <span>Servidor: <b className="text-ink/80 selectable">{API.replace(/^https?:\/\//, "")}</b></span>
               <button type="button" onClick={() => { setEditServer((v) => !v); setServerMsg(""); }} className="text-accent2 hover:underline">{editServer ? "cancelar" : "alterar"}</button>
@@ -142,7 +142,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
                 {serverMsg && <p className={serverMsg === "Testando..." ? "" : "text-accent"}>{serverMsg}</p>}
               </div>
             )}
-          </div>
+          </div>}
 
           {SHOW_TEST_LOGIN && (
             <div className="pt-4 border-t border-line space-y-2">

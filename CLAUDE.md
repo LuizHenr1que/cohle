@@ -6,8 +6,9 @@
 - Prefira: assinar vídeo só do que está visível/assistido, trabalho pausado quando a janela está oculta ou em chamada, requisições raras, imagens por URL com cache (nunca base64 nos DTOs), sem `backdrop-filter` pesado nem `shadowBlur`.
 - Toda mudança que mexe em tela, chamada ou áudio deve ser conferida contra o custo anterior; se piorar, corrija antes de entregar.
 
-## Versões de teste
-- Toda entrega vira "Versão de teste N · melhoria" (login e título da release). Regra em `docs/versoes.md`.
+## Versões (produção real a partir da Versão 1)
+- Numeração: **Versão N** = app `0.0.N` (ex.: Versão 1 = 0.0.1). Toda entrega aumenta os dois, vira "Versão N · melhoria" no login e no título da release (tag `v0.0.N`). Regra em `docs/versoes.md`.
+- O app se atualiza sozinho (electron-updater lendo `latest*.yml` da última release): sem subir `version` do `apps/desktop/package.json`, ninguém recebe a atualização.
 
 ## Outras preferências
 - Landing e app: ícones e imagens, nunca emojis. Responsivo em tudo.

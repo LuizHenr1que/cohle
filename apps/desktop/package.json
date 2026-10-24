@@ -1,6 +1,6 @@
 {
   "name": "@cohle/desktop",
-  "version": "0.1.13",
+  "version": "0.0.1",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {
@@ -27,7 +27,8 @@
     ],
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "category": "public.app-category.social-networking",
       "identity": null,
@@ -38,6 +39,12 @@
     },
     "win": {
       "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
         {
           "target": "zip",
           "arch": [
@@ -52,8 +59,25 @@
       "buildResources": "build"
     },
     "artifactName": "Cohle-${os}-${arch}.${ext}",
-    "afterPack": "build/adhoc-sign.cjs"
+    "afterPack": "build/adhoc-sign.cjs",
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/LuizHenr1que/cohle-releases/releases/latest/download/"
+      }
+    ]
   },
   "description": "Cohle - chat, voz e compartilhamento de tela",
-  "author": "Cohle"
+  "author": "Cohle",
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
 }

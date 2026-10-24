@@ -40,7 +40,7 @@ O Render lê o código de um repositório GitHub. Suba este projeto (o `.gitigno
 O serviço grátis **dorme após 15 minutos sem acesso** e leva cerca de 1 minuto para acordar. As 750 horas grátis do mês cobrem um serviço ligado o mês inteiro. Para ele não dormir, crie um monitor grátis no UptimeRobot (https://uptimerobot.com) chamando `https://SEU-SERVICO.onrender.com/health` a cada 5 minutos.
 
 ### 6. Apontar o app para ele
-- **Rápido:** no login do app, **Servidor › alterar** e cole `https://SEU-SERVICO.onrender.com`.
+- **Teste (build de desenvolvimento):** no login aparece **Servidor › alterar**; cole `https://SEU-SERVICO.onrender.com`. Os instaladores de produção ficam travados no servidor definido em `VITE_API_URL` e não mostram esse campo.
 - **Instalador já apontado para ele** (sem botões de teste):
   ```sh
   VITE_API_URL=https://SEU-SERVICO.onrender.com pnpm --filter @cohle/desktop dist:mac:prod

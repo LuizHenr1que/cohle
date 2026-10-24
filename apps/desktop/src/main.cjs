@@ -1,5 +1,6 @@
 const { app, BrowserWindow, desktopCapturer, ipcMain, nativeImage, session, shell, systemPreferences } = require("electron");
 const path = require("path");
+const updater = require("./updater.cjs");
 
 // Keep the footprint small: no extra Chromium services we do not use.
 app.commandLine.appendSwitch("disable-features", "MediaRouter,TranslateUI,OptimizationHints,AutofillServerCommunication");
@@ -139,9 +140,13 @@ async function createWindow() {
   else win.loadFile(path.join(__dirname, "..", "client", "index.html"));
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (process.platform === "darwin") app.dock?.setIcon(nativeImage.createFromPath(ICON));   // dev: the dock shows the real icon
+  if ((await updater.launchCheck()) === "restarting") return;      // an update is being installed: the app reopens by itself
+  updater.watch();
+  started = true;
   return createWindow();
 });
-app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
+let started = false;   // the update window may open and close before the app window exists: that must not quit the app
+app.on("window-all-closed", () => { if (started && process.platform !== "darwin") app.quit(); });
 app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

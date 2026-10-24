@@ -5,8 +5,8 @@ import { api, connectSocket } from "../api";
 // The call UI (and the LiveKit SDK, the heaviest dependency) loads only when you join a voice channel.
 import type { VoiceApi } from "./VoiceRoom";
 import { PersonRow } from "./PersonRow";
-import { useUpdate } from "../lib/update";
-import { UpdateBadge } from "./UpdateBadge";
+import { useAutoUpdate, useUpdate } from "../lib/update";
+import { AutoUpdateBadge, UpdateBadge } from "./UpdateBadge";
 import { DmChat, DmSidebar, useDms } from "./DirectMessages";
 const VoiceRoom = lazy(() => import("./VoiceRoom").then((m) => ({ default: m.VoiceRoom })));
 import { Avatar } from "./Avatar";
@@ -53,6 +53,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [rev, setRev] = useState(0); // bumps when the server list/members change, so open modals refetch
   const socket = useRef<ReturnType<typeof connectSocket>>();
   const update = useUpdate();
+  const auto = useAutoUpdate();
   const [dmOpen, setDmOpen] = useState(false);              // "home": direct messages instead of a server
   const [dmPeer, setDmPeer] = useState<UserDTO>();
   const deafRef = useRef(false);
@@ -235,7 +236,9 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           <MessageCircle size={20} />
           {dms.unread > 0 && <span className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center border-2 border-surface">{dms.unread > 99 ? "99+" : dms.unread}</span>}
         </button>
-        {update && <UpdateBadge n={update.n} note={update.note} url={update.url} />}
+        {auto && (auto.status === "downloading" || auto.status === "ready")
+          ? <AutoUpdateBadge st={auto} />
+          : update && (!auto || auto.status === "error" || auto.status === "unsupported") && <UpdateBadge n={update.n} note={update.note} url={update.url} />}
         {servers.map((s) => (
           <button key={s.id} title={s.name}
             onClick={() => { setDmOpen(false); setServerId(s.id); setChannel(undefined); }}

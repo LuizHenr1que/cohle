@@ -10,10 +10,10 @@ Você vai precisar de **duas coisas grátis**: o app do Cohle e o Tailscale (uma
 **Mac**: abra o `.dmg` e arraste o Cohle para Aplicativos. Na primeira vez, clique com o **botão direito → Abrir** (o app ainda não é assinado). Se aparecer "danificado", rode no Terminal: `xattr -cr /Applications/Cohle.app`.
 - Escolha o arquivo certo: `mac-arm64` (Mac com chip M1/M2/M3/M4) ou `mac-x64` (Mac Intel).
 
-**Windows**: descompacte o `.zip` e abra o `Cohle.exe`. Se o Windows avisar, clique em **Mais informações → Executar assim mesmo**.
+**Windows**: abra o instalador `Cohle-win-x64.exe` (instala e abre sozinho). Se o Windows avisar, clique em **Mais informações → Executar assim mesmo**.
 
 ## 3. Conectar
-1. Na tela de login, em **Servidor**, clique em **alterar**, cole o endereço que o seu amigo te passou (parece com `100.64.0.5:3001`) e clique em **Testar e salvar**.
+1. (Só nos instaladores de teste `dist:mac`/`dist:win`; os de produção já vêm travados no servidor.) Na tela de login, em **Servidor**, clique em **alterar**, cole o endereço que o seu amigo te passou (parece com `100.64.0.5:3001`) e clique em **Testar e salvar**.
 2. Clique em **Entrar como teste2** (em "Contas de teste"). Não precisa criar conta.
 3. Você já aparece no **Servidor de Teste**. Entre na **Sala de voz**, permita o microfone (e a câmera) e converse.
 4. No Mac, para compartilhar tela: *Ajustes do Sistema → Privacidade e Segurança → Gravação de Tela → Cohle* (depois reabra o app).
