@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  username     String    @unique
+  passwordHash String
+  avatarUrl    String?
+  avatarVersion Int      @default(0)
+  createdAt    DateTime  @default(now())
+  members      Member[]
+  messages     Message[]
+  bans         Ban[]
+}
+
+model Server {
+  id         String    @id @default(cuid())
+  name       String
+  inviteCode String    @unique @default(cuid())
+  iconUrl    String?
+  iconVersion Int     @default(0)
+  createdAt  DateTime  @default(now())
+  members    Member[]
+  channels   Channel[]
+  bans       Ban[]
+}
+
+model Member {
+  userId   String
+  serverId String
+  role     String @default("MEMBER")
+  muted    Boolean @default(false) // owner server-muted: cannot publish audio in any call
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@id([userId, serverId])
+}
+
+model Channel {
+  id       String      @id @default(cuid())
+  serverId String
+  name     String
+  type     ChannelType
+  server   Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  channelId String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
+}
+
+model Ban {
+  serverId  String
+  userId    String
+  createdAt DateTime @default(now())
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([serverId, userId])
+}

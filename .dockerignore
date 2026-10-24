@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+apps/desktop
+tools
+brand
+docs
+release
+.git
+.env
+**/.env
+tools/share/.secrets

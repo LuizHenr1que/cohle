@@ -1,0 +1,10 @@
+# One domain: /rtc* is LiveKit signalling (wss), everything else is the API (https + websockets).
+{$DOMAIN} {
+	encode zstd gzip
+	handle /rtc* {
+		reverse_proxy livekit:7880
+	}
+	handle {
+		reverse_proxy api:3001
+	}
+}

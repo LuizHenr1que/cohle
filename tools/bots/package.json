@@ -1,0 +1,14 @@
+{
+  "name": "@cohle/bots",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node bots.mjs"
+  },
+  "dependencies": {
+    "@livekit/rtc-ffi-bindings": "^0.13.2",
+    "@livekit/rtc-node": "^0.13.0",
+    "socket.io-client": "^4.8.0"
+  }
+}

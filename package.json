@@ -1,0 +1,12 @@
+{
+  "name": "cohle",
+  "private": true,
+  "packageManager": "pnpm@12.15.0",
+  "scripts": {
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down",
+    "dev:server": "pnpm --filter @cohle/server dev",
+    "dev:client": "pnpm --filter @cohle/client dev",
+    "dev:desktop": "pnpm --filter @cohle/desktop dev"
+  }
+}

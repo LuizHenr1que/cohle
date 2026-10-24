@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: auralis
+      POSTGRES_PASSWORD: auralis
+      POSTGRES_DB: auralis
+    ports: ["127.0.0.1:5432:5432"]   # database is never exposed to the network
+    volumes: [pgdata:/var/lib/postgresql/data]
+  livekit:
+    image: livekit/livekit-server:latest
+    # LIVEKIT_NODE_IP = the address other people reach this machine on (e.g. its Tailscale IP); default is local only.
+    command: --config /etc/livekit.yaml --node-ip ${LIVEKIT_NODE_IP:-127.0.0.1}
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-devsecret-devsecret-devsecret-devsecret}"
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    volumes: ["./livekit.yaml:/etc/livekit.yaml:ro"]
+volumes:
+  pgdata:

@@ -1,0 +1,14 @@
+import { Room, RoomEvent, VideoStream, TrackKind, TrackSource } from "@livekit/rtc-node";
+const API="http://localhost:3001";
+const j=(p,m="GET",b,t)=>fetch(API+p,{method:m,headers:{...(b?{"Content-Type":"application/json"}:{}),...(t?{Authorization:"Bearer "+t}:{})},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+const me=await j("/auth/login","POST",{email:"teste2@cohle.dev",password:"teste12345"});
+const srv=(await j("/servers","GET",undefined,me.token)).find(s=>s.name==="Servidor de Teste");
+const v=srv.channels.find(c=>c.type==="VOICE");
+const {token,url}=await j(`/channels/${v.id}/voice-token`,"POST",undefined,me.token);
+const room=new Room();let frames=0,size="";
+room.on(RoomEvent.TrackSubscribed,(t,pub,p)=>{ if(t.kind===TrackKind.KIND_VIDEO&&p.name==="bot1"){(async()=>{for await(const f of new VideoStream(t)){frames++;size=`${f.frame.width}x${f.frame.height}`}})().catch(()=>{})}});
+await room.connect(url,token,{autoSubscribe:true});
+await new Promise(r=>setTimeout(r,3000)); frames=0; const t0=Date.now();
+await new Promise(r=>setTimeout(r,8000));
+console.log(`recebido da rede (sem renderizar): ${(frames/((Date.now()-t0)/1000)).toFixed(1)} quadros/s, camada ${size}`);
+await room.disconnect();process.exit(0);

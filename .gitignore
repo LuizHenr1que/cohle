@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+*.log
+uploads
+.DS_Store
+release
+tools/share/.secrets
+
+# local-only
+.claude
+skills-lock.json
+tools/share/.secrets
+infra/prod/.env

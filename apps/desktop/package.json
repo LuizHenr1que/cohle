@@ -1,0 +1,54 @@
+{
+  "name": "@cohle/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "dist:mac": "VITE_TEST_LOGIN=1 pnpm --filter @cohle/client build && electron-builder --mac --arm64 --x64",
+    "dist:win": "VITE_TEST_LOGIN=1 pnpm --filter @cohle/client build && electron-builder --win --x64",
+    "dist:mac:prod": "pnpm --filter @cohle/client build && electron-builder --mac --arm64 --x64",
+    "dist:win:prod": "pnpm --filter @cohle/client build && electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "app.cohle.desktop",
+    "productName": "Cohle",
+    "files": [
+      "src/**",
+      "build/icon.png",
+      {
+        "from": "../client/dist",
+        "to": "client"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.social-networking",
+      "identity": null
+    },
+    "win": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "artifactName": "Cohle-${version}-${os}-${arch}.${ext}"
+  },
+  "description": "Cohle - chat, voz e compartilhamento de tela",
+  "author": "Cohle"
+}

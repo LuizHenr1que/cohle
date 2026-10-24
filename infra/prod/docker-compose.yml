@@ -1,0 +1,52 @@
+# Production stack: Caddy (automatic HTTPS) -> API + LiveKit, Postgres inside.
+#   cd infra/prod && cp .env.example .env && (edit) && docker compose up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cohle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: cohle
+    volumes: [pgdata:/var/lib/postgresql/data]       # never published: only the API can reach it
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cohle"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: { context: ../.., dockerfile: apps/server/Dockerfile }
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      DATABASE_URL: postgresql://cohle:${POSTGRES_PASSWORD}@postgres:5432/cohle
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET}
+      LIVEKIT_URL: wss://${DOMAIN:?defina DOMAIN}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?defina LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?defina LIVEKIT_API_SECRET}
+      TRUST_PROXY: "1"                                # behind Caddy: rate limits use the real client IP
+
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes: ["./livekit.yaml:/etc/livekit.yaml:ro"]
+    ports:                                            # media goes straight to the machine (not through Caddy)
+      - "7881:7881/tcp"
+      - "50000-50100:50000-50100/udp"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [api, livekit]
+    environment: { DOMAIN: "${DOMAIN}" }
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data                              # certificates survive restarts
+
+volumes:
+  pgdata:
+  caddy_data:
