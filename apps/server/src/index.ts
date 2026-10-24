@@ -530,13 +530,13 @@ io.on("connection", (socket) => {
     let v = voice.get(channelId);
     if (!v) { v = { serverId: ch.serverId, users: new Map() }; voice.set(channelId, v); }
     const member = await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId: ch.serverId } } });
-    v.users.set(userId, { ...toUser(user), sharing: !!socket.data.sharing, muted: !!member?.muted });
+    v.users.set(userId, { ...toUser(user), sharing: !!socket.data.sharing, muted: !!member?.muted, micOff: !!socket.data.micOff, deaf: !!socket.data.deaf });
     voiceOf.set(userId, channelId);
     joinedAt.set(userId, Date.now()); absent.delete(userId);
     socket.data.voice = true;
     io.to(`server:${ch.serverId}`).emit("voice:state", voiceDTO(channelId));
   });
-  socket.on("voice:leave", () => { socket.data.sharing = false; leaveVoice(userId); });
+  socket.on("voice:leave", () => { socket.data.sharing = false; socket.data.micOff = false; socket.data.deaf = false; leaveVoice(userId); });
   socket.on("voice:sharing", (on: boolean) => {
     socket.data.sharing = !!on;   // remembered even if voice:join is still being processed (reconnect race)
     sharingAt.set(userId, Date.now());
@@ -545,6 +545,16 @@ io.on("connection", (socket) => {
     const u = v?.users.get(userId);
     if (!channelId || !v || !u) return;
     v.users.set(userId, { ...u, sharing: !!on });
+    io.to(`server:${v.serverId}`).emit("voice:state", voiceDTO(channelId));
+  });
+  // mic/deafen state, told by the app the moment it changes (shown next to the name for everyone)
+  socket.on("voice:media", (m: { micOff?: boolean; deaf?: boolean }) => {
+    socket.data.micOff = !!m?.micOff; socket.data.deaf = !!m?.deaf;
+    const channelId = voiceOf.get(userId);
+    const v = channelId ? voice.get(channelId) : undefined;
+    const u = v?.users.get(userId);
+    if (!channelId || !v || !u || (u.micOff === socket.data.micOff && u.deaf === socket.data.deaf)) return;
+    v.users.set(userId, { ...u, micOff: socket.data.micOff, deaf: socket.data.deaf });
     io.to(`server:${v.serverId}`).emit("voice:state", voiceDTO(channelId));
   });
   socket.on("typing", (channelId: string) => {

@@ -16,7 +16,13 @@ import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
 import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
 
-type UserLike = Pick<UserDTO, "username" | "avatarUrl">;
+type UserLike = Pick<UserDTO, "username" | "avatarUrl" | "micOff" | "deaf">;
+/** What the sidebar (hover card, clicking a person) can ask of the call it is looking at. */
+export type VoiceApi = {
+  watch: (userId: string) => void;                                       // switch to this person's live (replaces any other one)
+  watching: () => string | undefined;
+  preview: (userId: string, el: HTMLVideoElement) => (() => void) | null;  // tiny live preview; returns the cleanup
+};
 // Per-person listening settings (only affect me). v/s: 0..2 = 0%..200%; m: muted for me.
 type Vol = { v: number; s: number; m: boolean };
 const DEFAULT_VOL: Vol = { v: 1, s: 1, m: false };
@@ -127,7 +133,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
   const avatarSize = compact ? "clamp(26px, 38cqmin, 44px)" : unwatched ? "clamp(34px, 24cqmin, 96px)" : "clamp(40px, 34cqmin, 120px)";
 
   return (
-    <div className={`@container relative rounded-2xl @sm:rounded-3xl bg-surface-2 border border-line w-full h-full min-h-0 select-none ${speaking ? "speaking" : ""}`}>
+    <div onClick={compact && unwatched ? onWatch : undefined} className={`@container relative rounded-2xl @sm:rounded-3xl bg-surface-2 border border-line w-full h-full min-h-0 select-none ${compact && unwatched ? "cursor-pointer hover:border-accent/60" : ""} ${speaking ? "speaking" : ""}`}>
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         <video ref={ref} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-contain bg-black/40 ${track ? "" : "hidden"}`} />
       </div>
@@ -173,12 +179,12 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
         <span className="min-w-0 truncate text-[11px] @sm:text-xs bg-black/55 px-2 @sm:px-3 py-0.5 @sm:py-1 rounded-full">
           {p.isLocal ? `${user.username} (você)` : user.username}
         </span>
+        {serverMuted
+          ? <span title="Silenciado pelo dono do servidor" className="shrink-0 bg-accent/90 rounded-full p-1"><Lock size={13} /></span>
+          : user.deaf
+            ? <span title="Áudio desativado" className="shrink-0 bg-black/55 rounded-full p-1"><HeadphoneOff size={13} className="text-accent" /></span>
+            : !p.isMicrophoneEnabled && <span title="Microfone desativado" className="shrink-0 bg-black/55 rounded-full p-1"><MicOff size={13} className="text-accent" /></span>}
         <span className="flex-1" />
-        {serverMuted ? (
-          <span className="shrink-0 bg-accent/90 rounded-full px-2 py-0.5 text-[10px] font-semibold flex items-center gap-1" title="Silenciado pelo dono do servidor"><Lock size={11} /><span className="@max-[200px]:hidden">Silenciado</span></span>
-        ) : !p.isMicrophoneEnabled ? (
-          <span className="shrink-0 bg-black/55 rounded-full p-1"><MicOff size={13} className="text-accent" /></span>
-        ) : null}
       </div>
     </div>
   );
@@ -235,9 +241,10 @@ type Status = "connecting" | "connected" | "error";
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const GAP = 12;
 
-export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName }: {
+export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia }: {
   channel: ChannelDTO; users: UserDTO[]; serverId: string; isOwner: boolean;
   chat?: React.ReactNode; chatOpen?: boolean; unread?: number; onToggleChat?: () => void; channelName?: string;
+  onApi?: (api: VoiceApi | null) => void; autoWatch?: string; onAutoWatched?: () => void; onMedia?: (micOff: boolean, deaf: boolean) => void;
   onLeave: () => void; onSpeakers: (ids: string[]) => void; onSharing: (on: boolean) => void; onMenu?: () => void;
 }) {
   const roomRef = useRef<Room>();
@@ -263,6 +270,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   noiseRef.current = noise;
   const deafRef = useRef(false);
   const micBeforeDeaf = useRef(true);
+  const previewRef = useRef(new Map<string, number>());   // userId -> open hover previews (a tiny live frame needs the track for a moment)
   const watchRef = useRef(watching);
   watchRef.current = watching;
   const volsRef = useRef(vols);
@@ -289,7 +297,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     if (pub.source === Track.Source.Microphone) want = true;
     else if (pub.source === Track.Source.Camera) want = !document.hidden;
     else if (pub.source === Track.Source.ScreenShareAudio) want = watchRef.current.has(p.identity);
-    else if (pub.source === Track.Source.ScreenShare) want = watchRef.current.has(p.identity) && !document.hidden;
+    else if (pub.source === Track.Source.ScreenShare) want = (watchRef.current.has(p.identity) || (previewRef.current.get(p.identity) ?? 0) > 0) && !document.hidden;
     if (pub.isSubscribed !== want) pub.setSubscribed(want);
   };
   const applyAll = () => roomRef.current?.remoteParticipants.forEach((p) => p.trackPublications.forEach((pub) => applyPolicy(pub, p)));
@@ -381,8 +389,9 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     if (focusId && !room.remoteParticipants.get(focusId)?.isScreenShareEnabled) setFocusId(undefined);
   });
 
+  // Watching is exclusive: clicking another live switches to it at once and lets go of the previous one (saves bandwidth too).
   function watch(id: string) {
-    const n = new Set(watchRef.current).add(id);
+    const n = new Set([id]);
     watchRef.current = n; setWatching(n);
     applyAll();
     setFocusId(id);
@@ -393,6 +402,47 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     applyAll();
     if (focusId === id) { if (document.fullscreenElement) void document.exitFullscreen(); setFocusId(undefined); }
   }
+
+  useEffect(() => {
+    if (!onApi) return;
+    onApi({
+      watch: (id) => watch(id),
+      watching: () => [...watchRef.current][0],
+      preview: (id, el) => {
+        const p = roomRef.current?.remoteParticipants.get(id);
+        if (!p || !p.isScreenShareEnabled) return null;
+        previewRef.current.set(id, (previewRef.current.get(id) ?? 0) + 1); applyAll();
+        let done = false, tries = 0, attached: { detach: (e: HTMLMediaElement) => unknown } | undefined;
+        const attach = () => {
+          if (done) return;
+          const t = p.getTrackPublication(Track.Source.ScreenShare)?.track;
+          if (t) { t.attach(el); attached = t; return; }
+          if (++tries < 30) setTimeout(attach, 150);                      // subscription takes a moment
+        };
+        attach();
+        return () => {
+          done = true; try { attached?.detach(el); } catch { /* element already gone */ }
+          const n = (previewRef.current.get(id) ?? 1) - 1; if (n <= 0) previewRef.current.delete(id); else previewRef.current.set(id, n);
+          applyAll();                                                     // not watched and no preview left: the video is unsubscribed again
+        };
+      },
+    });
+    return () => onApi(null);
+  }, []);
+
+  // tell the others (sidebar + tiles) the moment my mic / deafen state changes
+  const sentMedia = useRef("");
+  useEffect(() => {
+    const micOff = !(lp?.isMicrophoneEnabled), k = `${micOff}|${deafened}`;
+    if (status !== "connected" || k === sentMedia.current) return;
+    sentMedia.current = k; onMedia?.(micOff, deafened);
+  });
+
+  // Someone clicked a person who is live from outside this call (sidebar): start watching as soon as that person is visible here.
+  useEffect(() => {
+    if (!autoWatch || status !== "connected") return;
+    if (roomRef.current?.remoteParticipants.get(autoWatch)?.isScreenShareEnabled) { watch(autoWatch); onAutoWatched?.(); }
+  });
 
   // Switch the microphone treatment: capture constraints + (for the neural modes) a processor in the audio path.
   async function applyNoise(mode: NoiseMode) {

@@ -20,6 +20,8 @@ let asked = false;   // macOS shows its prompt the first time the capture API is
 
 ipcMain.handle("screen:openSettings", () => shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"));
 
+// only the public releases repo (the update download), nothing else the page might ask for
+ipcMain.handle("open:external", (_e, url) => { if (typeof url === "string" && url.startsWith("https://github.com/LuizHenr1que/cohle-releases/")) { console.log("[open:external]", url); return shell.openExternal(url); } });
 ipcMain.handle("sources:list", async () => {
   const status = screenStatus();
   if (status === "denied" || (status === "not-determined" && asked)) return { screenAccess: status, sources: [] };

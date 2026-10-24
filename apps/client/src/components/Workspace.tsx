@@ -1,8 +1,11 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu } from "lucide-react";
+import { Download, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu } from "lucide-react";
 import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO } from "@cohle/shared";
 import { api, connectSocket } from "../api";
 // The call UI (and the LiveKit SDK, the heaviest dependency) loads only when you join a voice channel.
+import type { VoiceApi } from "./VoiceRoom";
+import { PersonRow } from "./PersonRow";
+import { useUpdate } from "../lib/update";
 const VoiceRoom = lazy(() => import("./VoiceRoom").then((m) => ({ default: m.VoiceRoom })));
 import { Avatar } from "./Avatar";
 import { ProfileModal } from "./ProfileModal";
@@ -46,6 +49,9 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   useEffect(() => { if (wide) setNavOpen(false); }, [wide]);
   const [rev, setRev] = useState(0); // bumps when the server list/members change, so open modals refetch
   const socket = useRef<ReturnType<typeof connectSocket>>();
+  const update = useUpdate();
+  const voiceApi = useRef<VoiceApi | null>(null);
+  const [autoWatch, setAutoWatch] = useState<string>();     // a live clicked on the sidebar before we were in that call
   const voiceRef = useRef<ChannelDTO>();
   voiceRef.current = voice;
   const sharingRef = useRef(false);
@@ -124,6 +130,16 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
     if (voice?.id === c.id) return;                         // already in this call: just bring it back on screen
     setVoice(c); socket.current?.emit("voice:join", c.id);
   }
+  // clicking a person: their live replaces whatever we were watching, joining their call first if needed
+  function openPerson(c: ChannelDTO, u: UserDTO) {
+    if (voice?.id === c.id) {
+      setNavOpen(false); setView("call");
+      if (u.sharing && u.id !== self.id) voiceApi.current?.watch(u.id);
+      return;
+    }
+    setAutoWatch(u.sharing ? u.id : undefined);
+    joinVoice(c);
+  }
   function leaveVoice() { setVoice(undefined); setChatOpen(false); setView("text"); socket.current?.emit("voice:leave"); }
   async function afterServerChange(s: ServerDTO) {
     socket.current?.emit("server:join", s.id);
@@ -153,14 +169,9 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           {inside.length > 0 && <span className="ml-auto text-xs text-accent2">{inside.length}</span>}
         </button>
         {inside.map((u) => (
-          <div key={u.id} className="flex items-center gap-2 pl-9 pr-2 py-1 text-xs text-muted">
-            <Avatar user={u} size={20} speaking={voice?.id === c.id && speakers.has(u.id)} /> <span className="truncate">{u.id === self.id ? `${u.username} (você)` : u.username}</span>
-            {u.sharing && (
-              <span title="Compartilhando a tela" className="ml-auto flex items-center gap-1 bg-accent text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                <ScreenShare size={10} /> AO VIVO
-              </span>
-            )}
-          </div>
+          <PersonRow key={u.id} user={u} isSelf={u.id === self.id} isOwner={server?.ownerId === u.id} channelName={c.name}
+            inCall={voice?.id === c.id} speaking={voice?.id === c.id && speakers.has(u.id)} getApi={() => voiceApi.current}
+            onClick={() => openPerson(c, u)} />
         ))}
       </div>
     );
@@ -204,6 +215,12 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       {/* servers rail */}
       <nav className="glass rounded-3xl w-[72px] shrink-0 flex flex-col items-center gap-2 py-3 overflow-y-auto">
         <div title="Cohle" className="mb-1 shrink-0"><Logo size={40} /></div>
+        {update && (
+          <button onClick={() => window.cohle?.openExternal(update.url)} title={`Versão de teste ${update.n}: ${update.note.replace(/^Versão de teste \d+\s*[·-]\s*/, "")}. Clique para baixar e atualizar`}
+            className="shrink-0 w-14 flex flex-col items-center gap-0.5 rounded-xl bg-accent text-white text-[9px] font-bold leading-tight py-1.5 animate-pulse hover:animate-none">
+            <Download size={14} /> Nova versão
+          </button>
+        )}
         {servers.map((s) => (
           <button key={s.id} title={s.name}
             onClick={() => { setServerId(s.id); setChannel(undefined); }}
@@ -289,7 +306,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {voice && (
           <div className={view === "call" ? "flex-1 flex flex-col min-h-0 min-w-0" : "hidden"}>
           <Suspense fallback={<div className="flex-1 grid place-items-center text-muted text-sm">Carregando chamada...</div>}>
-            <VoiceRoom key={voice.id} channel={voice} chat={view === "call" && chatOpen ? chatPane(true) : null} chatOpen={chatOpen} unread={unread} onToggleChat={() => setChatOpen((v) => !v)} channelName={channel?.name} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
+            <VoiceRoom key={voice.id} channel={voice} onApi={(a) => { voiceApi.current = a; }} onMedia={(micOff, deaf) => socket.current?.emit("voice:media", { micOff, deaf })} autoWatch={autoWatch} onAutoWatched={() => setAutoWatch(undefined)} chat={view === "call" && chatOpen ? chatPane(true) : null} chatOpen={chatOpen} unread={unread} onToggleChat={() => setChatOpen((v) => !v)} channelName={channel?.name} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
           </Suspense>
           </div>
         )}

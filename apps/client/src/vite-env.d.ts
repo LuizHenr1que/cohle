@@ -4,6 +4,8 @@ interface ScreenSource { id: string; name: string; type: "screen" | "window"; th
 interface Window {
   cohle?: {
     platform: string;
+    arch: string;
+    openExternal: (url: string) => Promise<void>;
     overlayState: (s: { inCall: boolean; channel: string; speakers: { id: string; name: string; avatar: string | null }[] }) => void;
     openScreenSettings: () => Promise<void>;
     listSources: () => Promise<{ screenAccess: string; sources: ScreenSource[] }>;

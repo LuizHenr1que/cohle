@@ -35,7 +35,7 @@ export interface VoiceStateDTO { channelId: string; users: UserDTO[]; }
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export interface UserDTO { id: string; username: string; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; }
+export interface UserDTO { id: string; username: string; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
 export interface ChannelDTO { id: string; serverId: string; name: string; type: "TEXT" | "VOICE"; }
 export interface ServerDTO {
   id: string; name: string; inviteCode: string; iconUrl: string | null; ownerId: string; channels: ChannelDTO[];

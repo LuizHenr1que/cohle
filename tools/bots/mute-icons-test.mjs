@@ -1,0 +1,25 @@
+// Mic/deafen icons next to the name (sidebar of someone watching from outside). Needs the dev stack + Electron test app on CDP 9341.
+import { io } from "../bots/node_modules/socket.io-client/build/esm/index.js";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const API = "http://localhost:3001", PORT = 9341;
+let pass = 0, fail = 0; const ok = (l, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${l}${x ? "  — " + x : ""}`); };
+const login = async (e) => (await (await fetch(API + "/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: e, password: "teste12345" }) })).json());
+const a = await login("teste1@cohle.dev"), b = await login("teste2@cohle.dev");
+const voiceCh = (await (await fetch(API + "/servers", { headers: { Authorization: "Bearer " + a.token } })).json()).find((s) => s.name === "Servidor de Teste").channels.find((c) => c.type === "VOICE");
+const t = (await (await fetch(`http://localhost:${PORT}/json`)).json()).find((t) => t.type === "page" && !t.url.includes("overlay.html"));
+const ws = new WebSocket(t.webSocketDebuggerUrl); await new Promise((r) => (ws.onopen = r)); let id = 0; const w = new Map(); ws.onmessage = (e) => { const m = JSON.parse(e.data); w.get(m.id)?.(m.result); };
+const ev = (x) => new Promise((r) => { const i = ++id; w.set(i, r); ws.send(JSON.stringify({ id: i, method: "Runtime.evaluate", params: { expression: x, returnByValue: true, awaitPromise: true } })); }).then((r) => r.result?.value);
+await ev(`localStorage.clear(); localStorage.setItem('token',${JSON.stringify(a.token)}); localStorage.setItem('me',${JSON.stringify(JSON.stringify(a.user))}); location.reload()`); await sleep(5000);
+await ev(`(()=>{if(!/Sala de voz/.test(document.body.innerText)){[...document.querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').includes('Abrir menu'))?.click()}})()`); await sleep(800);
+const rowIcons = () => ev(`(()=>{const r=[...document.querySelectorAll('aside div.cursor-pointer')].find(d=>d.innerText.includes('teste2'));return r?[...r.querySelectorAll('[aria-label]')].map(x=>x.getAttribute('aria-label')):null})()`);
+const s = io(API, { auth: { token: b.token }, transports: ["websocket"] }); await new Promise((r) => s.on("connect", r)); await sleep(500);
+s.emit("voice:join", voiceCh.id); await sleep(1500);
+ok("teste2 entra sem ícones", JSON.stringify(await rowIcons()) === "[]", JSON.stringify(await rowIcons()));
+s.emit("voice:media", { micOff: true, deaf: false }); await sleep(800);
+ok("mutou: ícone de microfone ao lado do nome", (await rowIcons())?.includes("Microfone desativado"), JSON.stringify(await rowIcons()));
+s.emit("voice:media", { micOff: true, deaf: true }); await sleep(800);
+ok("desativou o áudio: ícone de fone", (await rowIcons())?.includes("Áudio desativado"), JSON.stringify(await rowIcons()));
+s.emit("voice:media", { micOff: false, deaf: false }); await sleep(800);
+ok("voltou: ícones somem", JSON.stringify(await rowIcons()) === "[]", JSON.stringify(await rowIcons()));
+s.emit("voice:leave"); s.close();
+console.log(`\n${pass} passaram, ${fail} falharam`); process.exit(fail ? 1 : 0);
