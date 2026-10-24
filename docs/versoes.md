@@ -24,3 +24,4 @@ Histórico:
 - **Versão de teste 8:** botão de nova versão redesenhado, mais claro e chamativo.
 - **Versão de teste 9:** botão de sons da sala com nome e destaque na barra da chamada.
 - **Versão de teste 10:** botão de sons volta a ser só o ícone na barra da chamada.
+- **Versão de teste 11:** câmera com prévia antes de ligar e mensagens de erro claras em português (câmera, microfone e tela).

@@ -1,6 +1,6 @@
 {
   "name": "@cohle/desktop",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {
@@ -30,7 +30,11 @@
         "dmg"
       ],
       "category": "public.app-category.social-networking",
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "NSCameraUsageDescription": "O Cohle usa a câmera para você aparecer nas chamadas de vídeo.",
+        "NSMicrophoneUsageDescription": "O Cohle usa o microfone para você falar nas chamadas de voz."
+      }
     },
     "win": {
       "target": [

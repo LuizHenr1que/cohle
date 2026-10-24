@@ -13,6 +13,7 @@ import { api, assetUrl } from "../api";
 import { Avatar } from "./Avatar";
 import { sounds } from "../sounds";
 import { CameraConfirm } from "./CameraConfirm";
+import { friendlyMediaError } from "../lib/mediaErrors";
 import { Soundboard } from "./Soundboard";
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
@@ -352,7 +353,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         setStatus("connected");
         sounds.joinSelf();
         bump();
-        await room.localParticipant.setMicrophoneEnabled(true).catch((e) => setErr(`Microfone: ${e.message}`));
+        await room.localParticipant.setMicrophoneEnabled(true).catch((e) => setErr(friendlyMediaError(e, "microphone")));
         if (isNeural(noiseRef.current)) await applyNoise(noiseRef.current);
         bump();
       } catch (e: any) { setStatus("error"); setErr(e.message ?? "falha ao conectar"); sounds.error(); }
@@ -512,7 +513,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         const on = !lp.isScreenShareEnabled; await lp.setScreenShareEnabled(on); onSharing(on); on ? sounds.screenOn() : sounds.screenOff();
       }
       setErr("");
-    } catch (e: any) { setErr(e.message); sounds.error(); }
+    } catch (e: any) { setErr(friendlyMediaError(e, what === "mic" ? "microphone" : what === "screen" ? "screen" : "camera")); sounds.error(); }
     tick((n) => n + 1);
   };
 
@@ -527,7 +528,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         { screenShareEncoding: { maxBitrate: q.bitrate, maxFramerate: q.fps } },
       );
       onSharing(true); sounds.screenOn(); setErr("");
-    } catch (e: any) { setErr(e.message); sounds.error(); }
+    } catch (e: any) { setErr(friendlyMediaError(e, "screen")); sounds.error(); }
     tick((n) => n + 1);
   }
 
@@ -647,7 +648,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
       </div>
       {chat && <aside className="max-sm:absolute max-sm:inset-0 max-sm:z-30 sm:w-80 lg:w-96 shrink-0 flex flex-col min-h-0 bg-bg sm:border-l border-line">{chat}</aside>}
       </div>
-      {askCam && <CameraConfirm onCancel={() => setAskCam(false)} onConfirm={async () => { setAskCam(false); try { await lp?.setCameraEnabled(true); setErr(""); } catch (e: any) { setErr(`Câmera: ${e.message}`); sounds.error(); } tick((n) => n + 1); }} />}
+      {askCam && <CameraConfirm onCancel={() => setAskCam(false)} onConfirm={async (deviceId) => { await lp?.setCameraEnabled(true, deviceId ? { deviceId } : undefined); setAskCam(false); setErr(""); tick((n) => n + 1); }} />}
       {picking && <ScreenPicker onCancel={() => setPicking(false)} onConfirm={startShare} />}
     </div>
   );
