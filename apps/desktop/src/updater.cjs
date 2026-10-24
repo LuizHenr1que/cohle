@@ -49,12 +49,12 @@ async function launchCheck() {
     const res = await Promise.race([autoUpdater.checkForUpdates(), timeout(7000)]);
     if (res === "timeout" || !res || !res.isUpdateAvailable) return "continue";
     const next = String(res.updateInfo.version).split(".").pop();
-    sp = splash.open({ title: `Atualizando para a Versão ${next}`, sub: "Preparando o download...", pct: null, foot });
-    autoUpdater.on("download-progress", (p) => sp.set({ pct: Math.round(p.percent), sub: `Baixando... ${Math.round(p.percent)}%  ·  ${(p.transferred / 1048576).toFixed(0)} de ${(p.total / 1048576).toFixed(0)} MB` }));
+    sp = splash.open({ title: `Atualizando para a Versão ${next}`, stat: "Preparando...", pct: null, msg: true, foot });
+    autoUpdater.on("download-progress", (p) => sp.set({ pct: Math.round(p.percent), stat: `${Math.round(p.percent)}%  ·  ${(p.transferred / 1048576).toFixed(0)} de ${(p.total / 1048576).toFixed(0)} MB` }));
     const ok = await Promise.race([res.downloadPromise.then(() => true), timeout(180000)]);
     if (ok !== true) throw new Error("download timeout");
     done = true;
-    sp.set({ pct: 100, sub: "Instalando e reabrindo o Cohle..." });
+    sp.set({ pct: 100, stat: "Instalando...", msg: "Instalando e reabrindo o Cohle..." });
     installing = true;
     setTimeout(() => autoUpdater.quitAndInstall(false, true), 900);
     return "restarting";
@@ -73,7 +73,7 @@ function welcome() {
     const prev = fs.existsSync(file) ? fs.readFileSync(file, "utf8").trim() : "";
     fs.writeFileSync(file, app.getVersion());
     if (!prev || prev === app.getVersion()) return null;
-    return splash.open({ title: "Cohle atualizado!", sub: `Você está na Versão ${buildNo()}. Abrindo...`, foot: `Cohle · Versão ${buildNo()}`, pct: null, done: true });
+    return splash.open({ title: "Cohle atualizado!", msg: `Você está na Versão ${buildNo()}. Abrindo...`, stat: "", foot: `Cohle · Versão ${buildNo()}`, pct: null, done: true });
   } catch { return null; }
 }
 

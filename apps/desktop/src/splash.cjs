@@ -1,49 +1,78 @@
-// The small "card" shown while Cohle updates or opens right after an update.
+// The "card" shown while Cohle updates or opens right after an update: the brand artwork on top,
+// progress and friendly messages below.
 const { BrowserWindow } = require("electron");
+const fs = require("fs");
+const path = require("path");
 
-const LOGO = `<svg viewBox="216 216 592 592" width="64" height="64" fill="none"><defs>
-<linearGradient id="r" x1="250" y1="260" x2="780" y2="780" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff3b5c"/><stop offset="1" stop-color="#ff9a62"/></linearGradient>
-<radialGradient id="o" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#fff1f3"/><stop offset=".35" stop-color="#ff7a8f"/><stop offset="1" stop-color="#ff3b5c"/></radialGradient></defs>
-<path d="M672.9 377A210 210 0 1 0 672.9 647" stroke="url(#r)" stroke-width="92" stroke-linecap="round"/><circle cx="684" cy="512" r="56" fill="url(#o)"/></svg>`;
-const CHECK = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const ART = fs.readFileSync(path.join(__dirname, "splash-art.svg"), "utf8");
+const CHECK = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+
+const MESSAGES = [
+  "Bem-vindo ao Cohle.", "Afinando os microfones...", "Polindo os pixels do compartilhamento de tela.", "Seu servidor sentiu a sua falta.",
+  "Avisando a galera que você já vem.", "Deixando tudo leve para o seu jogo respirar.", "Conferindo se alguém mutou o amigo de novo.",
+  "Quase lá. Respire fundo uma vez.", "A sala de voz já está esquentando.",
+];
 
 const HTML = `<!doctype html><meta charset="utf-8"><title>splash</title><style>
   *{box-sizing:border-box}html,body{margin:0;height:100%;background:transparent;overflow:hidden;font:500 13px -apple-system,"Segoe UI",Inter,system-ui,sans-serif;color:#f5eaee;-webkit-user-select:none;user-select:none}
-  .wrap{height:100%;padding:18px}
-  .card{height:100%;border-radius:26px;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px 28px;-webkit-app-region:drag;
-    background:radial-gradient(120% 90% at 50% -10%,rgba(255,59,92,.30),transparent 62%),linear-gradient(180deg,#1d0d14,#12080c);
-    border:1px solid rgba(255,255,255,.10);box-shadow:0 18px 60px rgba(0,0,0,.55),0 0 0 1px rgba(255,59,92,.10),inset 0 1px 0 rgba(255,255,255,.06);animation:in .35s cubic-bezier(.2,.8,.2,1) both}
-  @keyframes in{from{opacity:0;transform:translateY(8px) scale(.97)}}
-  .logo{width:72px;height:72px;display:grid;place-items:center;position:relative}
-  .logo::before{content:"";position:absolute;inset:-6px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,59,92,.45),transparent);animation:glow 2.2s ease-in-out infinite}
-  .logo svg{position:relative;animation:spin 3.2s linear infinite;transform-origin:50% 50%}
-  @keyframes spin{to{transform:rotate(360deg)}}@keyframes glow{50%{opacity:.45;transform:scale(1.15)}}
-  .ok{width:64px;height:64px;border-radius:50%;display:none;place-items:center;background:linear-gradient(135deg,#ff3b5c,#ff9a62);box-shadow:0 0 34px rgba(255,59,92,.55);animation:pop .4s cubic-bezier(.2,1.4,.4,1) both}
-  @keyframes pop{from{transform:scale(.4);opacity:0}}
-  .done .logo{display:none}.done .ok{display:grid}
-  h1{margin:2px 0 0;font-size:17px;font-weight:700;letter-spacing:-.01em;text-align:center}
-  .sub{color:#b9a5ad;font-size:12.5px;text-align:center;min-height:16px}
-  .bar{width:100%;max-width:260px;height:7px;border-radius:9px;background:rgba(255,255,255,.10);overflow:hidden;position:relative}
-  .fill{height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,#ff3b5c,#ff9a62);transition:width .25s ease;position:relative}
-  .bar.ind .fill{width:38%;animation:slide 1.3s ease-in-out infinite}
-  @keyframes slide{from{margin-left:-40%}to{margin-left:105%}}
-  .foot{position:absolute;bottom:12px;font-size:11px;color:rgba(185,165,173,.7);letter-spacing:.04em}
+  .wrap{height:100%;padding:20px}
+  .card{height:100%;border-radius:28px;position:relative;overflow:hidden;display:flex;flex-direction:column;-webkit-app-region:drag;
+    background:linear-gradient(135deg,#1e0d14,#12080c 55%,#0a0507);border:1px solid rgba(255,255,255,.10);
+    box-shadow:0 22px 70px rgba(0,0,0,.6),0 0 0 1px rgba(255,59,92,.10),inset 0 1px 0 rgba(255,255,255,.06);animation:in .4s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes in{from{opacity:0;transform:translateY(10px) scale(.97)}}
+  .art{flex:none;height:300px;position:relative}
+  .art svg{position:absolute;inset:0;width:100%;height:100%}
+  .art::after{content:"";position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(180deg,transparent,#12080c)}
+  .ok{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;display:none;place-items:center;z-index:2;background:linear-gradient(135deg,#ff3b5c,#ff9a62);box-shadow:0 0 44px rgba(255,59,92,.7);animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
+  .ok svg{position:static;width:26px;height:26px}
+  @keyframes pop{from{transform:scale(.3);opacity:0}}
+  .done .ok{display:grid}
+  .info{flex:1;padding:6px 34px 20px;display:flex;flex-direction:column;justify-content:center;gap:10px;position:relative;z-index:1}
+  h1{margin:0;font-size:20px;font-weight:750;letter-spacing:-.015em}
+  .bar{height:8px;border-radius:9px;background:rgba(255,255,255,.10);overflow:hidden}
+  .fill{height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,#ff3b5c,#ff9a62);transition:width .25s ease;box-shadow:0 0 14px rgba(255,90,100,.6)}
+  .bar.ind .fill{width:34%;animation:slide 1.3s ease-in-out infinite}
+  @keyframes slide{from{margin-left:-36%}to{margin-left:104%}}
+  .row{display:flex;justify-content:space-between;gap:16px;align-items:baseline;min-height:18px}
+  .msg{color:#ffd9de;font-size:13px;transition:opacity .35s,transform .35s}.msg.out{opacity:0;transform:translateY(4px)}
+  .stat{color:#b9a5ad;font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .foot{position:absolute;right:30px;top:14px;font-size:11px;color:rgba(255,240,243,.55);letter-spacing:.06em;z-index:3;background:rgba(18,8,12,.5);padding:4px 10px;border-radius:99px;border:1px solid rgba(255,255,255,.08)}
   .hide{visibility:hidden}
+  /* artwork: gentle motion, transform/opacity only */
+  .orbits .o1{transform-box:view-box;transform-origin:800px 320px;animation:rot 40s linear infinite}
+  .orbits .o3{transform-box:view-box;transform-origin:800px 320px;animation:rot 70s linear infinite reverse}
+  @keyframes rot{to{transform:rotate(360deg)}}
+  .fl{animation:fl 4.2s ease-in-out infinite}.fl.b{animation-delay:-.8s}.fl.c{animation-delay:-1.6s}.fl.d{animation-delay:-2.4s}.fl.e{animation-delay:-3.1s}.fl.f{animation-delay:-3.7s}
+  @keyframes fl{50%{transform:translateY(-9px)}}
+  .pulse{animation:pl 1.8s ease-in-out infinite}@keyframes pl{50%{opacity:.35}}
+  .bars rect{transform-box:fill-box;transform-origin:50% 100%;animation:bar 1.4s ease-in-out infinite}
+  .bars rect:nth-child(2n){animation-delay:-.45s}.bars rect:nth-child(3n){animation-delay:-.9s}.bars rect:nth-child(5n){animation-delay:-.2s}
+  @keyframes bar{50%{transform:scaleY(.55)}}
 </style><div class="wrap"><div class="card" id="c">
-  <div class="logo">${LOGO}</div><div class="ok">${CHECK}</div>
-  <h1 id="t">Cohle</h1>
-  <div class="bar ind" id="b"><div class="fill" id="f"></div></div>
-  <div class="sub" id="s"></div>
+  <div class="art">${ART}<div class="ok">${CHECK}</div></div>
   <div class="foot" id="v"></div>
+  <div class="info">
+    <h1 id="t">Cohle</h1>
+    <div class="bar ind" id="b"><div class="fill" id="f"></div></div>
+    <div class="row"><div class="msg" id="m"></div><div class="stat" id="s"></div></div>
+  </div>
 </div></div>
-<script>window.ui=(o)=>{const $=(i)=>document.getElementById(i);if(o.title!=null)$("t").textContent=o.title;if(o.sub!=null)$("s").textContent=o.sub;if(o.foot!=null)$("v").textContent=o.foot;
-const b=$("b");if(o.pct==null){b.classList.add("ind");$("f").style.width=""}else{b.classList.remove("ind");$("f").style.width=Math.max(3,o.pct)+"%"}
-b.classList.toggle("hide",!!o.done);$("c").classList.toggle("done",!!o.done)}</script>`;
+<script>
+const MSGS=${JSON.stringify(MESSAGES)};let mi=0,timer=null;
+const $=(i)=>document.getElementById(i);
+function rotate(on){clearInterval(timer);const m=$("m");if(!on){m.textContent="";return}
+  const order=MSGS.slice(1).sort(()=>Math.random()-.5);order.unshift(MSGS[0]);mi=0;m.textContent=order[0];
+  timer=setInterval(()=>{m.classList.add("out");setTimeout(()=>{mi=(mi+1)%order.length;m.textContent=order[mi];m.classList.remove("out")},350)},2800)}
+window.ui=(o)=>{if(o.title!=null)$("t").textContent=o.title;if(o.stat!=null)$("s").textContent=o.stat;if(o.foot!=null)$("v").textContent=o.foot;
+  const b=$("b");if(o.pct==null){b.classList.add("ind");$("f").style.width=""}else{b.classList.remove("ind");$("f").style.width=Math.max(3,o.pct)+"%"}
+  b.classList.toggle("hide",!!o.done);$("c").classList.toggle("done",!!o.done);
+  if(o.msg!==undefined){ if(o.msg===true&&!timer)rotate(true); else if(typeof o.msg==="string"){clearInterval(timer);timer=null;$("m").textContent=o.msg} }}
+</script>`;
 
 /** Opens the card (hidden until it painted) and returns a handle to update and close it. */
 function open(ui = {}) {
   const w = new BrowserWindow({
-    width: 400, height: 262, frame: false, transparent: true, resizable: false, movable: true, center: true, show: false, hasShadow: false,
+    width: 780, height: 500, frame: false, transparent: true, resizable: false, movable: true, center: true, show: false, hasShadow: false,
     backgroundColor: "#00000000", alwaysOnTop: true, skipTaskbar: true, fullscreenable: false,
     webPreferences: { sandbox: true, contextIsolation: true, spellcheck: false },
   });
