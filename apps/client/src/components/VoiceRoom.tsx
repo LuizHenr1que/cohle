@@ -327,13 +327,13 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
 
     room.on(RoomEvent.TrackPublished, (pub, p) => { applyPolicy(pub, p); bump(); });
     room.on(RoomEvent.ParticipantConnected, (p) => { sounds.userJoin(); p.trackPublications.forEach((pub) => applyPolicy(pub, p)); applyVolumes(); bump(); });
-    room.on(RoomEvent.ParticipantDisconnected, () => { sounds.userLeave(); bump(); });
+    room.on(RoomEvent.ParticipantDisconnected, (p) => { sounds.userLeave(); setSpeakers((prev) => (prev.includes(p.identity) ? prev.filter((i) => i !== p.identity) : prev)); bump(); });   // someone who left can't be "talking"
     room.on(RoomEvent.LocalTrackUnpublished, (pub) => { if (pub.source === Track.Source.ScreenShare) onSharing(false); });
     room.on(RoomEvent.ActiveSpeakersChanged, (s) => {
       const ids = s.map((x) => x.identity).sort();
       setSpeakers((prev) => (sameIds(prev, ids) ? prev : ids));            // skip re-render when nothing changed
     });
-    room.on(RoomEvent.Disconnected, () => setStatus((s) => (s === "error" ? s : "connecting")));
+    room.on(RoomEvent.Disconnected, () => { setSpeakers((prev) => (prev.length ? [] : prev)); setStatus((s) => (s === "error" ? s : "connecting")); });
     const onVis = () => { applyAll(); bump(); };
     document.addEventListener("visibilitychange", onVis);
     // closing/reloading the window: say goodbye to LiveKit now, so the room list does not keep a ghost until it times out
@@ -362,7 +362,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   // Desktop only: tell the floating widget (shown while Cohle is in the background) who is talking.
   useEffect(() => {
     if (!window.cohle?.overlayState) return;
-    const sp = speakers.map((id) => users.find((u) => u.id === id)).filter((u): u is UserDTO => !!u)
+    const sp = speakers.filter((id) => users.some((u) => u.id === id)).map((id) => users.find((u) => u.id === id)).filter((u): u is UserDTO => !!u)
       .map((u) => ({ id: u.id, name: u.username, avatar: assetUrl(u.avatarUrl) }));
     window.cohle.overlayState({ inCall: status === "connected", channel: channel.name, speakers: sp });
   }, [speakers, users, status, channel.name]);

@@ -73,15 +73,28 @@ function syncOverlay() {
   const want = ov.inCall && !ov.dismissed && !mainInFront();
   if (!want) { if (overlay && !overlay.isDestroyed() && overlay.isVisible()) overlay.hide(); return; }
   const o = ensureOverlay();
-  const send = () => o.webContents.send("overlay:state", { channel: ov.channel, speakers: ov.speakers });
+  const fresh = !o.isVisible();                                 // coming back after being hidden: forget names from before
+  const send = () => o.webContents.send("overlay:state", { channel: ov.channel, speakers: ov.speakers, reset: fresh });
   if (o.webContents.isLoading()) o.webContents.once("did-finish-load", send); else send();
-  if (!o.isVisible()) o.showInactive();
+  if (fresh) o.showInactive();
 }
 ipcMain.on("overlay:state", (_e, st) => {
   const wasIn = ov.inCall;
   ov = { inCall: !!st?.inCall, channel: String(st?.channel ?? "").slice(0, 60), speakers: Array.isArray(st?.speakers) ? st.speakers.slice(0, 6).map((p) => ({ id: String(p.id), name: String(p.name).slice(0, 40), avatar: typeof p.avatar === "string" && /^https?:/.test(p.avatar) ? p.avatar : null })) : [], dismissed: ov.dismissed };
   if (!ov.inCall || !wasIn) ov.dismissed = false;           // a new call brings the widget back
   syncOverlay();
+});
+// drag anywhere on the screen: the page reports mouse movement, the window follows (kept inside the visible displays)
+let drag = null;
+ipcMain.on("overlay:drag", (_e, phase, sx, sy) => {
+  if (!overlay || overlay.isDestroyed()) return;
+  if (phase === "start") { const [x, y] = overlay.getPosition(); drag = { ox: x - sx, oy: y - sy }; return; }
+  if (phase === "end") { drag = null; return; }
+  if (!drag) return;
+  const [w] = overlay.getSize();
+  const x = Math.round(drag.ox + sx), y = Math.round(drag.oy + sy);
+  const d = require("electron").screen.getDisplayNearestPoint({ x: x + w / 2, y: y + 20 }).workArea;
+  overlay.setPosition(Math.max(d.x - w + 60, Math.min(x, d.x + d.width - 60)), Math.max(d.y, Math.min(y, d.y + d.height - 40)));
 });
 ipcMain.on("overlay:size", (_e, h) => { if (overlay && !overlay.isDestroyed()) overlay.setSize(268, Math.max(40, Math.min(400, Math.round(h)))); });
 ipcMain.on("overlay:interactive", (_e, on) => { if (overlay && !overlay.isDestroyed()) overlay.setIgnoreMouseEvents(!on, { forward: true }); });

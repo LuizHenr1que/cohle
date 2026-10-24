@@ -6,7 +6,7 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; background: transparent; overflow: hidden; font: 500 13px/1.3 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: #f5eaee; -webkit-font-smoothing: antialiased; user-select: none; }
   #root { width: 256px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
-  .pill { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 12px; border-radius: 16px; cursor: pointer;
+  .pill { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 12px; border-radius: 16px; cursor: grab;
     background: rgba(20, 10, 14, .42); border: 1px solid rgba(255, 255, 255, .10); backdrop-filter: blur(14px) saturate(130%); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); opacity: .55; transition: opacity .15s; }
   .pill:hover { opacity: 1; background: rgba(20, 10, 14, .86); }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; flex: none; }
@@ -51,14 +51,20 @@
   }
   window.overlayApi.onState((st) => {
     ch.innerHTML = ""; const b = document.createElement("b"); b.textContent = "Cohle"; ch.append(b, document.createTextNode(st.channel ? " · " + st.channel : ""));
+    if (st.reset) { shown.forEach((s) => { clearTimeout(s.timer); s.el.remove(); }); shown.clear(); }
     const now = new Set(st.speakers.map((p) => p.id));
     st.speakers.forEach(add); [...shown.keys()].forEach((id) => { if (!now.has(id)) drop(id); }); fit();
   });
   document.getElementById("x").addEventListener("click", (e) => { e.stopPropagation(); window.overlayApi.close(); });
   const pill = document.getElementById("pill");
-  pill.addEventListener("click", () => window.overlayApi.focusApp());
+  // drag the header to move the widget anywhere; a click without moving still brings the app back
+  let down = null, moved = false;
+  pill.addEventListener("mousedown", (e) => { if (e.button !== 0 || e.target.closest("#x")) return; down = { x: e.screenX, y: e.screenY }; moved = false; window.overlayApi.drag("start", e.screenX, e.screenY); });
+  window.addEventListener("mousemove", (e) => { if (!down) return; if (Math.abs(e.screenX - down.x) + Math.abs(e.screenY - down.y) > 4) moved = true; if (moved) window.overlayApi.drag("move", e.screenX, e.screenY); });
+  window.addEventListener("mouseup", (e) => { if (down) { window.overlayApi.drag("end"); down = null; if (!pill.matches(":hover")) window.overlayApi.interactive(false); } });
+  pill.addEventListener("click", () => { if (!moved) window.overlayApi.focusApp(); moved = false; });
   // the window lets every click through to what is underneath; only the header pill (with the X) catches the mouse
   pill.addEventListener("mouseenter", () => window.overlayApi.interactive(true));
-  pill.addEventListener("mouseleave", () => window.overlayApi.interactive(false));
+  pill.addEventListener("mouseleave", () => { if (!down) window.overlayApi.interactive(false); });   // keep the mouse while dragging
   fit();
 </script></body></html>

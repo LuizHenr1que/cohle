@@ -4,5 +4,6 @@ contextBridge.exposeInMainWorld("overlayApi", {
   size: (h) => ipcRenderer.send("overlay:size", h),
   close: () => ipcRenderer.send("overlay:close"),
   interactive: (on) => ipcRenderer.send("overlay:interactive", !!on),
+  drag: (phase, x, y) => ipcRenderer.send("overlay:drag", phase, x, y),
   focusApp: () => ipcRenderer.send("overlay:focus-app"),
 });
