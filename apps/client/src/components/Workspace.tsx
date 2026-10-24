@@ -32,6 +32,13 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newChannelType, setNewChannelType] = useState<"TEXT" | "VOICE">();
   const [notice, setNotice] = useState<string>();
+  // the call keeps running while you read/write in text channels: `view` only decides what is on screen
+  const [view, setView] = useState<"call" | "text">("call");
+  const [chatOpen, setChatOpen] = useState(false);          // chat side panel inside the call view
+  const [unread, setUnread] = useState(0);
+  const viewRef = useRef(view), chatOpenRef = useRef(chatOpen);
+  viewRef.current = view; chatOpenRef.current = chatOpen;
+  useEffect(() => { if (chatOpen || view === "text") setUnread(0); }, [chatOpen, view]);
   // while in a call, decorative effects pause (see ParticleField): the call gets the CPU
   useEffect(() => { document.documentElement.classList.toggle("in-call", !!voice); return () => document.documentElement.classList.remove("in-call"); }, [!!voice]);
   const wide = useMedia("(min-width: 1000px)");   // below this the server/channel panels become a slide-over menu
@@ -73,7 +80,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       setOnline((o) => { const n = new Set(o); p.online ? n.add(p.userId) : n.delete(p.userId); return n; }));
     s.on("message:new", (m: MessageDTO) => {
       setMessages((l) => [...l, m]);
-      if (m.author.id !== me.id) sounds.message();
+      if (m.author.id !== me.id) { sounds.message(); if (voiceRef.current && viewRef.current === "call" && !chatOpenRef.current) setUnread((n) => n + 1); }
     });
     s.on("server:updated", () => reload());
     s.on("server:deleted", () => reload());
@@ -108,8 +115,12 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
     socket.current?.emit("message:send", { channelId: channel.id, content: text });
     setText("");
   }
-  function joinVoice(c: ChannelDTO) { setNavOpen(false); setVoice(c); socket.current?.emit("voice:join", c.id); }
-  function leaveVoice() { setVoice(undefined); socket.current?.emit("voice:leave"); }
+  function joinVoice(c: ChannelDTO) {
+    setNavOpen(false); setView("call");
+    if (voice?.id === c.id) return;                         // already in this call: just bring it back on screen
+    setVoice(c); socket.current?.emit("voice:join", c.id);
+  }
+  function leaveVoice() { setVoice(undefined); setChatOpen(false); setView("text"); socket.current?.emit("voice:leave"); }
   async function afterServerChange(s: ServerDTO) {
     socket.current?.emit("server:join", s.id);
     await reload(); setServerId(s.id); setChannel(undefined);
@@ -123,8 +134,8 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   );
 
   const textChan = (c: ChannelDTO) => (
-    <button key={c.id} onClick={() => { setChannel(c); setNavOpen(false); }}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${channel?.id === c.id && !voice ? "bg-accent/15 text-ink" : "text-muted hover:bg-white/5"}`}>
+    <button key={c.id} onClick={() => { setChannel(c); setView("text"); setNavOpen(false); }}
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${channel?.id === c.id && (!voice || view === "text") ? "bg-accent/15 text-ink" : "text-muted hover:bg-white/5"}`}>
       <Hash size={16} /> {c.name}
     </button>
   );
@@ -133,7 +144,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
     return (
       <div key={c.id}>
         <button onClick={() => joinVoice(c)}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${voice?.id === c.id ? "bg-accent/15 text-ink" : "text-muted hover:bg-white/5"}`}>
+          className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${voice?.id === c.id && view === "call" ? "bg-accent/15 text-ink" : "text-muted hover:bg-white/5"}`}>
           <Volume2 size={16} /> {c.name}
           {inside.length > 0 && <span className="ml-auto text-xs text-accent2">{inside.length}</span>}
         </button>
@@ -150,6 +161,36 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       </div>
     );
   };
+
+  // the same chat is used full-screen (text view) and as a side panel during a call
+  const chatPane = (compact: boolean) => (
+    <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          <header className="px-3 sm:px-6 py-3 sm:py-4 border-b border-line font-semibold flex items-center gap-2 min-w-0">
+            {!wide && !compact && <button onClick={() => setNavOpen(true)} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={20} /></button>}
+            <Hash size={18} className="text-muted shrink-0" /> <span className="truncate">{channel?.name ?? "Selecione um canal"}</span>
+          </header>
+          <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
+            {msgs.map((m) => (
+              <div key={m.id} className="flex gap-3">
+                <Avatar user={m.author.id === self.id ? self : m.author} size={38} />
+                <div className="min-w-0">
+                  <div className="text-sm"><b>{m.author.username}</b> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
+                  <p className="text-ink/90 whitespace-pre-wrap break-words">{m.content}</p>
+                </div>
+              </div>
+            ))}
+            <div ref={bottom} />
+          </div>
+          {channel && (
+            <form onSubmit={send} className="p-2 sm:p-4 flex gap-2 border-t border-line">
+              <input value={text} onChange={(e) => { setText(e.target.value); socket.current?.emit("typing", channel.id); }}
+                placeholder={`Mensagem em #${channel.name}`}
+                className="flex-1 rounded-2xl bg-white/5 border border-line px-4 py-3 outline-none focus:border-accent" />
+              <button className="grad rounded-2xl px-5 text-white"><Send size={18} /></button>
+            </form>
+          )}
+    </div>
+  );
 
   return (
     <div className="h-full flex gap-2 sm:gap-3 p-2 sm:p-3 min-w-0">
@@ -214,7 +255,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {voice && (
           <div className="mt-2 rounded-2xl bg-emerald-500/10 border border-emerald-400/20 px-3 py-2 flex items-center gap-2 text-xs">
             <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="flex-1 truncate">Em voz: <b>{voice.name}</b></span>
+            <button onClick={() => { setView("call"); setNavOpen(false); }} title="Voltar para a chamada" className="flex-1 min-w-0 truncate text-left hover:underline">Em voz: <b>{voice.name}</b>{view === "text" && <span className="text-muted"> · voltar</span>}</button>
             <button onClick={leaveVoice} className="text-accent hover:underline">Sair</button>
           </div>
         )}
@@ -241,36 +282,14 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
             {notice}<button onClick={() => setNotice(undefined)} className="opacity-80 hover:opacity-100">✕</button>
           </div>
         )}
-        {voice ? (
+        {voice && (
+          <div className={view === "call" ? "flex-1 flex flex-col min-h-0 min-w-0" : "hidden"}>
           <Suspense fallback={<div className="flex-1 grid place-items-center text-muted text-sm">Carregando chamada...</div>}>
-            <VoiceRoom key={voice.id} channel={voice} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
+            <VoiceRoom key={voice.id} channel={voice} chat={view === "call" && chatOpen ? chatPane(true) : null} chatOpen={chatOpen} unread={unread} onToggleChat={() => setChatOpen((v) => !v)} channelName={channel?.name} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
           </Suspense>
-        ) : (<>
-          <header className="px-3 sm:px-6 py-3 sm:py-4 border-b border-line font-semibold flex items-center gap-2 min-w-0">
-            {!wide && <button onClick={() => setNavOpen(true)} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={20} /></button>}
-            <Hash size={18} className="text-muted shrink-0" /> <span className="truncate">{channel?.name ?? "Selecione um canal"}</span>
-          </header>
-          <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
-            {msgs.map((m) => (
-              <div key={m.id} className="flex gap-3">
-                <Avatar user={m.author.id === self.id ? self : m.author} size={38} />
-                <div className="min-w-0">
-                  <div className="text-sm"><b>{m.author.username}</b> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
-                  <p className="text-ink/90 whitespace-pre-wrap break-words">{m.content}</p>
-                </div>
-              </div>
-            ))}
-            <div ref={bottom} />
           </div>
-          {channel && (
-            <form onSubmit={send} className="p-2 sm:p-4 flex gap-2 border-t border-line">
-              <input value={text} onChange={(e) => { setText(e.target.value); socket.current?.emit("typing", channel.id); }}
-                placeholder={`Mensagem em #${channel.name}`}
-                className="flex-1 rounded-2xl bg-white/5 border border-line px-4 py-3 outline-none focus:border-accent" />
-              <button className="grad rounded-2xl px-5 text-white"><Send size={18} /></button>
-            </form>
-          )}
-        </>)}
+        )}
+        {(!voice || view === "text") && chatPane(false)}
       </main>
 
       {serverModal && <ServerModal initial={serverModal} username={self.username} onClose={() => setServerModal(undefined)} onDone={afterServerChange} />}

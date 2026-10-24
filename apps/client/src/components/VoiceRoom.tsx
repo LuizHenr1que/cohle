@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Room, RoomEvent, Track, VideoPresets,
+  Room, RoomEvent, Track, VideoPresets, type LocalAudioTrack,
   type Participant, type RemoteParticipant, type RemoteTrackPublication,
 } from "livekit-client";
 import {
   Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, Volume2, VolumeX, Headphones, HeadphoneOff,
-  ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, Ban, UserX, PhoneMissed, ShieldAlert, Menu, Eye, EyeOff,
+  ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, Ban, UserX, PhoneMissed, ShieldAlert, Menu, Eye, EyeOff, AudioLines, Check, ChevronUp, MessageSquare,
 } from "lucide-react";
 import type { ChannelDTO, UserDTO } from "@cohle/shared";
 import { api, assetUrl } from "../api";
@@ -14,6 +14,7 @@ import { Avatar } from "./Avatar";
 import { sounds } from "../sounds";
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
+import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
 
 type UserLike = Pick<UserDTO, "username" | "avatarUrl">;
 // Per-person listening settings (only affect me). v/s: 0..2 = 0%..200%; m: muted for me.
@@ -234,8 +235,9 @@ type Status = "connecting" | "connected" | "error";
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const GAP = 12;
 
-export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu }: {
+export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName }: {
   channel: ChannelDTO; users: UserDTO[]; serverId: string; isOwner: boolean;
+  chat?: React.ReactNode; chatOpen?: boolean; unread?: number; onToggleChat?: () => void; channelName?: string;
   onLeave: () => void; onSpeakers: (ids: string[]) => void; onSharing: (on: boolean) => void; onMenu?: () => void;
 }) {
   const roomRef = useRef<Room>();
@@ -253,6 +255,12 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   const [vols, setVols] = useState<Record<string, Vol>>(loadVols);
   const [preview, setPreview] = useState(() => { try { return localStorage.getItem("cohle:preview") !== "off"; } catch { return true; } });
   const togglePreview = () => setPreview((v) => { try { localStorage.setItem("cohle:preview", v ? "off" : "on"); } catch { /* ignore */ } return !v; });
+  const [noise, setNoise] = useState<NoiseMode>(loadNoiseMode);   // on by default (neural, runs locally)
+  const [audioMenu, setAudioMenu] = useState(false);
+  const [devices, setDevices] = useState<{ ins: MediaDeviceInfo[]; outs: MediaDeviceInfo[]; inId?: string; outId?: string }>({ ins: [], outs: [] });
+  const lastNeural = useRef<NoiseMode>(isNeural(loadNoiseMode()) ? loadNoiseMode() : "rnnoise");
+  const noiseRef = useRef(noise);
+  noiseRef.current = noise;
   const deafRef = useRef(false);
   const micBeforeDeaf = useRef(true);
   const watchRef = useRef(watching);
@@ -291,6 +299,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
       adaptiveStream: true, dynacast: true,
       webAudioMix: (() => { try { return localStorage.getItem("cohle:webaudio") !== "off"; } catch { return true; } })(),   // lets the volume slider go above 100%
       videoCaptureDefaults: { resolution: VideoPresets.h540.resolution },   // lighter camera than 720p
+      audioCaptureDefaults: captureOptions(noiseRef.current),               // echo cancellation + auto gain always; browser suppressor only in "Padrão"
     });
     roomRef.current = room;
     try { if (localStorage.getItem("cohle:debug") === "1") (window as any).__cohleRoom = room; } catch { /* ignore */ }
@@ -330,6 +339,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         sounds.joinSelf();
         bump();
         await room.localParticipant.setMicrophoneEnabled(true).catch((e) => setErr(`Microfone: ${e.message}`));
+        if (isNeural(noiseRef.current)) await applyNoise(noiseRef.current);
         bump();
       } catch (e: any) { setStatus("error"); setErr(e.message ?? "falha ao conectar"); sounds.error(); }
     })();
@@ -380,6 +390,43 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
     applyAll();
     if (focusId === id) { if (document.fullscreenElement) void document.exitFullscreen(); setFocusId(undefined); }
   }
+
+  // Switch the microphone treatment: capture constraints + (for the neural modes) a processor in the audio path.
+  async function applyNoise(mode: NoiseMode) {
+    const track = roomRef.current?.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack as LocalAudioTrack | undefined;
+    if (!track) return;
+    try {
+      await track.stopProcessor();
+      await track.restartTrack(captureOptions(mode));
+      if (isNeural(mode)) await track.setProcessor(new NoiseProcessor(mode as "rnnoise" | "gtcrn"));
+    } catch (e: any) {
+      await track.stopProcessor().catch(() => {});
+      await track.restartTrack(captureOptions("browser")).catch(() => {});      // plan B: the system suppressor
+      setErr("Não consegui ligar a supressão de ruído avançada; usando a padrão.");
+    }
+  }
+  const pickNoise = (m: NoiseMode) => { if (isNeural(m)) lastNeural.current = m; setNoise(m); saveNoiseMode(m); void applyNoise(m); };
+  const toggleNoise = () => pickNoise(noise === "off" ? lastNeural.current : "off");
+
+  async function loadDevices() {
+    const r = roomRef.current; if (!r) return;
+    try {
+      const [ins, outs] = await Promise.all([Room.getLocalDevices("audioinput"), Room.getLocalDevices("audiooutput")]);
+      setDevices({ ins, outs, inId: r.getActiveDevice("audioinput"), outId: r.getActiveDevice("audiooutput") });
+    } catch { /* devices unavailable: the menu just hides the lists */ }
+  }
+  async function pickDevice(kind: "audioinput" | "audiooutput", id: string) {
+    try { await roomRef.current?.switchActiveDevice(kind, id); setErr(""); } catch (e: any) { setErr(`Não consegui trocar o dispositivo: ${e.message ?? e}`); }
+    void loadDevices();
+  }
+  useEffect(() => {
+    if (!audioMenu) return;
+    void loadDevices();
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setAudioMenu(false); };
+    const away = (e: MouseEvent) => { if (!(e.target as HTMLElement).closest("[data-audio-menu]")) setAudioMenu(false); };
+    window.addEventListener("keydown", esc); document.addEventListener("mousedown", away);
+    return () => { window.removeEventListener("keydown", esc); document.removeEventListener("mousedown", away); };
+  }, [audioMenu]);
 
   async function toggleDeafen() {
     if (!room) return;
@@ -462,12 +509,19 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         {onMenu && <button onClick={onMenu} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={20} /></button>}
         <Volume2 size={18} className="text-muted shrink-0 hidden sm:block" />
         <span className="font-semibold truncate">{channel.name}</span>
-        <span className="ml-auto flex items-center gap-2 text-xs text-muted shrink-0">
+        {onToggleChat && (
+          <button onClick={onToggleChat} title={chatOpen ? "Fechar o chat" : "Abrir o chat"} className={`relative ml-auto shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium transition ${chatOpen ? "bg-accent/20 text-ink" : "bg-white/5 text-muted hover:text-ink hover:bg-white/10"}`}>
+            <MessageSquare size={15} /> <span className="hidden sm:inline">Chat</span>
+            {!!unread && !chatOpen && <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-accent text-white text-[10px] font-bold grid place-items-center">{unread > 9 ? "9+" : unread}</span>}
+          </button>
+        )}
+        <span className={`${onToggleChat ? "" : "ml-auto "}flex items-center gap-2 text-xs text-muted shrink-0`}>
           <span className={`size-2 rounded-full ${dot}`} /> <span className="hidden xs:inline sm:inline">{label}</span>
           {status === "connected" && <span>· {parts.length}<span className="hidden sm:inline"> na sala</span></span>}
         </span>
       </header>
 
+      <div className="flex-1 flex min-h-0 min-w-0 relative">
       <div className="flex-1 flex flex-col p-2 sm:p-4 gap-2 sm:gap-3 min-h-0 min-w-0">
         {err && <p className="text-accent text-sm bg-accent/10 rounded-xl px-4 py-2">{err}</p>}
         {meMuted && <p className="text-sm bg-accent/10 border border-accent/30 rounded-xl px-4 py-2 flex items-center gap-2"><Lock size={14} /> O dono do servidor silenciou o seu microfone.</p>}
@@ -493,13 +547,45 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
         </div>
 
         <div className="flex flex-wrap justify-center gap-2 sm:gap-3 shrink-0">
-          <button className={btn(!!lp?.isMicrophoneEnabled)} onClick={() => toggle("mic")} title={meMuted ? "Silenciado pelo dono" : "Microfone"}>
-            {meMuted ? <Lock size={20} /> : lp?.isMicrophoneEnabled ? <Mic size={20} /> : <MicOff size={20} />}</button>
+          <div className="relative flex" data-audio-menu>
+            <button className={`${btn(!!lp?.isMicrophoneEnabled)} rounded-r-md`} onClick={() => toggle("mic")} title={meMuted ? "Silenciado pelo dono" : "Microfone"}>
+              {meMuted ? <Lock size={20} /> : lp?.isMicrophoneEnabled ? <Mic size={20} /> : <MicOff size={20} />}</button>
+            <button className={`h-11 sm:h-12 w-7 rounded-2xl rounded-l-md grid place-items-center transition ${audioMenu ? "bg-accent/30" : "bg-white/10 hover:bg-white/15"}`} onClick={() => setAudioMenu((v) => !v)} title="Configurações de áudio" aria-label="Configurações de áudio" aria-expanded={audioMenu}>
+              <ChevronUp size={15} className={`transition ${audioMenu ? "" : "rotate-180"}`} /></button>
+            {audioMenu && (
+              <div className="absolute bottom-full mb-3 left-0 w-[22rem] max-w-[92vw] z-40 rounded-2xl bg-surface border border-line shadow-2xl p-3 space-y-3 max-h-[min(70vh,520px)] overflow-y-auto text-left">
+                <label className="block space-y-1"><span className="text-[11px] uppercase tracking-widest text-muted">Microfone</span>
+                  <select value={devices.inId ?? "default"} onChange={(e) => pickDevice("audioinput", e.target.value)} className="w-full rounded-xl bg-white/5 border border-line px-3 py-2 text-sm outline-none focus:border-accent">
+                    {devices.ins.length === 0 && <option value="default">Padrão do sistema</option>}
+                    {devices.ins.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || "Microfone"}</option>)}
+                  </select></label>
+                {devices.outs.length > 0 && (
+                  <label className="block space-y-1"><span className="text-[11px] uppercase tracking-widest text-muted">Alto-falante</span>
+                    <select value={devices.outId ?? "default"} onChange={(e) => pickDevice("audiooutput", e.target.value)} className="w-full rounded-xl bg-white/5 border border-line px-3 py-2 text-sm outline-none focus:border-accent">
+                      {devices.outs.map((d) => <option key={d.deviceId} value={d.deviceId}>{d.label || "Alto-falante"}</option>)}
+                    </select></label>
+                )}
+                <div className="space-y-1 pt-1 border-t border-line">
+                  <p className="text-[11px] uppercase tracking-widest text-muted pt-2">Supressão de ruído</p>
+                  {NOISE_MODES.map((m) => (
+                    <button key={m.id} onClick={() => pickNoise(m.id)} className={`w-full text-left rounded-xl px-3 py-2 transition ${noise === m.id ? "bg-accent/15" : "hover:bg-white/5"}`}>
+                      <span className="flex items-center gap-2 text-sm font-medium">{m.label}{noise === m.id && <Check size={14} className="text-accent2 ml-auto" />}</span>
+                      <span className="block text-xs text-muted mt-0.5">{m.hint}</span>
+                    </button>
+                  ))}
+                  <p className="text-[11px] text-muted pt-1">Cancelamento de eco e ganho automático ficam sempre ligados.</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <button title={noise === "off" ? "Ligar a supressão de ruído" : "Desligar a supressão de ruído"} aria-pressed={noise !== "off"} className={`${btn(true)} ${noise !== "off" ? "text-accent2 ring-1 ring-accent2/50" : ""}`} onClick={toggleNoise}><AudioLines size={20} /></button>
           <button title={deafened ? "Desativar ensurdecer" : "Ensurdecer"} className={btn(!deafened)} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}</button>
           <button title="Câmera" className={btn(!!lp?.isCameraEnabled)} onClick={() => toggle("cam")}>{lp?.isCameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}</button>
           <button title="Compartilhar tela" className={`size-11 sm:size-12 rounded-2xl grid place-items-center ${lp?.isScreenShareEnabled ? "grad text-white" : "bg-white/10"}`} onClick={() => toggle("screen")}><MonitorUp size={20} /></button>
           <button title="Sair da chamada" className="size-11 sm:size-12 rounded-2xl grid place-items-center bg-red-600" onClick={onLeave}><PhoneOff size={20} /></button>
         </div>
+      </div>
+      {chat && <aside className="max-sm:absolute max-sm:inset-0 max-sm:z-30 sm:w-80 lg:w-96 shrink-0 flex flex-col min-h-0 bg-bg sm:border-l border-line">{chat}</aside>}
       </div>
       {picking && <ScreenPicker onCancel={() => setPicking(false)} onConfirm={startShare} />}
     </div>
