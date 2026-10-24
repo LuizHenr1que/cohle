@@ -145,7 +145,9 @@ app.whenReady().then(async () => {
   if ((await updater.launchCheck()) === "restarting") return;      // an update is being installed: the app reopens by itself
   updater.watch();
   started = true;
-  return createWindow();
+  const welcome = updater.welcome();                               // "Cohle atualizado!" card on the first launch after an update
+  await createWindow();
+  if (welcome) welcome.close(2200);
 });
 let started = false;   // the update window may open and close before the app window exists: that must not quit the app
 app.on("window-all-closed", () => { if (started && process.platform !== "darwin") app.quit(); });
