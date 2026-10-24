@@ -28,6 +28,8 @@ export function ScreenPicker({ onCancel, onConfirm }: { onCancel: () => void; on
     } finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, []);
+  // the user grants the permission in System Settings and comes back: refresh by itself
+  useEffect(() => { const h = () => { if (access !== "granted") void load(); }; window.addEventListener("focus", h); return () => window.removeEventListener("focus", h); }, [access]);
 
   const shown = sources.filter((s) => s.type === tab);
   const tabBtn = (t: "screen" | "window", label: string, Icon: typeof Monitor) => (
@@ -55,10 +57,15 @@ export function ScreenPicker({ onCancel, onConfirm }: { onCancel: () => void; on
         </div>
 
         {access !== "granted" && (
-          <p className="text-sm bg-accent/10 border border-accent/30 rounded-xl px-4 py-3">
-            O macOS ainda não liberou a gravação de tela para o app. Vá em <b>Ajustes do Sistema › Privacidade e Segurança › Gravação de Tela</b>,
-            ative o Cohle (ou Electron em desenvolvimento), reinicie o app e tente de novo.
-          </p>
+          <div className="text-sm bg-accent/10 border border-accent/30 rounded-xl px-4 py-3 space-y-2">
+            <p>O macOS ainda não liberou a <b>Gravação de Tela</b> para o Cohle. Ative uma única vez e o Cohle passa a lembrar.</p>
+            <ol className="list-decimal pl-5 text-muted space-y-0.5">
+              <li>Clique em <b className="text-ink">Abrir Ajustes do Sistema</b>.</li>
+              <li>Ligue a chave do <b className="text-ink">Cohle</b> em Gravação de Tela e Áudio do Sistema.</li>
+              <li>Volte para cá. Se o macOS pedir, escolha <b className="text-ink">Sair e Reabrir</b>.</li>
+            </ol>
+            <button onClick={() => window.cohle?.openScreenSettings()} className="grad rounded-lg px-4 py-2 font-semibold text-white">Abrir Ajustes do Sistema</button>
+          </div>
         )}
 
         <div className="flex-1 overflow-y-auto grid gap-3 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] content-start min-h-[200px]">

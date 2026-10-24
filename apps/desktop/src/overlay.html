@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data: http://localhost:*; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: transparent; overflow: hidden; font: 500 13px/1.3 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: #f5eaee; -webkit-font-smoothing: antialiased; user-select: none; }
+  #root { width: 256px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .pill { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 12px; border-radius: 16px; cursor: pointer;
+    background: rgba(20, 10, 14, .42); border: 1px solid rgba(255, 255, 255, .10); backdrop-filter: blur(14px) saturate(130%); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); opacity: .55; transition: opacity .15s; }
+  .pill:hover { opacity: 1; background: rgba(20, 10, 14, .86); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; flex: none; }
+  .pill b { font-weight: 700; } .pill span.ch { color: #b9a5ad; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  .x { width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .08); color: #f5eaee; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .x:hover { background: rgba(255, 59, 92, .55); }
+  .who { display: flex; align-items: center; gap: 9px; padding: 5px 12px 5px 6px; border-radius: 99px; align-self: flex-start; max-width: 100%;
+    background: rgba(20, 10, 14, .38); border: 1px solid rgba(61, 220, 132, .35); backdrop-filter: blur(12px); box-shadow: 0 4px 14px rgba(0, 0, 0, .25); opacity: .8; pointer-events: none;
+    animation: in .16s ease-out both; }
+  .who.out { animation: out .22s ease-in both; }
+  .av { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 11px; color: #fff; flex: none; overflow: hidden;
+    background: linear-gradient(135deg, #ff3b5c, #ff8a5b); box-shadow: 0 0 0 2px #3ddc84; }
+  .av img { width: 100%; height: 100%; object-fit: cover; }
+  .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @keyframes in { from { opacity: 0; transform: translateX(10px); } }
+  @keyframes out { to { opacity: 0; transform: translateX(10px); } }
+</style></head>
+<body><div id="root">
+  <div class="pill" id="pill" title="Voltar para o Cohle">
+    <i class="dot"></i><span class="ch" id="ch"></span>
+    <button class="x" id="x" title="Fechar o widget" aria-label="Fechar o widget"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div id="list"></div>
+</div>
+<script>
+  const root = document.getElementById("root"), list = document.getElementById("list"), ch = document.getElementById("ch");
+  const shown = new Map();                       // id -> { el, timer }: a name stays 1.2 s after the person stops (no flicker)
+  const HOLD = 1200;
+  const fit = () => window.overlayApi.size(Math.ceil(root.getBoundingClientRect().height));
+  function add(p) {
+    let s = shown.get(p.id);
+    if (s) { clearTimeout(s.timer); s.timer = null; s.el.classList.remove("out"); return; }
+    const el = document.createElement("div"); el.className = "who";
+    const av = document.createElement("span"); av.className = "av";
+    if (p.avatar) { const i = document.createElement("img"); i.src = p.avatar; i.onerror = () => { i.remove(); av.textContent = (p.name || "?")[0].toUpperCase(); }; av.append(i); } else av.textContent = (p.name || "?")[0].toUpperCase();
+    const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = p.name;   // textContent: names are data, never HTML
+    el.append(av, nm); list.append(el); shown.set(p.id, { el, timer: null }); fit();
+  }
+  function drop(id) {
+    const s = shown.get(id); if (!s || s.timer) return;
+    s.timer = setTimeout(() => { s.el.classList.add("out"); setTimeout(() => { s.el.remove(); shown.delete(id); fit(); }, 220); }, HOLD);
+  }
+  window.overlayApi.onState((st) => {
+    ch.innerHTML = ""; const b = document.createElement("b"); b.textContent = "Cohle"; ch.append(b, document.createTextNode(st.channel ? " · " + st.channel : ""));
+    const now = new Set(st.speakers.map((p) => p.id));
+    st.speakers.forEach(add); [...shown.keys()].forEach((id) => { if (!now.has(id)) drop(id); }); fit();
+  });
+  document.getElementById("x").addEventListener("click", (e) => { e.stopPropagation(); window.overlayApi.close(); });
+  const pill = document.getElementById("pill");
+  pill.addEventListener("click", () => window.overlayApi.focusApp());
+  // the window lets every click through to what is underneath; only the header pill (with the X) catches the mouse
+  pill.addEventListener("mouseenter", () => window.overlayApi.interactive(true));
+  pill.addEventListener("mouseleave", () => window.overlayApi.interactive(false));
+  fit();
+</script></body></html>

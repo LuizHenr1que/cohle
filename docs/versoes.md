@@ -15,3 +15,4 @@ O login do app mostra **"Versão de teste N · o que mudou"**, e a landing mostr
 
 Histórico:
 - **Versão de teste 1:** prévia da sua tela ao compartilhar.
+- **Versão de teste 2:** widget de chamada em segundo plano e app mais leve.

@@ -9,7 +9,7 @@ import {
   ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, Ban, UserX, PhoneMissed, ShieldAlert, Menu, Eye, EyeOff,
 } from "lucide-react";
 import type { ChannelDTO, UserDTO } from "@cohle/shared";
-import { api } from "../api";
+import { api, assetUrl } from "../api";
 import { Avatar } from "./Avatar";
 import { sounds } from "../sounds";
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
@@ -289,10 +289,11 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   useEffect(() => {
     const room = new Room({
       adaptiveStream: true, dynacast: true,
-      webAudioMix: true,                                                    // lets the volume slider go above 100%
+      webAudioMix: (() => { try { return localStorage.getItem("cohle:webaudio") !== "off"; } catch { return true; } })(),   // lets the volume slider go above 100%
       videoCaptureDefaults: { resolution: VideoPresets.h540.resolution },   // lighter camera than 720p
     });
     roomRef.current = room;
+    try { if (localStorage.getItem("cohle:debug") === "1") (window as any).__cohleRoom = room; } catch { /* ignore */ }
     const bump = () => tick((n) => n + 1);
     (["TrackUnsubscribed", "LocalTrackPublished", "LocalTrackUnpublished", "TrackMuted", "TrackUnmuted", "TrackUnpublished"] as const)
       .forEach((e) => room.on(RoomEvent[e] as any, bump));
@@ -336,6 +337,15 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   }, [channel.id]);
 
   useEffect(() => { onSpeakers(speakers); }, [speakers]);
+
+  // Desktop only: tell the floating widget (shown while Cohle is in the background) who is talking.
+  useEffect(() => {
+    if (!window.cohle?.overlayState) return;
+    const sp = speakers.map((id) => users.find((u) => u.id === id)).filter((u): u is UserDTO => !!u)
+      .map((u) => ({ id: u.id, name: u.username, avatar: assetUrl(u.avatarUrl) }));
+    window.cohle.overlayState({ inCall: status === "connected", channel: channel.name, speakers: sp });
+  }, [speakers, users, status, channel.name]);
+  useEffect(() => () => window.cohle?.overlayState?.({ inCall: false, channel: "", speakers: [] }), []);
   useEffect(() => () => onSpeakers([]), []);
 
   const room = roomRef.current;

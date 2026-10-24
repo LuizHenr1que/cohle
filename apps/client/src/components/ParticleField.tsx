@@ -17,7 +17,7 @@ export function ParticleField() {
       w = window.innerWidth; h = window.innerHeight;
       canvas.width = w * dpr; canvas.height = h * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const count = Math.round(Math.min(60, Math.max(24, (w * h) / 32000)));
+      const count = Math.round(Math.min(34, Math.max(16, (w * h) / 60000)));
       dots = Array.from({ length: count }, () => ({
         x: Math.random() * w, y: Math.random() * h,
         vx: (Math.random() - 0.5) * 0.25, vy: 0.08 + Math.random() * 0.3, // gentle downward drift
@@ -26,11 +26,13 @@ export function ParticleField() {
     };
 
     // Draw at ~30fps, and not at all while the window is hidden or unfocused (e.g. you're in a game).
-    let last = 0;
+    let last = 0, cleared = false;
     const active = () => !document.hidden && document.hasFocus();
     const frame = (now = performance.now()) => {
       raf = requestAnimationFrame(frame);
-      if (!active() || now - last < 33) return;
+      if (!active() || now - last < 50) return;               // 20 fps is plenty for slow drifting dots
+      if (document.documentElement.classList.contains("in-call")) { if (!cleared) { ctx.clearRect(0, 0, w, h); cleared = true; } return; }   // never compete with a call
+      cleared = false;
       last = now;
       ctx.clearRect(0, 0, w, h);
       for (const d of dots) {
@@ -49,11 +51,12 @@ export function ParticleField() {
         }
       }
       for (const d of dots) {
-        ctx.fillStyle = d.hue > 0.7 ? "rgba(255, 138, 91, 0.75)" : "rgba(255, 110, 130, 0.7)";
-        ctx.shadowColor = "rgba(255, 59, 92, 0.8)"; ctx.shadowBlur = 8;
+        const warm = d.hue > 0.7;
+        ctx.fillStyle = warm ? "rgba(255, 138, 91, 0.16)" : "rgba(255, 59, 92, 0.16)";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r * 3, 0, Math.PI * 2); ctx.fill();               // cheap glow (no shadowBlur)
+        ctx.fillStyle = warm ? "rgba(255, 138, 91, 0.75)" : "rgba(255, 110, 130, 0.7)";
         ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
       }
-      ctx.shadowBlur = 0;
     };
 
     resize(); raf = requestAnimationFrame(frame);

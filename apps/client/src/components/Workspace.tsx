@@ -32,6 +32,8 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newChannelType, setNewChannelType] = useState<"TEXT" | "VOICE">();
   const [notice, setNotice] = useState<string>();
+  // while in a call, decorative effects pause (see ParticleField): the call gets the CPU
+  useEffect(() => { document.documentElement.classList.toggle("in-call", !!voice); return () => document.documentElement.classList.remove("in-call"); }, [!!voice]);
   const wide = useMedia("(min-width: 1000px)");   // below this the server/channel panels become a slide-over menu
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => { if (wide) setNavOpen(false); }, [wide]);
