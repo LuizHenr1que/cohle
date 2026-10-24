@@ -22,3 +22,4 @@ Histórico:
 - **Versão de teste 6:** widget da chamada arrastável pela tela e sem nomes fantasmas de quem saiu.
 - **Versão de teste 7:** mensagens diretas com histórico, confirmação antes de ligar a câmera e sons (susto, fogos, risos, chamando, tatakae) para toda a sala.
 - **Versão de teste 8:** botão de nova versão redesenhado, mais claro e chamativo.
+- **Versão de teste 9:** botão de sons da sala com nome e destaque na barra da chamada.
