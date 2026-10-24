@@ -12,3 +12,4 @@ tools/share/.secrets
 skills-lock.json
 tools/share/.secrets
 infra/prod/.env
+release-prod
