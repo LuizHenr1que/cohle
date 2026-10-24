@@ -34,7 +34,8 @@ if (process.env.NODE_ENV === "production") {
 const app = Fastify({ logger: true, trustProxy: process.env.TRUST_PROXY === "1", bodyLimit: 1_500_000 });
 await app.register(cors, { origin: true });
 await app.register(rateLimit, { global: false });   // enabled per route below
-const authLimit = { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } };
+// login/register attempts per minute per IP (AUTH_RATE_MAX only raises it for local test fixtures)
+const authLimit = { config: { rateLimit: { max: Number(process.env.AUTH_RATE_MAX ?? 10), timeWindow: "1 minute" } } };
 await app.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret" });
 
 const auth = async (req: any, reply: any) => {

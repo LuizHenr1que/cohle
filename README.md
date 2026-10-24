@@ -68,3 +68,9 @@ O servidor roda no **seu** computador; o amigo instala o app e conecta no seu IP
 - Ainda **não são assinados** (assinar exige conta paga da Apple e certificado do Windows), então o primeiro abrir pede um clique extra (explicado em `docs/amigo.md`).
 
 **Limites:** o seu Mac precisa ficar ligado, com o Docker e o `start.sh` rodando. Para muita gente de uma vez, o próximo passo é hospedar o servidor em uma máquina na nuvem.
+
+## Landing page
+`apps/landing` é o site de divulgação (estático, pronto para a Vercel). Veja `apps/landing/README.md`.
+
+## Produção
+O servidor roda no Render (plano grátis), o banco no Neon e a voz no LiveKit Cloud. Passo a passo em `docs/render.md`. Para conferir um servidor no ar: `node tools/bots/smoke.mjs https://cohle-api.onrender.com`.

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <linearGradient id="ring" x1="250" y1="260" x2="780" y2="780" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff3b5c"/><stop offset="1" stop-color="#ff9a62"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0.35" cy="0.3" r="0.85">
+      <stop offset="0" stop-color="#fff1f3"/><stop offset="0.35" stop-color="#ff7a8f"/><stop offset="1" stop-color="#ff3b5c"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="22"/></filter>
+  </defs>
+  <path d="M672.9 377 A210 210 0 1 0 672.9 647" stroke="url(#ring)" stroke-width="92" stroke-linecap="round" filter="url(#glow)" opacity=".55"/>
+  <path d="M672.9 377 A210 210 0 1 0 672.9 647" stroke="url(#ring)" stroke-width="92" stroke-linecap="round"/>
+  <circle cx="684" cy="512" r="62" fill="#ff3b5c" filter="url(#glow)" opacity=".7"/>
+  <circle cx="684" cy="512" r="56" fill="url(#orb)"/>
+</svg>

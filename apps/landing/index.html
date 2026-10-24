@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cohle: a resenha não acabou, só mudou de endereço</title>
+  <meta name="description" content="Chat, chamada de voz e compartilhamento de tela num app só. Leve o bastante para rodar com o jogo aberto. Para macOS e Windows." />
+  <meta name="theme-color" content="#0a0507" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Cohle: a resenha não acabou, só mudou de endereço" />
+  <meta property="og:description" content="Chat, voz e compartilhamento de tela num app só. Leve, bonito e feito para a galera." />
+  <meta property="og:image" content="og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>document.documentElement.classList.add("js")</script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="dots" aria-hidden="true"></canvas>
+
+  <header class="nav" id="nav">
+    <div class="wrap nav-in">
+      <a class="brand" href="#top" aria-label="Cohle, início">
+        <img src="logo-mark.svg" alt="" width="34" height="34" /><span>Cohle</span>
+      </a>
+      <nav class="links" aria-label="Seções">
+        <a href="#demo">Demo</a><a href="#recursos">Recursos</a><a href="#app-real">Prints</a><a href="#futuro">Em construção</a><a href="#baixar">Baixar</a><a href="#faq">FAQ</a>
+      </nav>
+      <a class="btn btn-grad btn-sm" href="#baixar" data-dl-primary>
+        <svg class="i"><use href="icons.svg#i-download"/></svg><span data-dl-label>Baixar</span>
+      </a>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero wrap">
+      <div class="hero-copy reveal">
+        <span class="eyebrow"><svg class="i"><use href="icons.svg#i-sparkles"/></svg>Chat, voz e tela. Sem drama.</span>
+        <h1>A resenha <span class="grad-text">não acabou</span>.<br />Só mudou de endereço.</h1>
+        <p class="lead">O Cohle junta chat, chamada de voz e compartilhamento de tela num app só. Leve o bastante para rodar com o jogo aberto, bonito o bastante para você querer ficar.</p>
+        <div class="cta-row">
+          <a class="btn btn-grad btn-lg" href="#baixar" data-dl-primary>
+            <svg class="i" data-dl-icon><use href="icons.svg#i-download"/></svg><span data-dl-label>Baixar</span>
+          </a>
+          <a class="btn btn-ghost btn-lg" href="#demo"><svg class="i"><use href="icons.svg#i-play"/></svg>Mexer na demo</a>
+        </div>
+        <p class="other-dl" data-dl-others></p>
+        <ul class="trust">
+          <li><svg class="i"><use href="icons.svg#i-check"/></svg>Grátis na fase de testes</li>
+          <li><svg class="i"><use href="icons.svg#i-check"/></svg>Sem cartão de crédito</li>
+          <li><svg class="i"><use href="icons.svg#i-check"/></svg>Sem pedir licença para conversar</li>
+        </ul>
+      </div>
+
+      <div class="hero-stage reveal" id="demo">
+        <div class="stage3d" id="stage3d">
+          <div class="float">
+            <div class="tilt" id="tilt">
+              <div class="glow" aria-hidden="true"></div>
+              <div class="mock-frame">
+                <div class="mock-wrap" id="mockWrap">
+                  <div class="m-app" id="mock" aria-label="Demonstração interativa do Cohle"></div>
+                </div>
+                <div class="demo-hint" id="demoHint"><svg class="i"><use href="icons.svg#i-play"/></svg>Clique à vontade. É de mentirinha.</div>
+              </div>
+              <span class="chip chip-live"><svg class="i"><use href="icons.svg#i-screen-share"/></svg>AO VIVO</span>
+              <span class="chip chip-voice"><svg class="i"><use href="icons.svg#i-volume-2"/></svg>6 na sala</span>
+              <span class="chip chip-light"><svg class="i"><use href="icons.svg#i-zap"/></svg>Modo Leve</span>
+            </div>
+          </div>
+        </div>
+        <div class="try" role="group" aria-label="Experimente na demo">
+          <span class="try-label">Experimente:</span>
+          <button data-try="voice"><svg class="i"><use href="icons.svg#i-volume-2"/></svg>Entrar na sala de voz</button>
+          <button data-try="stage"><svg class="i"><use href="icons.svg#i-monitor-play"/></svg>Assistir ao vivo</button>
+          <button data-try="owner"><svg class="i"><use href="icons.svg#i-crown"/></svg>Ser o dono</button>
+          <button data-try="lite"><svg class="i"><use href="icons.svg#i-zap"/></svg>Modo Leve</button>
+          <button data-try="chat"><svg class="i"><use href="icons.svg#i-message-square"/></svg>Mandar mensagem</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- JOKES -->
+    <section class="marquee" aria-label="Recadinhos">
+      <div class="marquee-track">
+        <div class="marquee-set">
+          <span><svg class="i"><use href="icons.svg#i-heart"/></svg>Seu servidor ficou órfão? A gente adotou.</span>
+          <span><svg class="i"><use href="icons.svg#i-bell"/></svg>Aquele app que sumiu do mapa? Não vamos dar nomes. O jurídico dorme melhor assim.</span>
+          <span><svg class="i"><use href="icons.svg#i-users"/></svg>Reúna a galera de novo. Você acaba de virar o síndico da resenha.</span>
+          <span><svg class="i"><use href="icons.svg#i-ban"/></svg>Banir é só para quem merece. E quem decide é o dono do servidor.</span>
+          <span><svg class="i"><use href="icons.svg#i-mic-off"/></svg>Mutar aquele amigo que respira no microfone nunca foi tão fácil.</span>
+          <span><svg class="i"><use href="icons.svg#i-gamepad-2"/></svg>Compartilhar a tela sem travar o jogo: sim, é possível.</span>
+        </div>
+        <div class="marquee-set" aria-hidden="true">
+          <span><svg class="i"><use href="icons.svg#i-heart"/></svg>Seu servidor ficou órfão? A gente adotou.</span>
+          <span><svg class="i"><use href="icons.svg#i-bell"/></svg>Aquele app que sumiu do mapa? Não vamos dar nomes. O jurídico dorme melhor assim.</span>
+          <span><svg class="i"><use href="icons.svg#i-users"/></svg>Reúna a galera de novo. Você acaba de virar o síndico da resenha.</span>
+          <span><svg class="i"><use href="icons.svg#i-ban"/></svg>Banir é só para quem merece. E quem decide é o dono do servidor.</span>
+          <span><svg class="i"><use href="icons.svg#i-mic-off"/></svg>Mutar aquele amigo que respira no microfone nunca foi tão fácil.</span>
+          <span><svg class="i"><use href="icons.svg#i-gamepad-2"/></svg>Compartilhar a tela sem travar o jogo: sim, é possível.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="section wrap" id="recursos">
+      <header class="sec-head reveal">
+        <span class="eyebrow"><svg class="i"><use href="icons.svg#i-layers"/></svg>Recursos</span>
+        <h2>Tudo o que a galera usa. Nada do que pesa.</h2>
+        <p>Cada coisa aqui já funciona hoje, no app que você baixa. As que ainda estão no forno ficam na seção de baixo, com etiqueta e tudo.</p>
+      </header>
+
+      <div class="bento">
+        <article class="card c-voice reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-volume-2"/></svg></div>
+          <h3>Voz que dá para ouvir</h3>
+          <p>Sala de voz com anel verde em quem está falando. Agora você sabe exatamente quem é o culpado do barulho.</p>
+          <div class="viz-voice" aria-hidden="true">
+            <span class="av speak">A</span><span class="av">B</span><span class="av speak">C</span><span class="av">D</span><span class="av">E</span>
+          </div>
+        </article>
+
+        <article class="card c-share reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-monitor-up"/></svg></div>
+          <h3>Compartilhe a tela do seu jeito</h3>
+          <p>Tela inteira ou uma janela. Escolha a qualidade: <b>Leve</b> para não atrapalhar o jogo, <b>Equilibrada</b> ou <b>Alta</b> para mostrar tudo. Quem assiste só baixa o vídeo se clicar em Assistir.</p>
+          <div class="seg" role="group" aria-label="Qualidade do compartilhamento">
+            <button class="on" data-q="Leve · 720p 15 fps">Leve</button><button data-q="Equilibrada · 720p 30 fps">Equilibrada</button><button data-q="Alta · 1080p 30 fps">Alta</button>
+          </div>
+          <p class="seg-note" id="segNote">Leve · 720p 15 fps</p>
+        </article>
+
+        <article class="card c-volume reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-sliders-horizontal"/></svg></div>
+          <h3>Volume por pessoa, até 200%</h3>
+          <p>O amigo que fala baixinho sobe. O que grita desce. Cada um do seu jeito, só para você.</p>
+          <label class="range"><span>Ana</span><input type="range" min="0" max="200" value="100" data-r /><b>100%</b></label>
+          <label class="range"><span>Bruno</span><input type="range" min="0" max="200" value="140" id="rangeDemo" data-r /><b id="rangeVal">140%</b></label>
+          <label class="range"><span>Carla</span><input type="range" min="0" max="200" value="60" data-r /><b>60%</b></label>
+          <p class="mini">Ou mute só para você, sem avisar ninguém.</p>
+        </article>
+
+        <article class="card c-owner reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-crown"/></svg></div>
+          <h3>O dono manda</h3>
+          <p>Silenciar para todos, desconectar da chamada, expulsar e banir. Com lista de banidos e botão de desbanir, porque todo mundo merece uma segunda chance.</p>
+          <ul class="owner-list" aria-hidden="true">
+            <li><svg class="i"><use href="icons.svg#i-mic-off"/></svg>Silenciar para todos</li>
+            <li><svg class="i"><use href="icons.svg#i-phone-missed"/></svg>Desconectar da chamada</li>
+            <li><svg class="i"><use href="icons.svg#i-user-x"/></svg>Expulsar</li>
+            <li><svg class="i"><use href="icons.svg#i-ban"/></svg>Banir</li>
+          </ul>
+        </article>
+
+        <article class="card c-light reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-zap"/></svg></div>
+          <h3>Feito para ficar aberto enquanto você joga</h3>
+          <p>Modo Leve, efeitos que pausam quando a janela perde o foco e transmissão que só roda quando você pede. Seu PC agradece, seu jogo também.</p>
+          <ul class="checks" aria-hidden="true">
+            <li><svg class="i"><use href="icons.svg#i-check"/></svg>Efeitos pausam sem foco</li>
+            <li><svg class="i"><use href="icons.svg#i-check"/></svg>Vídeo só quando você assiste</li>
+            <li><svg class="i"><use href="icons.svg#i-check"/></svg>Carregamento inicial enxuto</li>
+          </ul>
+          <div class="meter" aria-hidden="true"><i style="--w:18%"></i><span>Com o jogo em primeiro plano</span></div>
+        </article>
+
+        <article class="card c-templates reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-layers"/></svg></div>
+          <h3>Servidor pronto em dois cliques</h3>
+          <p>Escolha um modelo e o servidor já nasce com os canais certos.</p>
+          <div class="tpls" aria-hidden="true">
+            <span><svg class="i"><use href="icons.svg#i-gamepad-2"/></svg>Jogos</span>
+            <span><svg class="i"><use href="icons.svg#i-users"/></svg>Amigos</span>
+            <span><svg class="i"><use href="icons.svg#i-graduation-cap"/></svg>Estudo</span>
+            <span><svg class="i"><use href="icons.svg#i-globe"/></svg>Comunidade</span>
+            <span><svg class="i"><use href="icons.svg#i-palette"/></svg>Criadores</span>
+          </div>
+        </article>
+
+        <article class="card c-invite reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-user-plus"/></svg></div>
+          <h3>Convite por código</h3>
+          <p>Um código e a galera entra. Se o código vazar, o dono gera outro e o antigo para de funcionar.</p>
+          <code class="code">a3f9c1d07b</code>
+        </article>
+
+        <article class="card c-camera reveal">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-headphones"/></svg></div>
+          <h3>Mutar, ensurdecer, câmera</h3>
+          <p>Os botões que você espera, no lugar que você espera. E sons discretos para avisar quem entrou, quem saiu e quando chegou mensagem.</p>
+        </article>
+      </div>
+    </section>
+
+
+    <!-- REAL SCREENSHOTS -->
+    <section class="section wrap" id="app-real">
+      <header class="sec-head reveal">
+        <span class="eyebrow"><svg class="i"><use href="icons.svg#i-image"/></svg>Prints de verdade</span>
+        <h2>Sem Photoshop. É o app mesmo.</h2>
+        <p>Estas telas vêm do Cohle rodando de verdade. As pessoas são fictícias, mas o barulho é real.</p>
+      </header>
+      <div class="gallery reveal">
+        <div class="shot-tabs" role="tablist" aria-label="Telas do app">
+          <button class="on" role="tab" data-shot="voz"><svg class="i"><use href="icons.svg#i-volume-2"/></svg>Sala de voz</button>
+          <button role="tab" data-shot="ao-vivo"><svg class="i"><use href="icons.svg#i-monitor-play"/></svg>Ao vivo</button>
+          <button role="tab" data-shot="dono"><svg class="i"><use href="icons.svg#i-crown"/></svg>Menu do dono</button>
+          <button role="tab" data-shot="chat"><svg class="i"><use href="icons.svg#i-message-square"/></svg>Chat</button>
+          <button role="tab" data-shot="criar"><svg class="i"><use href="icons.svg#i-layers"/></svg>Novo servidor</button>
+          <button role="tab" data-shot="membros"><svg class="i"><use href="icons.svg#i-users"/></svg>Membros</button>
+          <button role="tab" data-shot="login"><svg class="i"><use href="icons.svg#i-key-round"/></svg>Entrar</button>
+        </div>
+        <div class="shot-stage" id="shotStage">
+          <figure class="shot-main" id="shotMain">
+            <div class="shot-glow" aria-hidden="true"></div>
+            <img id="shotImg" src="shots/voz.jpg" width="1800" height="1125" alt="Sala de voz do Cohle com oito pessoas, anéis verdes em quem está falando e botão para assistir transmissões" />
+          </figure>
+          <p class="shot-cap" id="shotCap"></p>
+        </div>
+      </div>
+
+      <div class="phones reveal">
+        <div class="phones-copy">
+          <h3>No celular, em construção. No tamanho do celular, já funciona.</h3>
+          <p>O app de celular ainda está no forno, mas o layout já se adapta a telas pequenas: menu que desliza, grade de pessoas que se reorganiza e transmissão em tela cheia. Respira, ele chega.</p>
+          <span class="badge wip"><svg class="i"><use href="icons.svg#i-smartphone"/></svg>App de celular: em construção</span>
+        </div>
+        <div class="phones-stage" id="phonesStage">
+          <div class="phone p1"><img src="shots/celular-voz.jpg" loading="lazy" width="780" height="1688" alt="Sala de voz no tamanho de celular" /></div>
+          <div class="phone p2"><img src="shots/celular-menu.jpg" loading="lazy" width="780" height="1688" alt="Menu lateral no tamanho de celular" /></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FUTURE -->
+    <section class="section wrap" id="futuro">
+      <div class="calm card reveal">
+        <div class="calm-ic"><svg class="i"><use href="icons.svg#i-hourglass"/></svg></div>
+        <div>
+          <h2>Calma, a gente está construindo.</h2>
+          <p>A versão <b>web</b> (direto no navegador) e o <b>app de celular</b> estão sendo criados agora. Respira, toma uma água. O desktop já está de pé e servindo café.</p>
+        </div>
+        <div class="calm-badges">
+          <span class="badge ok"><svg class="i"><use href="icons.svg#i-laptop"/></svg>Desktop: disponível</span>
+          <span class="badge wip"><svg class="i"><use href="icons.svg#i-globe"/></svg>Web: em construção</span>
+          <span class="badge wip"><svg class="i"><use href="icons.svg#i-smartphone"/></svg>Celular: em construção</span>
+        </div>
+      </div>
+
+      <div class="road">
+        <div class="road-head reveal">
+          <h3>O que vem por aí</h3>
+          <p>Sem promessa de data, só de empenho. A ordem pode mudar conforme a galera pedir.</p>
+        </div>
+        <ul class="road-grid">
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-globe"/></svg><div><b>Versão web</b><span>Entrar pelo navegador, sem instalar</span></div><em class="badge wip">Em construção</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-smartphone"/></svg><div><b>App de celular</b><span>A resenha no bolso</span></div><em class="badge wip">Em construção</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-message-square"/></svg><div><b>Mensagens diretas</b><span>Conversa a dois, sem plateia</span></div><em class="badge plan">Planejado</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-file-up"/></svg><div><b>Arquivos e imagens</b><span>Mandar o meme na qualidade original</span></div><em class="badge plan">Planejado</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-smile"/></svg><div><b>Reações e respostas</b><span>Responder sem perder o fio</span></div><em class="badge plan">Planejado</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-key-round"/></svg><div><b>Login com Google e GitHub</b><span>E recuperar senha, claro</span></div><em class="badge plan">Planejado</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-shield-alert"/></svg><div><b>Cargos e permissões</b><span>Moderadores além do dono</span></div><em class="badge plan">Planejado</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-bot"/></svg><div><b>Bots e integrações</b><span>Para quem gosta de automatizar</span></div><em class="badge dream">Sonhando alto</em></li>
+          <li class="reveal"><svg class="i"><use href="icons.svg#i-palette"/></svg><div><b>Temas</b><span>Seu Cohle, sua cara</span></div><em class="badge dream">Sonhando alto</em></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- BANNER -->
+    <section class="section wrap">
+      <div class="banner reveal">
+        <img src="banner.svg" alt="Pessoas conectadas ao redor do símbolo do Cohle" loading="lazy" />
+        <div class="banner-copy">
+          <h2>Chama a galera.</h2>
+          <p>Cria o servidor, manda o código e pronto. A parte difícil, convencer o povo a sair do sofá, continua com você.</p>
+          <a class="btn btn-grad btn-lg" href="#baixar" data-dl-primary><svg class="i" data-dl-icon><use href="icons.svg#i-download"/></svg><span data-dl-label>Baixar</span></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section class="section wrap" id="baixar">
+      <header class="sec-head reveal">
+        <span class="eyebrow"><svg class="i"><use href="icons.svg#i-download"/></svg>Baixar</span>
+        <h2>Escolha o seu sistema.</h2>
+        <p data-dl-detected>Escolha abaixo o instalador do seu computador.</p>
+      </header>
+      <div class="dl-grid">
+        <article class="card dl reveal" data-os="mac-arm64">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-laptop"/></svg></div>
+          <h3>macOS</h3><p class="muted">Apple Silicon (M1, M2, M3, M4)</p>
+          <a class="btn btn-grad" href="#baixar" data-dl="mac-arm64"><svg class="i"><use href="icons.svg#i-download"/></svg>Baixar .dmg <small>97 MB</small></a>
+        </article>
+        <article class="card dl reveal" data-os="mac-x64">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-laptop"/></svg></div>
+          <h3>macOS</h3><p class="muted">Intel (Macs mais antigos)</p>
+          <a class="btn btn-ghost" href="#baixar" data-dl="mac-x64"><svg class="i"><use href="icons.svg#i-download"/></svg>Baixar .dmg <small>101 MB</small></a>
+        </article>
+        <article class="card dl reveal" data-os="win-x64">
+          <div class="card-ic"><svg class="i"><use href="icons.svg#i-monitor"/></svg></div>
+          <h3>Windows</h3><p class="muted">Windows 10 e 11, 64 bits</p>
+          <a class="btn btn-grad" href="#baixar" data-dl="win-x64"><svg class="i"><use href="icons.svg#i-download"/></svg>Baixar .zip <small>107 MB</small></a>
+        </article>
+      </div>
+
+      <div class="steps card reveal">
+        <div class="steps-ic"><svg class="i"><use href="icons.svg#i-shield-alert"/></svg></div>
+        <div>
+          <h3>Primeira vez? O sistema pode desconfiar.</h3>
+          <p>O Cohle ainda não tem a assinatura paga das lojas, então o seu computador faz uma cara de estranhamento. É esperado e leva dez segundos para resolver.</p>
+          <ol>
+            <li><b>macOS:</b> abra o .dmg, arraste o Cohle para Aplicativos e, na primeira vez, clique com o botão direito e escolha <i>Abrir</i>.</li>
+            <li><b>Windows:</b> descompacte o .zip e abra o <i>Cohle.exe</i>. Se aparecer o aviso azul, clique em <i>Mais informações</i> e depois em <i>Executar assim mesmo</i>.</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section wrap narrow" id="faq">
+      <header class="sec-head reveal">
+        <span class="eyebrow"><svg class="i"><use href="icons.svg#i-message-square"/></svg>FAQ</span>
+        <h2>Perguntas que a gente já ouviu (e algumas que inventou).</h2>
+      </header>
+      <div class="faq reveal">
+        <details><summary>É grátis?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Hoje não cobramos nada. Qualquer mudança no futuro será avisada com bastante antecedência. A gente não é do tipo que aparece de surpresa na fatura.</p></details>
+        <details><summary>Roda no meu computador?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Roda em Macs com chip Apple e Intel, e em Windows 64 bits. Ele foi pensado para ficar aberto em segundo plano enquanto você joga, sem pesar.</p></details>
+        <details><summary>E no navegador e no celular?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Os dois estão sendo criados. Por favor, tenha calma: coisa boa leva tempo, e coisa mal feita leva reclamação.</p></details>
+        <details><summary>Vocês têm ligação com outros apps de conversa?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Nenhuma. O Cohle é independente e não é afiliado, patrocinado ou aprovado por nenhum outro serviço. Qualquer semelhança de ideia é coincidência de quem também gosta de conversar.</p></details>
+        <details><summary>Como ficam as minhas mensagens e dados?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Contas e mensagens ficam guardadas no servidor do Cohle. Estamos em fase de testes: ainda não existe criptografia ponta a ponta nem recuperação automática de senha, e ambos estão no nosso caminho. Por enquanto, não use o Cohle para o que é realmente secreto.</p></details>
+        <details><summary>Posso mutar ou expulsar alguém?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>O dono do servidor pode silenciar para todos, desconectar da chamada, expulsar e banir (e desbanir depois). Cada pessoa também pode mutar qualquer um só para si e ajustar o volume dele.</p></details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap foot-in">
+      <a class="brand" href="#top"><img src="logo-mark.svg" alt="" width="30" height="30" /><span>Cohle</span></a>
+      <p>Feito com café e zero paciência para app lento.</p>
+      <p class="legal">O Cohle é independente e não é afiliado, patrocinado ou aprovado por nenhum outro serviço de conversa. Marcas citadas pertencem aos seus donos. <span id="year"></span></p>
+    </div>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>

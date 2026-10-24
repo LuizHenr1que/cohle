@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  *{box-sizing:border-box} body{margin:0;width:1200px;height:630px;overflow:hidden;background:#0a0507;font-family:Inter,system-ui,sans-serif;color:#f5eaee;position:relative}
+  .bg{position:absolute;inset:0;background:radial-gradient(700px 420px at 0% -10%,rgba(255,59,92,.35),transparent 60%),radial-gradient(640px 460px at 100% 100%,rgba(255,138,91,.25),transparent 60%)}
+  .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:44px 44px;-webkit-mask:radial-gradient(circle at 70% 50%,#000 20%,transparent 75%)}
+  .copy{position:absolute;left:64px;top:0;bottom:0;width:470px;display:flex;flex-direction:column;justify-content:center;gap:22px}
+  .brand{display:flex;align-items:center;gap:14px;font-weight:800;font-size:34px;letter-spacing:-.02em}
+  .brand img{width:52px;height:52px}
+  h1{margin:0;font-size:60px;line-height:1.04;letter-spacing:-.03em;font-weight:800}
+  h1 span{background:linear-gradient(135deg,#ff9db0,#ffb48f);-webkit-background-clip:text;background-clip:text;color:transparent}
+  p{margin:0;font-size:22px;color:#cdbcc3;line-height:1.4}
+  .tags{display:flex;gap:10px;font-size:18px;font-weight:700}
+  .tags b{padding:8px 16px;border-radius:99px;background:rgba(255,59,92,.15);border:1px solid rgba(255,59,92,.4);color:#ff9db0}
+  .card{position:absolute;right:-130px;top:90px;width:740px;perspective:1000px}
+  .card div{transform:rotateY(-14deg) rotateX(6deg);position:relative}
+  .card div::before{content:"";position:absolute;inset:-4px;border-radius:30px;background:linear-gradient(135deg,#ff3b5c,#ff8a5b,#ffd3a0);filter:blur(34px);opacity:.7}
+  .card img{position:relative;display:block;width:100%;border-radius:26px;border:1px solid rgba(255,255,255,.2);box-shadow:0 40px 90px rgba(0,0,0,.6)}
+</style>
+<div class="bg"></div><div class="grid"></div>
+<div class="copy">
+  <div class="brand"><img src="../logo-mark.svg" alt="">Cohle</div>
+  <h1>A resenha <span>não acabou.</span><br>Só mudou de endereço.</h1>
+  <p>Chat, voz e compartilhamento de tela num app só. Para macOS e Windows.</p>
+  <div class="tags"><b>Leve</b><b>Bonito</b><b>Feito para a galera</b></div>
+</div>
+<div class="card"><div><img src="../shots/voz.jpg" alt=""></div></div>

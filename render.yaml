@@ -10,6 +10,14 @@ services:
     dockerContext: .
     healthCheckPath: /health
     autoDeploy: true
+    buildFilter:                 # redeploy only when the API (or what it is built from) changes, not for landing/docs edits
+      paths:
+        - apps/server/**
+        - packages/shared/**
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - package.json
+        - render.yaml
     envVars:
       - key: NODE_ENV
         value: production

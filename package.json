@@ -7,6 +7,7 @@
     "infra:down": "docker compose -f infra/docker-compose.yml down",
     "dev:server": "pnpm --filter @cohle/server dev",
     "dev:client": "pnpm --filter @cohle/client dev",
-    "dev:desktop": "pnpm --filter @cohle/desktop dev"
+    "dev:desktop": "pnpm --filter @cohle/desktop dev",
+    "dev:landing": "python3 -m http.server 5174 -d apps/landing"
   }
 }
