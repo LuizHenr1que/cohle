@@ -56,9 +56,11 @@ const p = (t: string) => `<p style="margin:0 0 16px;font-size:15px;line-height:1
 const small = (t: string) => `<p style="margin:0 0 14px;font-size:13px;line-height:1.6;color:${C.mute}">${t}</p>`;
 
 function codeBlock(code: string, minutes: number): string {
-  const cell = (d: string) => `<td align="center" width="14%" style="width:14%;padding:0 3px"><div style="background:${C.box};border:1px solid #3b202b;border-radius:14px;padding:14px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:30px;font-weight:800;color:${C.ink};line-height:1">${d}</div></td>`;
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 14px"><tr>${[...code].map(cell).join("")}</tr></table>
-  <p style="margin:0 0 18px;font-size:13px;color:${C.mute}">Este código vale por <b style="color:${C.ink}">${minutes} minutos</b> e só pode ser usado uma vez.</p>`;
+  // ONE text node (not six boxes): selecting or double-clicking copies the whole code in a single piece
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 14px"><tr><td align="center" style="background:${C.box};border:1px solid #3b202b;border-radius:16px;padding:20px 8px">
+    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:38px;font-weight:800;letter-spacing:.42em;padding-left:.42em;color:${C.ink};line-height:1;white-space:nowrap">${code}</span>
+  </td></tr></table>
+  <p style="margin:0 0 18px;font-size:13px;color:${C.mute}">Selecione o código com um duplo clique para copiar. Ele vale por <b style="color:${C.ink}">${minutes} minutos</b> e só pode ser usado uma vez.</p>`;
 }
 
 function button(href: string, label: string): string {

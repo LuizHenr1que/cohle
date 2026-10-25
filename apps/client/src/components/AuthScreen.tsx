@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Mic, MonitorUp, MessagesSquare, FlaskConical, MailCheck, KeyRound, ArrowLeft } from "lucide-react";
+import { Mic, MonitorUp, MessagesSquare, FlaskConical, MailCheck, KeyRound, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Logo } from "./Logo";
 import { BUILD, BUILD_LABEL } from "../version";
 import { api, API, SERVER_LOCKED, checkServer, normalizeServerUrl, switchServer } from "../api";
@@ -21,14 +21,15 @@ const GithubIcon = () => (
 // Quick login for the shared test accounts. On in dev and in installers built with VITE_TEST_LOGIN=1.
 const SHOW_TEST_LOGIN = import.meta.env.DEV || import.meta.env.VITE_TEST_LOGIN === "1";
 
-export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) => void }) {
+export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, remember: boolean) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [step, setStep] = useState<"form" | "verify" | "forgot" | "reset">("form");   // e-mail confirmation / password reset
   const [code, setCode] = useState("");
   const [pw2, setPw2] = useState("");
   const [wait, setWait] = useState(0);                                               // seconds until another code can be requested
   const [info, setInfo] = useState("");
-  const [f, setF] = useState({ email: "", username: "", password: "" });
+  const [remember, setRemember] = useState(() => { try { return localStorage.getItem("cohle:remember") !== "off"; } catch { return true; } });
+  const [f, setF] = useState(() => { let email = ""; try { email = localStorage.getItem("cohle:last-email") ?? ""; } catch { /* ignore */ } return { email, username: "", password: "" }; });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [slide, setSlide] = useState(0);
@@ -57,7 +58,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
     try {
       const r = await fn();
       if (r?.needsVerification) toVerify(r.email ?? f.email);
-      else if (r?.token) { if (isNew) { try { localStorage.setItem(`cohle:tour:${r.user.id}`, "pending"); } catch { /* private mode */ } } onDone(r.token, r.user); }
+      else if (r?.token) { if (isNew) { try { localStorage.setItem(`cohle:tour:${r.user.id}`, "pending"); } catch { /* private mode */ } } try { localStorage.setItem("cohle:remember", remember ? "on" : "off"); if (remember) localStorage.setItem("cohle:last-email", f.email); else localStorage.removeItem("cohle:last-email"); } catch { /* ignore */ } onDone(r.token, r.user, remember); }
     } catch (e: any) {
       if (e?.data?.needsVerification) { toVerify(e.data.email ?? f.email); api.resend(e.data.email ?? f.email).catch(() => {}); }   // the old code may have expired: send a fresh one
       else setErr(e.message);
@@ -159,8 +160,8 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
               <h1 className="text-3xl font-bold">Escolha uma nova senha</h1>
               <p className="text-muted text-sm">Se existir uma conta com <b className="text-ink">{f.email}</b>, o código chegou por e-mail. Digite-o e crie a nova senha.</p>
               <CodeInput value={code} onChange={setCode} disabled={busy} />
-              <input className={input} placeholder="Nova senha (mín. 8 caracteres)" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
-              <input className={input} placeholder="Repita a nova senha" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+              <PasswordInput className={input} placeholder="Nova senha (mín. 8 caracteres)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+              <PasswordInput className={input} placeholder="Repita a nova senha" value={pw2} onChange={(e) => setPw2(e.target.value)} />
               <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition disabled:opacity-60">{busy ? "Salvando..." : "Redefinir senha e entrar"}</button>
             </form>
           )}
@@ -193,8 +194,9 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
           {mode === "register" && (
             <input className={input} placeholder="Nome de usuário" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
           )}
-          <input className={input} placeholder="Senha (mín. 8 caracteres)" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+          <PasswordInput className={input} placeholder="Senha (mín. 8 caracteres)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
           {mode === "login" && <button type="button" onClick={() => { setErr(""); setInfo(""); setStep("forgot"); }} className="text-sm text-accent2 hover:underline -mt-1 block ml-auto">Esqueci minha senha</button>}
+          <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none w-fit"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-[#ff3b5c] size-4" /> Lembrar de mim neste computador</label>
           {err && <p className="text-accent text-sm">{err}</p>}
 
           <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition shadow-[0_8px_30px_rgba(255,59,92,0.35)] disabled:opacity-60">
@@ -248,5 +250,17 @@ function CodeInput({ value, onChange, disabled }: { value: string; onChange: (v:
     <input value={value} disabled={disabled} autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" aria-label="Código de 6 dígitos"
       onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
       className="w-full rounded-xl bg-white/5 border border-line px-4 py-4 text-center text-3xl font-bold tracking-[0.55em] pl-[0.55em] outline-none focus:border-accent focus:bg-white/[0.07] transition placeholder:text-muted/40 tabular-nums" />
+  );
+}
+
+/** Password field with a show/hide eye. */
+function PasswordInput({ className, ...rest }: React.InputHTMLAttributes<HTMLInputElement>) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input {...rest} type={show ? "text" : "password"} className={`${className ?? ""} pr-12`} />
+      <button type="button" tabIndex={-1} onClick={() => setShow((v) => !v)} aria-label={show ? "Ocultar senha" : "Mostrar senha"} title={show ? "Ocultar senha" : "Mostrar senha"}
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-muted hover:text-ink">{show ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+    </div>
   );
 }

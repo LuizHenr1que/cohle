@@ -11,7 +11,7 @@ const setVal = (sel, v) => ev(`(()=>{const e=document.querySelector(${JSON.strin
 const click = (txt) => ev(`(()=>{const e=[...document.querySelectorAll('button')].find(b=>b.innerText.includes(${JSON.stringify(txt)}));if(e)e.click();return !!e})()`);
 const lastCode = (to) => { const t = readFileSync("/tmp/server.log", "utf8"); const m = [...t.matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))]; return m.at(-1)?.[1]; };
 const tag = Date.now().toString(36), email = `tour_${tag}@exemplo.dev`;
-await ev(`localStorage.clear(); location.reload()`); await sleep(2500);
+await ev(`localStorage.clear(); sessionStorage.clear(); location.reload()`); await sleep(2500);
 await click("Não tem conta? Cadastre-se"); await sleep(300);
 await setVal('input[type="email"]', email); await setVal('input[placeholder="Nome de usuário"]', `tour_${tag}`.slice(0, 20)); await setVal('input[type="password"]', "senha-forte-1");
 await click("Criar conta"); await sleep(1800);
@@ -36,7 +36,7 @@ ok("perfil → «Rever o tour» reabre", await ev(`!!document.querySelector('[ro
 await click("Pular tour"); await sleep(400);
 ok("«Pular tour» fecha na hora", await ev(`!document.querySelector('[role=dialog][aria-label="Tour de boas-vindas"]')`));
 // existing accounts never see it
-await ev(`localStorage.clear(); location.reload()`); await sleep(2500);
+await ev(`localStorage.clear(); sessionStorage.clear(); location.reload()`); await sleep(2500);
 const a = await (await fetch("http://localhost:3001/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "teste1@cohle.dev", password: "teste12345" }) })).json();
 await ev(`localStorage.setItem('token',${JSON.stringify(a.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(a.user))});location.reload()`); await sleep(4000);
 ok("conta que já existia não vê o tour", await ev(`!document.querySelector('[role=dialog][aria-label="Tour de boas-vindas"]')`));

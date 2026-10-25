@@ -21,18 +21,23 @@ export async function checkServer(url: string): Promise<boolean> {
 }
 /** Switch server: accounts belong to one server, so sign out and reload. */
 export function switchServer(url: string) {
-  try { localStorage.setItem(SERVER_KEY, url); localStorage.removeItem("token"); localStorage.removeItem("me"); } catch { /* ignore */ }
+  try { localStorage.setItem(SERVER_KEY, url); clearStored("token", "me"); } catch { /* ignore */ }
   location.reload();
 }
 
 // Image URLs from the API are paths (cacheable); data: URLs are local previews.
 export const assetUrl = (u?: string | null) => (!u ? null : u.startsWith("data:") || u.startsWith("http") ? u : API + u);
 
-let token: string | null = localStorage.getItem("token");
+// "Remember me": the session lives in localStorage (survives closing the app) or only in sessionStorage (until the app is quit).
+export const getStored = (k: string): string | null => { try { return sessionStorage.getItem(k) ?? localStorage.getItem(k); } catch { return null; } };
+export const setStored = (k: string, v: string, remember: boolean) => { try { (remember ? localStorage : sessionStorage).setItem(k, v); (remember ? sessionStorage : localStorage).removeItem(k); } catch { /* storage unavailable */ } };
+export const clearStored = (...ks: string[]) => { try { ks.forEach((k) => { localStorage.removeItem(k); sessionStorage.removeItem(k); }); } catch { /* ignore */ } };
+
+let token: string | null = getStored("token");
 export const getToken = () => token;
-export const setToken = (t: string | null) => {
+export const setToken = (t: string | null, remember = true) => {
   token = t;
-  t ? localStorage.setItem("token", t) : localStorage.removeItem("token");
+  t ? setStored("token", t, remember) : clearStored("token");
 };
 
 // Server messages are in English: show them to the person in clear Portuguese.

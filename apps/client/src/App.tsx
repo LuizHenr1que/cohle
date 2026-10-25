@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, getToken, setToken } from "./api";
+import { api, getToken, setToken, getStored, setStored, clearStored } from "./api";
 import { AuthScreen } from "./components/AuthScreen";
 import { Workspace } from "./components/Workspace";
 import { ParticleField } from "./components/ParticleField";
@@ -7,7 +7,7 @@ import { ParticleField } from "./components/ParticleField";
 export function App() {
   const [authed, setAuthed] = useState(!!getToken());
   const [me, setMe] = useState<{ id: string; username: string } | null>(
-    JSON.parse(localStorage.getItem("me") ?? "null"),
+    JSON.parse(getStored("me") ?? "null"),
   );
 
   useEffect(() => {
@@ -39,10 +39,10 @@ export function App() {
   if (!authed || !me)
     return shell(
       <AuthScreen
-        onDone={(t, u) => {
-          setToken(t); localStorage.setItem("me", JSON.stringify(u)); setMe(u); setAuthed(true);
+        onDone={(t, u, remember) => {
+          setToken(t, remember); setStored("me", JSON.stringify(u), remember); setMe(u); setAuthed(true);
         }}
       />,
     );
-  return shell(<Workspace me={me} fx={fx && !lite} onToggleFx={toggleFx} lite={lite} onToggleLite={toggleLite} onLogout={() => { setToken(null); localStorage.removeItem("me"); setAuthed(false); setMe(null); }} />);
+  return shell(<Workspace me={me} fx={fx && !lite} onToggleFx={toggleFx} lite={lite} onToggleLite={toggleLite} onLogout={() => { setToken(null); clearStored("me"); setAuthed(false); setMe(null); }} />);
 }

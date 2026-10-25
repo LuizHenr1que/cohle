@@ -10,7 +10,7 @@ const setVal = (sel, v) => ev(`(()=>{const e=document.querySelector(${JSON.strin
 const click = (txt) => ev(`(()=>{const e=[...document.querySelectorAll('button')].find(b=>b.innerText.includes(${JSON.stringify(txt)}));if(e)e.click();return !!e})()`);
 const lastCode = (to) => { const t = readFileSync("/tmp/server.log", "utf8"); const m = [...t.matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))]; return m.length ? m.at(-1)[1] : null; };
 const tag = Date.now().toString(36), email = `ui_${tag}@exemplo.dev`, user = `ui_${tag}`.slice(0, 20);
-const fresh = async () => { await ev(`localStorage.clear(); location.reload()`); await sleep(2500); };
+const fresh = async () => { await ev(`localStorage.clear(); sessionStorage.clear(); location.reload()`); await sleep(2500); };
 
 await fresh();
 await click("Não tem conta? Cadastre-se"); await sleep(300);
