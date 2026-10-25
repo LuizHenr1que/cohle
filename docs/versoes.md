@@ -36,3 +36,4 @@ Histórico (antes da Versão 1 eram "versões de teste" 1 a 13, numeração `0.1
 - **Versão 3 (0.0.3):** o Cohle.exe agora leva o ícone e o nome do Cohle (antes aparecia "Electron" no Windows) e a prévia da landing deixou de ser interativa.
 - **Versão 4 (0.0.4):** a tela de atualização agora usa a arte do banner do Cohle, com frases de boas-vindas que vão passando enquanto baixa.
 - **Versão 5 (0.0.5):** ao fechar a janela o Cohle fica na bandeja do sistema (menu: abrir, verificar atualização, iniciar com o computador e sair) e a barra lateral de servidores pode ser expandida para mostrar nomes e botões.
+- **Versão 6 (0.0.6):** cadastro com confirmação por e-mail (código de 6 dígitos), "Esqueci minha senha", e-mail de boas-vindas, tour de boas-vindas para contas novas e mensagens de erro em português.
