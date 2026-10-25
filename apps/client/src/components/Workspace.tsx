@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu } from "lucide-react";
 import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO } from "@cohle/shared";
 import { api, connectSocket } from "../api";
 // The call UI (and the LiveKit SDK, the heaviest dependency) loads only when you join a voice channel.
@@ -68,6 +68,18 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
 
   const server = servers.find((s) => s.id === serverId);
   const isOwner = server?.ownerId === self.id;
+  // Left rail: icons only, or expanded with names and labels (remembered)
+  const [rail, setRail] = useState(() => { try { return localStorage.getItem("cohle:rail") === "open"; } catch { return false; } });
+  const toggleRail = (v: boolean) => { setRail(v); try { localStorage.setItem("cohle:rail", v ? "open" : "closed"); } catch { /* private mode */ } };
+  const railOpen = wide && rail;
+  const rb = (o: { title: string; label?: string; icon: React.ReactNode; onClick: () => void; cls: string; badge?: React.ReactNode }) => (
+    <button key={o.title} onClick={o.onClick} title={o.title}
+      className={`relative shrink-0 rounded-2xl transition ${railOpen ? "w-full h-12 flex items-center gap-3 px-3.5" : "size-12 grid place-items-center"} ${o.cls}`}>
+      {o.icon}
+      {railOpen && <span className="truncate text-sm font-medium flex-1 text-left">{o.label ?? o.title}</span>}
+      {o.badge}
+    </button>
+  );
 
   // Reload servers and reconcile the selection (a server/channel may have been deleted or renamed).
   const reload = () => api.servers().then((l) => {
@@ -229,36 +241,42 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       {(wide || navOpen) && (
       <div className={wide ? "flex gap-3 shrink-0" : "fixed z-50 left-2 bottom-2 top-[calc(var(--titlebar,0px)+0.5rem)] flex gap-2 w-[min(94vw,400px)]"}>
       {/* servers rail */}
-      <nav className="glass rounded-3xl w-[72px] shrink-0 flex flex-col items-center gap-2 py-3 overflow-y-auto">
-        <div title="Cohle" className="mb-1 shrink-0"><Logo size={40} /></div>
-        <button onClick={() => { setDmOpen(true); dms.load(); }} title="Mensagens diretas"
-          className={`relative shrink-0 size-12 rounded-2xl grid place-items-center transition ${dmOpen ? "bg-accent text-white shadow-[0_6px_20px_rgba(255,59,92,0.4)]" : "bg-white/5 text-accent hover:bg-white/10"}`}>
-          <MessageCircle size={20} />
-          {dms.unread > 0 && <span className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center border-2 border-surface">{dms.unread > 99 ? "99+" : dms.unread}</span>}
-        </button>
+      <nav className={`glass rounded-3xl shrink-0 flex flex-col gap-2 py-3 overflow-y-auto ${railOpen ? "w-[232px] items-stretch px-2.5" : "w-[72px] items-center"}`}>
+        {railOpen ? (
+          <div className="flex items-center gap-2.5 px-1 mb-1 shrink-0">
+            <Logo size={36} /><span className="font-bold tracking-tight flex-1">Cohle</span>
+            <button onClick={() => toggleRail(false)} title="Recolher a barra lateral" aria-label="Recolher a barra lateral" className="p-2 rounded-xl text-muted hover:text-ink hover:bg-white/10"><PanelLeftClose size={18} /></button>
+          </div>
+        ) : (<>
+          <div title="Cohle" className="mb-0.5 shrink-0"><Logo size={40} /></div>
+          {wide && <button onClick={() => toggleRail(true)} title="Expandir a barra lateral (nomes e botões)" aria-label="Expandir a barra lateral" className="shrink-0 size-9 rounded-xl text-muted grid place-items-center hover:text-ink hover:bg-white/10"><PanelLeftOpen size={18} /></button>}
+        </>)}
+        {rb({ title: "Mensagens diretas", icon: <MessageCircle size={20} />, onClick: () => { setDmOpen(true); dms.load(); },
+          cls: dmOpen ? "bg-accent text-white shadow-[0_6px_20px_rgba(255,59,92,0.4)]" : "bg-white/5 text-accent hover:bg-white/10",
+          badge: dms.unread > 0 && <span className={`${railOpen ? "" : "absolute -bottom-1 -right-1 border-2 border-surface"} min-w-5 h-5 px-1 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center`}>{dms.unread > 99 ? "99+" : dms.unread}</span> })}
         {auto && (auto.status === "downloading" || auto.status === "ready")
           ? <AutoUpdateBadge st={auto} />
           : update && (!auto || auto.status === "error" || auto.status === "unsupported") && <UpdateBadge n={update.n} note={update.note} url={update.url} />}
-        {servers.map((s) => (
-          <button key={s.id} title={s.name}
-            onClick={() => { setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
-            className={`rounded-2xl transition ${!dmOpen && s.id === serverId ? "ring-2 ring-accent shadow-[0_6px_20px_rgba(255,59,92,0.4)]" : "opacity-70 hover:opacity-100"}`}>
-            <ServerIcon server={s} size={48} />
-          </button>
-        ))}
-        <div className="w-8 h-px bg-line my-1" />
-        <button onClick={() => setServerModal("create")} title="Criar servidor" className="size-12 rounded-2xl bg-white/5 text-accent2 grid place-items-center hover:bg-white/10"><Plus size={18} /></button>
-        <button onClick={() => setServerModal("join")} title="Entrar com convite" className="size-12 rounded-2xl bg-white/5 text-accent grid place-items-center hover:bg-white/10"><Link2 size={18} /></button>
+        {railOpen && <div className="px-2 pt-1 text-[11px] uppercase tracking-widest text-muted">Servidores</div>}
+        {servers.map((s) => {
+          const on = !dmOpen && s.id === serverId;
+          return (
+            <button key={s.id} title={s.name} onClick={() => { setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
+              className={`shrink-0 transition ${railOpen ? `w-full flex items-center gap-3 rounded-2xl pr-3 ${on ? "bg-accent/15" : "hover:bg-white/5"}` : ""}`}>
+              <span className={`shrink-0 rounded-2xl transition ${on ? "ring-2 ring-accent shadow-[0_6px_20px_rgba(255,59,92,0.4)]" : railOpen ? "" : "opacity-70 hover:opacity-100"}`}><ServerIcon server={s} size={48} /></span>
+              {railOpen && <span className={`truncate text-sm text-left flex-1 ${on ? "font-semibold text-ink" : "text-muted"}`}>{s.name}</span>}
+            </button>
+          );
+        })}
+        <div className={`h-px bg-line my-1 shrink-0 ${railOpen ? "w-full" : "w-8"}`} />
+        {rb({ title: "Criar servidor", icon: <Plus size={18} />, onClick: () => setServerModal("create"), cls: "bg-white/5 text-accent2 hover:bg-white/10" })}
+        {rb({ title: "Entrar com convite", icon: <Link2 size={18} />, onClick: () => setServerModal("join"), cls: "bg-white/5 text-accent hover:bg-white/10" })}
         <div className="flex-1" />
-        <button onClick={onToggleLite} title={lite ? "Modo leve ligado (clique para desligar)" : "Modo leve: menos efeitos, ideal para jogar"}
-          className={`size-12 rounded-2xl grid place-items-center transition ${lite ? "bg-emerald-500/20 text-emerald-300" : "text-muted hover:text-ink"}`}>
-          <Zap size={18} />
-        </button>
-        <button onClick={onToggleFx} title={fx ? "Desligar animação de fundo" : "Ligar animação de fundo"}
-          className={`size-12 rounded-2xl grid place-items-center transition ${fx ? "bg-accent/15 text-accent" : "text-muted hover:text-ink"}`}>
-          <Sparkles size={18} />
-        </button>
-        <button onClick={onLogout} title="Sair" className="size-12 rounded-2xl text-muted grid place-items-center hover:text-ink"><LogOut size={18} /></button>
+        {rb({ title: lite ? "Modo leve ligado (clique para desligar)" : "Modo leve: menos efeitos, ideal para jogar", label: "Modo leve", icon: <Zap size={18} />, onClick: onToggleLite, badge: railOpen && lite && <span className="text-[10px] font-bold uppercase tracking-wide rounded-full bg-emerald-400/20 px-2 py-0.5">ligado</span>,
+          cls: lite ? "bg-emerald-500/20 text-emerald-300" : "text-muted hover:text-ink hover:bg-white/5" })}
+        {rb({ title: fx ? "Desligar animação de fundo" : "Ligar animação de fundo", label: "Animação de fundo", icon: <Sparkles size={18} />, onClick: onToggleFx, badge: railOpen && fx && <span className="text-[10px] font-bold uppercase tracking-wide rounded-full bg-accent/20 px-2 py-0.5">ligada</span>,
+          cls: fx ? "bg-accent/15 text-accent" : "text-muted hover:text-ink hover:bg-white/5" })}
+        {rb({ title: "Sair", label: "Sair da conta", icon: <LogOut size={18} />, onClick: onLogout, cls: "text-muted hover:text-ink hover:bg-white/5" })}
       </nav>
 
       {/* channels */}

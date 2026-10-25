@@ -16,7 +16,8 @@ const enabled = () => !!autoUpdater && app.isPackaged;
 let state = { status: enabled() ? "idle" : "unsupported", version: null, percent: 0 };
 let installing = false;
 const broadcast = () => { for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed() && w.webContents.getURL().indexOf("overlay.html") < 0 && w.webContents.getURL().indexOf("splash") < 0) w.webContents.send("update:state", state); };
-const set = (patch) => { state = { ...state, ...patch }; broadcast(); };
+const listeners = new Set();
+const set = (patch) => { state = { ...state, ...patch }; broadcast(); listeners.forEach((f) => f(state)); };
 
 function setup() {
   if (!enabled()) return;
@@ -28,7 +29,7 @@ function setup() {
   autoUpdater.on("update-available", (i) => set({ status: "downloading", version: i.version, percent: 0 }));
   autoUpdater.on("download-progress", (p) => set({ status: "downloading", percent: Math.round(p.percent) }));
   autoUpdater.on("update-downloaded", (i) => set({ status: "ready", version: i.version, percent: 100 }));
-  autoUpdater.on("update-not-available", () => set({ status: "idle" }));
+  autoUpdater.on("update-not-available", () => set({ status: "none" }));
   autoUpdater.on("error", (e) => { console.warn("[updater]", e && e.message); if (state.status !== "ready") set({ status: "error" }); });
 }
 
@@ -88,4 +89,11 @@ function watch() {
 ipcMain.handle("update:get", () => state);
 ipcMain.handle("update:install", () => install());
 
-module.exports = { launchCheck, watch, welcome };
+/** Manual "check for updates" (tray menu). */
+function checkNow() {
+  if (!enabled() || installing || state.status === "downloading" || state.status === "ready") return;
+  set({ status: "checking" });
+  autoUpdater.checkForUpdates().then((r) => { if (!r || !r.isUpdateAvailable) set({ status: "none" }); }).catch(() => set({ status: "error" }));
+}
+
+module.exports = { launchCheck, watch, welcome, getState: () => state, onChange: (f) => listeners.add(f), install, checkNow, enabled };

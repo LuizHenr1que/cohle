@@ -1,6 +1,7 @@
 const { app, BrowserWindow, desktopCapturer, ipcMain, nativeImage, session, shell, systemPreferences } = require("electron");
 const path = require("path");
 const updater = require("./updater.cjs");
+const trayMod = require("./tray.cjs");
 
 // Keep the footprint small: no extra Chromium services we do not use.
 app.commandLine.appendSwitch("disable-features", "MediaRouter,TranslateUI,OptimizationHints,AutofillServerCommunication");
@@ -8,6 +9,12 @@ app.commandLine.appendSwitch("disable-background-networking");
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required"); // remote voices must play without a click
 
 app.setName("Cohle");
+app.setAppUserModelId("app.cohle.desktop");     // Windows: notifications, taskbar grouping and the firewall prompt use this identity
+let quitting = false;                              // true only when the person really quits: closing the window just hides it
+const startHidden = process.argv.includes("--hidden");   // started by "open at login"
+// one Cohle at a time (packaged app): opening it again brings the running one back
+const gotLock = !(app.isPackaged && !process.env.COHLE_MULTI) || app.requestSingleInstanceLock();
+if (!gotLock) app.quit();
 const ICON = path.join(__dirname, "..", "build", "icon.png");   // packaged builds embed icon.icns / icon.ico instead
 
 const DEV_URL = process.env.COHLE_DEV_URL ?? "http://localhost:5173";
@@ -107,6 +114,7 @@ async function createWindow() {
     width: 1280, height: 800, minWidth: 380, minHeight: 520,
     icon: ICON,
     backgroundColor: "#0a0507",
+    show: !startHidden,
     // macOS: hidden title bar, the client draws a 44px drag strip under the traffic lights.
     // Windows/Linux: keep the native frame so caption buttons and snapping behave natively.
     ...(process.platform === "darwin"
@@ -135,20 +143,34 @@ async function createWindow() {
 
   mainWin = win;
   for (const e of ["focus", "blur", "minimize", "restore", "show", "hide"]) win.on(e, () => setTimeout(syncOverlay, 60));
+  win.on("close", (e) => {            // like Discord: the red X sends Cohle to the tray; calls keep going
+    if (quitting) return;
+    e.preventDefault(); win.hide(); trayMod.hintOnce();
+  });
   win.on("closed", () => { mainWin = null; if (overlay && !overlay.isDestroyed()) overlay.destroy(); });
   if (isDev) win.loadURL(DEV_URL);
   else win.loadFile(path.join(__dirname, "..", "client", "index.html"));
 }
 
 app.whenReady().then(async () => {
+  if (!gotLock) return;                                            // another Cohle is already running
   if (process.platform === "darwin") app.dock?.setIcon(nativeImage.createFromPath(ICON));   // dev: the dock shows the real icon
   if ((await updater.launchCheck()) === "restarting") return;      // an update is being installed: the app reopens by itself
   updater.watch();
   started = true;
+  trayMod.create({ show: showMain, quit: () => { quitting = true; app.quit(); }, updater });
   const welcome = updater.welcome();                               // "Cohle atualizado!" card on the first launch after an update
   await createWindow();
   if (welcome) welcome.close(2200);
 });
 let started = false;   // the update window may open and close before the app window exists: that must not quit the app
 app.on("window-all-closed", () => { if (started && process.platform !== "darwin") app.quit(); });
-app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+function showMain() {
+  if (mainWin && !mainWin.isDestroyed()) { if (mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.focus(); }
+  else createWindow();
+}
+app.on("activate", showMain);
+app.on("second-instance", showMain);
+app.on("before-quit", () => { quitting = true; });   // Cmd+Q, logoff, installing an update: really quit
+
+if (process.env.COHLE_TEST) global.__cohle = { win: () => mainWin, tray: () => trayMod.get(), menu: () => trayMod.menu(), quitting: () => quitting };   // test hook (never set in releases)

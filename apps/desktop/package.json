@@ -1,6 +1,6 @@
 {
   "name": "@cohle/desktop",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "main": "src/main.cjs",
   "scripts": {
@@ -20,6 +20,7 @@
     "files": [
       "src/**",
       "build/icon.png",
+      "build/tray-*.png",
       {
         "from": "../client/dist",
         "to": "client"
