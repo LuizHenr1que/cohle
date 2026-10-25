@@ -35,6 +35,27 @@ export const setToken = (t: string | null) => {
   t ? localStorage.setItem("token", t) : localStorage.removeItem("token");
 };
 
+// Server messages are in English: show them to the person in clear Portuguese.
+const MESSAGES: Record<string, string> = {
+  "invalid credentials": "E-mail ou senha incorretos.",
+  "email or username already in use": "Este e-mail ou nome de usuário já está em uso.",
+  "invalid input": "Confira os dados informados.",
+  "invalid code": "Código inválido. Confira e tente de novo.",
+  "wrong": "Código incorreto. Confira e tente de novo.",
+  "expired": "Este código expirou. Peça um novo.",
+  "locked": "Muitas tentativas erradas. Peça um novo código.",
+  "email delivery failed": "Não foi possível enviar o e-mail agora. Tente novamente em instantes.",
+  "email unavailable": "A recuperação de senha está indisponível no momento.",
+  "email not verified": "Confirme o seu e-mail para entrar.",
+};
+function friendly(raw: unknown, status: number): string {
+  const key = typeof raw === "string" ? raw : "";
+  if (MESSAGES[key]) return MESSAGES[key];
+  if (status === 429 || /rate limit/i.test(key)) return "Muitas tentativas. Aguarde um minuto e tente novamente.";
+  if (status >= 500) return "Algo deu errado do nosso lado. Tente novamente em instantes.";
+  return key && /[ãçéíóúâêô]/i.test(key) ? key : "Não foi possível concluir. Tente novamente.";
+}
+
 async function req<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   let res: Response;
   try {
@@ -50,14 +71,18 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<T> 
     throw new Error(SERVER_LOCKED ? "Não foi possível conectar ao Cohle. Verifique sua internet e tente novamente." : `Não consegui falar com o servidor (${API}). Confira o endereço e se ele está ligado.`);
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? "erro");
+  if (!res.ok) throw Object.assign(new Error(friendly(data.error ?? data.message, res.status)), { status: res.status, data });
   return data as T;
 }
 
 export const api = {
   register: (b: { email: string; username: string; password: string }) =>
-    req<{ token: string; user: UserDTO }>("/auth/register", "POST", b),
+    req<{ token: string; user: UserDTO } | { needsVerification: true; email: string }>("/auth/register", "POST", b),
   login: (b: { email: string; password: string }) => req<{ token: string; user: UserDTO }>("/auth/login", "POST", b),
+  verify: (b: { email: string; code: string }) => req<{ token: string; user: UserDTO }>("/auth/verify", "POST", b),
+  resend: (email: string) => req<{ ok: true }>("/auth/resend", "POST", { email }),
+  forgot: (email: string) => req<{ ok: true }>("/auth/forgot", "POST", { email }),
+  reset: (b: { email: string; code: string; password: string }) => req<{ token: string; user: UserDTO }>("/auth/reset", "POST", b),
   me: () => req<UserDTO>("/me"),
   updateProfile: (b: { username?: string; avatarUrl?: string | null }) => req<UserDTO>("/me", "PATCH", b),
   servers: () => req<ServerDTO[]>("/servers"),

@@ -48,6 +48,9 @@ O serviço grátis **dorme após 15 minutos sem acesso** e leva cerca de 1 minut
   ```
   Os arquivos saem em `apps/desktop/release/`.
 
+## E-mail (opcional, recomendado)
+Para confirmação de e-mail e "esqueci a senha", configure o Resend: veja `docs/email.md` (variável `RESEND_API_KEY`).
+
 ## Limites do plano grátis (leia antes de convidar muita gente)
 | Peça | Limite |
 | --- | --- |

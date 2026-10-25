@@ -13,7 +13,7 @@ app.whenReady().then(async () => {
     ses.on("will-download", (_e, item) => { got.push({ file: item.getFilename(), mb: Math.round(item.getTotalBytes() / 1048576), url: item.getURL().slice(0, 70) }); item.cancel(); });
     const win = new BrowserWindow({ width: 1280, height: 800, show: true, focusable: false, x: 20, y: 20, webPreferences: { session: ses, backgroundThrottling: false } });
     win.webContents.setUserAgent(ua);
-    await win.loadURL("https://cohle.vercel.app/"); await sleep(2500);
+    await win.loadURL("https://cohle.verticeapp.com.br/"); await sleep(2500);
     const label = await win.webContents.executeJavaScript(`document.querySelector('.hero [data-dl-primary] [data-dl-label]').textContent`);
     await win.webContents.executeJavaScript(`document.querySelector('.hero [data-dl-primary]').click()`); await sleep(6000);
     console.log(`${name}: botão "${label}" -> download iniciado:`, JSON.stringify(got));

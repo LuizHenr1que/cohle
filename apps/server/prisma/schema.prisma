@@ -19,6 +19,8 @@ model User {
   passwordHash String
   avatarUrl    String?
   avatarVersion Int      @default(0)
+  emailVerifiedAt DateTime?
+  emailCodes   EmailCode[]
   createdAt    DateTime  @default(now())
   members      Member[]
   messages     Message[]
@@ -102,4 +104,18 @@ model DmRead {
   readAt DateTime @default(now())
 
   @@id([userId, peerId])
+}
+
+// One-time 6-digit codes sent by e-mail (confirm the address, reset the password). Only a hash is stored.
+model EmailCode {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String   // VERIFY | RESET
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, createdAt])
 }

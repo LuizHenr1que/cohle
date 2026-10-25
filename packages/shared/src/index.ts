@@ -1,14 +1,19 @@
 import { z } from "zod";
 
+const emailField = z.string().trim().toLowerCase().email().max(200);
 export const registerSchema = z.object({
-  email: z.string().email(),
+  email: emailField,
   username: z.string().min(2).max(24).regex(/^[a-zA-Z0-9_.-]+$/),
   password: z.string().min(8).max(100),
 });
 export const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailField,
   password: z.string().min(1),
 });
+const codeField = z.string().regex(/^\d{6}$/);
+export const verifySchema = z.object({ email: emailField, code: codeField });
+export const forgotSchema = z.object({ email: emailField });
+export const resetSchema = z.object({ email: emailField, code: codeField, password: z.string().min(8).max(100) });
 const IMG_RE = /^data:image\/(png|jpeg|webp|gif);base64,/;
 const iconSchema = z.string().regex(IMG_RE).max(400_000);
 export const SERVER_TEMPLATES = ["custom", "gaming", "friends", "study", "community", "creators"] as const;

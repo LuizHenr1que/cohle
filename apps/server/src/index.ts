@@ -9,10 +9,12 @@ import { PrismaClient } from "@prisma/client";
 import { hash, verify } from "@node-rs/argon2";
 import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import {
-  registerSchema, loginSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
+  registerSchema, loginSchema, verifySchema, forgotSchema, resetSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
   type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
   type DirectMessageDTO, type DmConversationDTO,
 } from "@cohle/shared";
+import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail } from "./email.js";
+import { issueCode, checkCode } from "./codes.js";
 
 const prisma = new PrismaClient();
 // Admin API of the LiveKit server (mute / disconnect people at the SFU, not just in the UI).
@@ -86,26 +88,89 @@ const BOOT = randomBytes(3).toString("hex"), STARTED = Date.now();
 app.get("/health", async () => ({ ok: true, name: "cohle", boot: BOOT, up: Math.round((Date.now() - STARTED) / 1000) }));
 
 // ---- auth ----
+const byEmail = (email: string) => prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
+const session = (user: any) => ({ token: app.jwt.sign({ sub: user.id }), user: toUser(user) });
+// Without a mail service configured the address is simply trusted (development, or before the key is set up).
+const verifying = emailMode !== "off";
+const mailCode = async (user: any, kind: "VERIFY" | "RESET") => {
+  const code = await issueCode(prisma, user.id, kind);
+  if (!code) return "wait" as const;                                   // asked again too soon
+  const m = kind === "VERIFY" ? verifyEmail(user.username, code) : resetEmail(user.username, code);
+  await sendMail({ ...m, to: user.email });
+  return "sent" as const;
+};
+
 app.post("/auth/register", authLimit, async (req, reply) => {
   const p = registerSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
   const exists = await prisma.user.findFirst({
-    where: { OR: [{ email: p.data.email }, { username: p.data.username }] },
+    where: { OR: [{ email: { equals: p.data.email, mode: "insensitive" } }, { username: p.data.username }] },
   });
   if (exists) return reply.code(409).send({ error: "email or username already in use" });
   const user = await prisma.user.create({
-    data: { email: p.data.email, username: p.data.username, passwordHash: await hash(p.data.password) },
+    data: { email: p.data.email, username: p.data.username, passwordHash: await hash(p.data.password), emailVerifiedAt: verifying ? null : new Date() },
   });
-  return { token: app.jwt.sign({ sub: user.id }), user: toUser(user) };
+  if (!verifying) return session(user);
+  try { await mailCode(user, "VERIFY"); }
+  catch (e) {
+    app.log.error({ err: String(e) }, "could not send the confirmation e-mail");
+    await prisma.user.delete({ where: { id: user.id } }).catch(() => {});      // do not leave an account nobody can confirm
+    return reply.code(502).send({ error: "email delivery failed" });
+  }
+  return { needsVerification: true, email: user.email };
 });
 
 app.post("/auth/login", authLimit, async (req, reply) => {
   const p = loginSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
-  const user = await prisma.user.findUnique({ where: { email: p.data.email } });
+  const user = await byEmail(p.data.email);
   if (!user || !(await verify(user.passwordHash, p.data.password)))
     return reply.code(401).send({ error: "invalid credentials" });
-  return { token: app.jwt.sign({ sub: user.id }), user: toUser(user) };
+  if (verifying && !user.emailVerifiedAt) return reply.code(403).send({ error: "email not verified", needsVerification: true, email: user.email });
+  return session(user);
+});
+
+// confirm the address with the 6-digit code, then sign in
+app.post("/auth/verify", authLimit, async (req, reply) => {
+  const p = verifySchema.safeParse(req.body);
+  if (!p.success) return reply.code(400).send({ error: "invalid code" });
+  const user = await byEmail(p.data.email);
+  const res = user ? await checkCode(prisma, user.id, "VERIFY", p.data.code) : "wrong";
+  if (!user || res !== "ok") return reply.code(res === "expired" ? 410 : res === "locked" ? 429 : 400).send({ error: res === "ok" ? "invalid code" : res });
+  const wasNew = !user.emailVerifiedAt;
+  const done = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: user.emailVerifiedAt ?? new Date() } });
+  if (wasNew) sendMail({ ...welcomeEmail(done.username), to: done.email }).catch((e) => app.log.warn({ err: String(e) }, "welcome e-mail failed"));
+  return session(done);
+});
+
+// a new confirmation code (always answers ok: it does not reveal which addresses exist)
+app.post("/auth/resend", authLimit, async (req) => {
+  const p = forgotSchema.safeParse(req.body);
+  if (p.success && verifying) {
+    const user = await byEmail(p.data.email);
+    if (user && !user.emailVerifiedAt) await mailCode(user, "VERIFY").catch((e) => app.log.warn({ err: String(e) }, "resend failed"));
+  }
+  return { ok: true };
+});
+
+app.post("/auth/forgot", authLimit, async (req, reply) => {
+  const p = forgotSchema.safeParse(req.body);
+  if (!p.success) return reply.code(400).send({ error: "invalid input" });
+  if (!verifying) return reply.code(503).send({ error: "email unavailable" });
+  const user = await byEmail(p.data.email);
+  if (user) await mailCode(user, "RESET").catch((e) => app.log.warn({ err: String(e) }, "reset e-mail failed"));
+  return { ok: true };                                                  // same answer whether or not the account exists
+});
+
+app.post("/auth/reset", authLimit, async (req, reply) => {
+  const p = resetSchema.safeParse(req.body);
+  if (!p.success) return reply.code(400).send({ error: "invalid input" });
+  const user = await byEmail(p.data.email);
+  const res = user ? await checkCode(prisma, user.id, "RESET", p.data.code) : "wrong";
+  if (!user || res !== "ok") return reply.code(res === "expired" ? 410 : res === "locked" ? 429 : 400).send({ error: res === "ok" ? "invalid code" : res });
+  const done = await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(p.data.password), emailVerifiedAt: user.emailVerifiedAt ?? new Date() } });
+  await prisma.emailCode.deleteMany({ where: { userId: user.id } });
+  return session(done);
 });
 
 app.get("/me", { preHandler: auth }, async (req, reply) => {
@@ -653,8 +718,8 @@ if (process.env.NODE_ENV !== "production" || process.env.SEED_TEST_USERS === "1"
   const users = [];
   for (const n of ["teste1", "teste2"]) {
     users.push(await prisma.user.upsert({
-      where: { username: n }, update: { email: `${n}@cohle.dev` },
-      create: { email: `${n}@cohle.dev`, username: n, passwordHash: await hash("teste12345") },
+      where: { username: n }, update: { email: `${n}@cohle.dev`, emailVerifiedAt: new Date() },
+      create: { email: `${n}@cohle.dev`, username: n, passwordHash: await hash("teste12345"), emailVerifiedAt: new Date() },
     }));
   }
   if (!(await prisma.server.findFirst({ where: { name: "Servidor de Teste" } }))) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Mic, MonitorUp, MessagesSquare, FlaskConical } from "lucide-react";
+import { Mic, MonitorUp, MessagesSquare, FlaskConical, MailCheck, KeyRound, ArrowLeft } from "lucide-react";
 import { Logo } from "./Logo";
 import { BUILD, BUILD_LABEL } from "../version";
 import { api, API, SERVER_LOCKED, checkServer, normalizeServerUrl, switchServer } from "../api";
@@ -23,6 +23,11 @@ const SHOW_TEST_LOGIN = import.meta.env.DEV || import.meta.env.VITE_TEST_LOGIN =
 
 export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [step, setStep] = useState<"form" | "verify" | "forgot" | "reset">("form");   // e-mail confirmation / password reset
+  const [code, setCode] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [wait, setWait] = useState(0);                                               // seconds until another code can be requested
+  const [info, setInfo] = useState("");
   const [f, setF] = useState({ email: "", username: "", password: "" });
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -44,16 +49,45 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
     return () => clearInterval(t);
   }, []);
 
-  async function run(fn: () => Promise<{ token: string; user: UserDTO }>) {
+  useEffect(() => { if (wait <= 0) return; const t = setTimeout(() => setWait((w) => w - 1), 1000); return () => clearTimeout(t); }, [wait]);
+  const toVerify = (email: string) => { setF((x) => ({ ...x, email })); setCode(""); setInfo(""); setStep("verify"); setWait(45); };
+
+  async function run(fn: () => Promise<any>) {
     setErr(""); setBusy(true);
-    try { const r = await fn(); onDone(r.token, r.user); }
-    catch (e: any) { setErr(e.message); }
-    finally { setBusy(false); }
+    try {
+      const r = await fn();
+      if (r?.needsVerification) toVerify(r.email ?? f.email);
+      else if (r?.token) onDone(r.token, r.user);
+    } catch (e: any) {
+      if (e?.data?.needsVerification) { toVerify(e.data.email ?? f.email); api.resend(e.data.email ?? f.email).catch(() => {}); }   // the old code may have expired: send a fresh one
+      else setErr(e.message);
+    } finally { setBusy(false); }
   }
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     run(() => (mode === "login" ? api.login({ email: f.email, password: f.password }) : api.register(f)));
   };
+  const resendCode = async () => {
+    if (wait > 0) return;
+    setErr(""); setInfo(""); setWait(45);
+    try { await (step === "verify" ? api.resend(f.email) : api.forgot(f.email)); setInfo("Enviamos um novo código. Confira a caixa de entrada e o spam."); }
+    catch (e: any) { setErr(e.message); setWait(0); }
+  };
+  const sendForgot = (e: React.FormEvent) => {
+    e.preventDefault(); setErr(""); setInfo("");
+    if (!/^\S+@\S+\.\S+$/.test(f.email)) return setErr("Digite um e-mail válido.");
+    setBusy(true);
+    api.forgot(f.email).then(() => { setCode(""); setPw2(""); setWait(45); setStep("reset"); }).catch((x) => setErr(x.message)).finally(() => setBusy(false));
+  };
+  const confirmCode = (value = code) => { if (value.length === 6) run(() => api.verify({ email: f.email, code: value })); };
+  const doReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length !== 6) return setErr("Digite o código de 6 dígitos que enviamos por e-mail.");
+    if (f.password.length < 8) return setErr("A nova senha precisa ter pelo menos 8 caracteres.");
+    if (f.password !== pw2) return setErr("As senhas não conferem.");
+    run(() => api.reset({ email: f.email, code, password: f.password }));
+  };
+  const back = () => { setStep("form"); setErr(""); setInfo(""); setCode(""); };
   const quick = (n: number) => run(() => api.login({ email: `teste${n}@cohle.dev`, password: "teste12345" }));
 
   const input = "w-full rounded-xl bg-white/5 border border-line px-4 py-3 outline-none focus:border-accent focus:bg-white/[0.07] transition placeholder:text-muted";
@@ -100,6 +134,45 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
 
       {/* RIGHT: auth */}
       <section className="flex-1 lg:max-w-xl flex overflow-y-auto">
+        {step !== "form" ? (
+        <div className="w-full max-w-sm space-y-4 p-4 m-auto">
+          <button type="button" onClick={back} className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink"><ArrowLeft size={15} /> Voltar</button>
+          {step === "verify" && (<>
+            <div className="size-12 rounded-2xl bg-accent/15 text-accent grid place-items-center"><MailCheck size={24} /></div>
+            <h1 className="text-3xl font-bold">Confirme o seu e-mail</h1>
+            <p className="text-muted text-sm">Enviamos um código de 6 dígitos para <b className="text-ink">{f.email}</b>. Digite-o abaixo para ativar a conta.</p>
+            <CodeInput value={code} onChange={(v) => { setCode(v); if (v.length === 6) confirmCode(v); }} disabled={busy} />
+            <button type="button" disabled={busy || code.length !== 6} onClick={() => confirmCode()} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition disabled:opacity-50">{busy ? "Confirmando..." : "Confirmar"}</button>
+          </>)}
+          {step === "forgot" && (
+            <form onSubmit={sendForgot} className="space-y-4">
+              <div className="size-12 rounded-2xl bg-accent/15 text-accent grid place-items-center"><KeyRound size={24} /></div>
+              <h1 className="text-3xl font-bold">Esqueceu a senha?</h1>
+              <p className="text-muted text-sm">Digite o e-mail da sua conta. Enviaremos um código para você escolher uma nova senha.</p>
+              <input className={input} placeholder="E-mail" type="email" autoFocus value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+              <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition disabled:opacity-60">{busy ? "Enviando..." : "Enviar código"}</button>
+            </form>
+          )}
+          {step === "reset" && (
+            <form onSubmit={doReset} className="space-y-4">
+              <div className="size-12 rounded-2xl bg-accent/15 text-accent grid place-items-center"><KeyRound size={24} /></div>
+              <h1 className="text-3xl font-bold">Escolha uma nova senha</h1>
+              <p className="text-muted text-sm">Se existir uma conta com <b className="text-ink">{f.email}</b>, o código chegou por e-mail. Digite-o e crie a nova senha.</p>
+              <CodeInput value={code} onChange={setCode} disabled={busy} />
+              <input className={input} placeholder="Nova senha (mín. 8 caracteres)" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+              <input className={input} placeholder="Repita a nova senha" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+              <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition disabled:opacity-60">{busy ? "Salvando..." : "Redefinir senha e entrar"}</button>
+            </form>
+          )}
+          {err && <p className="text-accent text-sm">{err}</p>}
+          {info && <p className="text-emerald-300 text-sm">{info}</p>}
+          {step !== "forgot" && (
+            <button type="button" onClick={resendCode} disabled={wait > 0} className="w-full text-sm text-muted hover:text-ink disabled:opacity-60 disabled:hover:text-muted">
+              {wait > 0 ? `Reenviar código em ${wait}s` : "Não recebeu? Reenviar código"}
+            </button>
+          )}
+        </div>
+        ) : (
         <form onSubmit={submit} className="w-full max-w-sm space-y-4 p-4 m-auto">
           <h1 className="text-3xl font-bold">{mode === "login" ? "Bem-vindo de volta" : "Crie sua conta"}</h1>
           <p className="text-muted text-sm">{mode === "login" ? "Entre para continuar suas conversas." : "Comece grátis em poucos segundos."}</p>
@@ -121,6 +194,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
             <input className={input} placeholder="Nome de usuário" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
           )}
           <input className={input} placeholder="Senha (mín. 8 caracteres)" type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+          {mode === "login" && <button type="button" onClick={() => { setErr(""); setInfo(""); setStep("forgot"); }} className="text-sm text-accent2 hover:underline -mt-1 block ml-auto">Esqueci minha senha</button>}
           {err && <p className="text-accent text-sm">{err}</p>}
 
           <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition shadow-[0_8px_30px_rgba(255,59,92,0.35)] disabled:opacity-60">
@@ -162,7 +236,17 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
             <span><b className="text-ink/80 font-semibold">{BUILD_LABEL}</b> <span aria-hidden="true">·</span> {BUILD.note}</span>
           </p>
         </form>
+        )}
       </section>
     </div>
+  );
+}
+
+/** Six boxes' worth of digits in one field: easy to paste, easy to type. */
+function CodeInput({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  return (
+    <input value={value} disabled={disabled} autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" aria-label="Código de 6 dígitos"
+      onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+      className="w-full rounded-xl bg-white/5 border border-line px-4 py-4 text-center text-3xl font-bold tracking-[0.55em] pl-[0.55em] outline-none focus:border-accent focus:bg-white/[0.07] transition placeholder:text-muted/40 tabular-nums" />
   );
 }
