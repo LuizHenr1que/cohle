@@ -5,7 +5,7 @@ import { api } from "../api";
 import { Avatar } from "./Avatar";
 import { fileToSquareDataUrl } from "../lib/image";
 
-export function ProfileModal({ user, onClose, onSaved }: { user: UserDTO; onClose: () => void; onSaved: (u: UserDTO) => void }) {
+export function ProfileModal({ user, onClose, onSaved, onTour }: { user: UserDTO; onClose: () => void; onSaved: (u: UserDTO) => void; onTour?: () => void }) {
   const [username, setUsername] = useState(user.username);
   const [avatar, setAvatar] = useState<string | null>(user.avatarUrl ?? null);
   const [err, setErr] = useState("");
@@ -53,6 +53,7 @@ export function ProfileModal({ user, onClose, onSaved }: { user: UserDTO; onClos
         <button onClick={save} disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white disabled:opacity-60">
           {busy ? "Salvando..." : "Salvar"}
         </button>
+        {onTour && <button type="button" onClick={() => { onClose(); onTour(); }} className="w-full text-sm text-muted hover:text-ink">Rever o tour de boas-vindas</button>}
       </div>
     </div>
   );

@@ -52,12 +52,12 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
   useEffect(() => { if (wait <= 0) return; const t = setTimeout(() => setWait((w) => w - 1), 1000); return () => clearTimeout(t); }, [wait]);
   const toVerify = (email: string) => { setF((x) => ({ ...x, email })); setCode(""); setInfo(""); setStep("verify"); setWait(45); };
 
-  async function run(fn: () => Promise<any>) {
+  async function run(fn: () => Promise<any>, isNew = false) {
     setErr(""); setBusy(true);
     try {
       const r = await fn();
       if (r?.needsVerification) toVerify(r.email ?? f.email);
-      else if (r?.token) onDone(r.token, r.user);
+      else if (r?.token) { if (isNew) { try { localStorage.setItem(`cohle:tour:${r.user.id}`, "pending"); } catch { /* private mode */ } } onDone(r.token, r.user); }
     } catch (e: any) {
       if (e?.data?.needsVerification) { toVerify(e.data.email ?? f.email); api.resend(e.data.email ?? f.email).catch(() => {}); }   // the old code may have expired: send a fresh one
       else setErr(e.message);
@@ -65,7 +65,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
   }
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    run(() => (mode === "login" ? api.login({ email: f.email, password: f.password }) : api.register(f)));
+    run(() => (mode === "login" ? api.login({ email: f.email, password: f.password }) : api.register(f)), mode === "register");
   };
   const resendCode = async () => {
     if (wait > 0) return;
@@ -79,7 +79,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO) 
     setBusy(true);
     api.forgot(f.email).then(() => { setCode(""); setPw2(""); setWait(45); setStep("reset"); }).catch((x) => setErr(x.message)).finally(() => setBusy(false));
   };
-  const confirmCode = (value = code) => { if (value.length === 6) run(() => api.verify({ email: f.email, code: value })); };
+  const confirmCode = (value = code) => { if (value.length === 6) run(() => api.verify({ email: f.email, code: value }), true); };
   const doReset = (e: React.FormEvent) => {
     e.preventDefault();
     if (code.length !== 6) return setErr("Digite o código de 6 dígitos que enviamos por e-mail.");

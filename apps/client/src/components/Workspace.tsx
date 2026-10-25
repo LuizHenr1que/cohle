@@ -8,6 +8,7 @@ import { PersonRow } from "./PersonRow";
 import { useAutoUpdate, useUpdate } from "../lib/update";
 import { AutoUpdateBadge, UpdateBadge } from "./UpdateBadge";
 import { DmChat, DmSidebar, useDms } from "./DirectMessages";
+import { Tour } from "./Tour";
 const VoiceRoom = lazy(() => import("./VoiceRoom").then((m) => ({ default: m.VoiceRoom })));
 import { Avatar } from "./Avatar";
 import { ProfileModal } from "./ProfileModal";
@@ -53,6 +54,10 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [rev, setRev] = useState(0); // bumps when the server list/members change, so open modals refetch
   const socket = useRef<ReturnType<typeof connectSocket>>();
   const update = useUpdate();
+  // first-run tour: AuthScreen marks brand-new accounts as "pending"
+  const tourKey = `cohle:tour:${me.id}`;
+  const [tour, setTour] = useState(() => { try { return localStorage.getItem(tourKey) === "pending"; } catch { return false; } });
+  const closeTour = (next?: "create" | "join") => { setTour(false); try { localStorage.setItem(tourKey, "done"); } catch { /* private mode */ } if (next) setServerModal(next); };
   const auto = useAutoUpdate();
   const [dmOpen, setDmOpen] = useState(false);              // "home": direct messages instead of a server
   const [dmPeer, setDmPeer] = useState<UserDTO>();
@@ -364,6 +369,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {!dmOpen && (!voice || view === "text") && chatPane(false)}
       </main>
 
+      {tour && <Tour name={self.username} onFinish={closeTour} />}
       {serverModal && <ServerModal initial={serverModal} username={self.username} onClose={() => setServerModal(undefined)} onDone={afterServerChange} />}
       {inviteOpen && server && <InviteModal server={server} onClose={() => setInviteOpen(false)} />}
       {newChannelType && server && <ChannelModal serverId={server.id} initialType={newChannelType} onClose={() => setNewChannelType(undefined)} />}
@@ -372,7 +378,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           onClose={() => setSettingsOpen(false)} onAddChannel={(t) => setNewChannelType(t)} onMessage={openDm} />
       )}
       {profileOpen && (
-        <ProfileModal user={self} onClose={() => setProfileOpen(false)}
+        <ProfileModal user={self} onClose={() => setProfileOpen(false)} onTour={() => setTour(true)}
           onSaved={(u) => { setSelf(u); localStorage.setItem("me", JSON.stringify(u)); }} />
       )}
     </div>
