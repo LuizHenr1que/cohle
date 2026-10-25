@@ -4,6 +4,7 @@ import type { Socket } from "socket.io-client";
 import type { DirectMessageDTO, DmConversationDTO, UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
+import { DevBadge } from "./Badge";
 import { sounds } from "../sounds";
 
 /** Conversation list + unread counters for direct messages, kept live through the socket. */
@@ -79,7 +80,7 @@ export function DmSidebar({ convs, online, peerId, onOpen }: {
             className={`w-full flex items-center gap-3 px-2 py-2 rounded-xl text-left transition ${peerId === c.peer.id ? "bg-accent/15" : "hover:bg-white/5"}`}>
             <span className="relative shrink-0"><Avatar user={c.peer} size={36} />{dot(c.peer.id)}</span>
             <span className="min-w-0 flex-1">
-              <span className={`block text-sm truncate ${c.unread ? "font-semibold text-ink" : ""}`}>{c.peer.username}</span>
+              <span className={`flex items-center gap-1.5 text-sm ${c.unread ? "font-semibold text-ink" : ""}`}><span className="truncate">{c.peer.username}</span><DevBadge user={c.peer} /></span>
               <span className={`block text-xs truncate ${c.unread ? "text-ink/80" : "text-muted"}`}>{c.last.fromId !== c.peer.id ? "Você: " : ""}{c.last.content}</span>
             </span>
             {c.unread > 0 && <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">{c.unread > 99 ? "99+" : c.unread}</span>}
@@ -163,7 +164,7 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu }: {
       <header className="px-3 sm:px-6 py-3 border-b border-line flex items-center gap-3 min-w-0">
         {onMenu && <button onClick={onMenu} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={18} /></button>}
         <span className="relative shrink-0"><Avatar user={peer} size={36} /><span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online ? "bg-emerald-400" : "bg-muted"}`} /></span>
-        <div className="min-w-0"><div className="font-semibold truncate">{peer.username}</div><div className="text-[11px] text-muted">{online ? "Online" : "Offline"}</div></div>
+        <div className="min-w-0"><div className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{peer.username}</span><DevBadge user={peer} full /></div><div className="text-[11px] text-muted">{online ? "Online" : "Offline"}</div></div>
       </header>
       <div ref={box} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
         {more && <button onClick={older} className="mx-auto mb-3 flex items-center gap-1.5 text-xs text-muted hover:text-ink rounded-full bg-white/5 px-3 py-1.5"><ChevronUp size={14} /> Ver mensagens anteriores</button>}
@@ -185,7 +186,7 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu }: {
               <div className={`flex gap-3 group ${head ? "mt-3" : ""}`}>
                 <div className="w-9 shrink-0">{head && <Avatar user={mine ? self : peer} size={36} />}</div>
                 <div className="min-w-0 flex-1">
-                  {head && <div className="text-sm"><b>{mine ? self.username : peer.username}</b> <span className="text-muted text-xs ml-1">{clock(m.createdAt)}</span></div>}
+                  {head && <div className="text-sm"><b>{mine ? self.username : peer.username}</b> <DevBadge user={mine ? self : peer} /> <span className="text-muted text-xs ml-1">{clock(m.createdAt)}</span></div>}
                   <p className="text-ink/90 whitespace-pre-wrap break-words relative">
                     {m.content}
                     {!head && <span className="absolute -left-12 top-0.5 text-[10px] text-muted opacity-0 group-hover:opacity-100">{clock(m.createdAt)}</span>}

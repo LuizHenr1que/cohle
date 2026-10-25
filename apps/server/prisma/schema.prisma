@@ -20,6 +20,7 @@ model User {
   avatarUrl    String?
   avatarVersion Int      @default(0)
   emailVerifiedAt DateTime?
+  badge        String?   // "DEV": shown next to the name (granted by the server, never chosen by the user)
   emailCodes   EmailCode[]
   createdAt    DateTime  @default(now())
   members      Member[]

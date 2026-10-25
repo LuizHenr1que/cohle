@@ -49,7 +49,16 @@ const uid = (req: any): string => req.user.sub;
 // Images are never inlined in API payloads: DTOs carry a versioned URL the browser can cache forever.
 const toUser = (u: any): UserDTO => ({
   id: u.id, username: u.username, avatarUrl: u.avatarVersion > 0 ? `/avatars/${u.id}?v=${u.avatarVersion}` : null,
+  ...(u.badge === "DEV" ? { badge: "DEV" as const } : {}),
 });
+// The "Desenvolvedor" badge belongs to the team's own accounts. It is granted by the server, only to a CONFIRMED e-mail
+// listed here (plus DEV_EMAILS, comma separated), so nobody can claim it by typing a name.
+const DEV_EMAILS = new Set(["verticeappempresa@gmail.com", ...(process.env.DEV_EMAILS ?? "").split(",")].map((e) => e.trim().toLowerCase()).filter(Boolean));
+const withBadge = async (user: any) => {
+  if (user.badge !== "DEV" && user.emailVerifiedAt && DEV_EMAILS.has(String(user.email).toLowerCase()))
+    return prisma.user.update({ where: { id: user.id }, data: { badge: "DEV" } });
+  return user;
+};
 // Strip heavy/private columns when a user is only embedded in another payload.
 const lightUser = { omit: { avatarUrl: true, passwordHash: true, email: true } } as const;
 const lightServer = { omit: { iconUrl: true } } as const;
@@ -89,7 +98,7 @@ app.get("/health", async () => ({ ok: true, name: "cohle", boot: BOOT, up: Math.
 
 // ---- auth ----
 const byEmail = (email: string) => prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
-const session = (user: any) => ({ token: app.jwt.sign({ sub: user.id }), user: toUser(user) });
+const session = async (user: any) => { const u = await withBadge(user); return { token: app.jwt.sign({ sub: u.id }), user: toUser(u) }; };
 // Without a mail service configured the address is simply trusted (development, or before the key is set up).
 const verifying = emailMode !== "off";
 const mailCode = async (user: any, kind: "VERIFY" | "RESET") => {
@@ -110,7 +119,7 @@ app.post("/auth/register", authLimit, async (req, reply) => {
   const user = await prisma.user.create({
     data: { email: p.data.email, username: p.data.username, passwordHash: await hash(p.data.password), emailVerifiedAt: verifying ? null : new Date() },
   });
-  if (!verifying) return session(user);
+  if (!verifying) return await session(user);
   try { await mailCode(user, "VERIFY"); }
   catch (e) {
     app.log.error({ err: String(e) }, "could not send the confirmation e-mail");
@@ -127,7 +136,7 @@ app.post("/auth/login", authLimit, async (req, reply) => {
   if (!user || !(await verify(user.passwordHash, p.data.password)))
     return reply.code(401).send({ error: "invalid credentials" });
   if (verifying && !user.emailVerifiedAt) return reply.code(403).send({ error: "email not verified", needsVerification: true, email: user.email });
-  return session(user);
+  return await session(user);
 });
 
 // confirm the address with the 6-digit code, then sign in
@@ -140,7 +149,7 @@ app.post("/auth/verify", authLimit, async (req, reply) => {
   const wasNew = !user.emailVerifiedAt;
   const done = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: user.emailVerifiedAt ?? new Date() } });
   if (wasNew) sendMail({ ...welcomeEmail(done.username), to: done.email }).catch((e) => app.log.warn({ err: String(e) }, "welcome e-mail failed"));
-  return session(done);
+  return await session(done);
 });
 
 // a new confirmation code (always answers ok: it does not reveal which addresses exist)
@@ -170,7 +179,7 @@ app.post("/auth/reset", authLimit, async (req, reply) => {
   if (!user || res !== "ok") return reply.code(res === "expired" ? 410 : res === "locked" ? 429 : 400).send({ error: res === "ok" ? "invalid code" : res });
   const done = await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(p.data.password), emailVerifiedAt: user.emailVerifiedAt ?? new Date() } });
   await prisma.emailCode.deleteMany({ where: { userId: user.id } });
-  return session(done);
+  return await session(done);
 });
 
 app.get("/me", { preHandler: auth }, async (req, reply) => {

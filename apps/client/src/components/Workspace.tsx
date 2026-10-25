@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { PanelLeftClose, PanelLeftOpen, MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu, Compass } from "lucide-react";
 import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO } from "@cohle/shared";
 import { api, connectSocket } from "../api";
 // The call UI (and the LiveKit SDK, the heaviest dependency) loads only when you join a voice channel.
@@ -9,6 +9,8 @@ import { useAutoUpdate, useUpdate } from "../lib/update";
 import { AutoUpdateBadge, UpdateBadge } from "./UpdateBadge";
 import { DmChat, DmSidebar, useDms } from "./DirectMessages";
 import { Tour } from "./Tour";
+import { DevBadge } from "./Badge";
+import { NoServerHome, NoChannelHome } from "./EmptyStates";
 const VoiceRoom = lazy(() => import("./VoiceRoom").then((m) => ({ default: m.VoiceRoom })));
 import { Avatar } from "./Avatar";
 import { ProfileModal } from "./ProfileModal";
@@ -222,7 +224,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
               <div key={m.id} className="flex gap-3">
                 <Avatar user={m.author.id === self.id ? self : m.author} size={38} />
                 <div className="min-w-0">
-                  <div className="text-sm"><b>{m.author.username}</b> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
+                  <div className="text-sm"><b>{m.author.username}</b> <DevBadge user={m.author} /> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
                   <p className="text-ink/90 whitespace-pre-wrap break-words">{m.content}</p>
                 </div>
               </div>
@@ -291,7 +293,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           <div className="flex items-center gap-2">
             {server && <ServerIcon server={server} size={32} />}
             <div className="min-w-0 flex-1">
-              <h2 className="font-semibold truncate flex items-center gap-1.5">{server?.name ?? "Sem servidor"}{isOwner && <Crown size={13} className="text-accent2 shrink-0" />}</h2>
+              <h2 className="font-semibold truncate flex items-center gap-1.5">{server?.name ?? "Bem-vindo"}{isOwner && <Crown size={13} className="text-accent2 shrink-0" />}</h2>
             </div>
             {server && (
               <button onClick={() => setSettingsOpen(true)} title={isOwner ? "Configurações do servidor" : "Membros e opções"} className="text-muted hover:text-ink p-1">
@@ -313,6 +315,15 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
             {section("Voz", "VOICE")}
             {server.channels.filter((c) => c.type === "VOICE").map(voiceChan)}
           </>)}
+          {!server && (
+            <div className="px-3 py-8 text-center">
+              <div className="mx-auto size-12 rounded-2xl bg-accent/15 text-accent grid place-items-center"><Compass size={22} /></div>
+              <p className="font-semibold mt-3">Nenhum servidor ainda</p>
+              <p className="text-xs text-muted mt-1 leading-relaxed">Crie um servidor ou entre com um convite para ver canais e salas de voz aqui.</p>
+              <button onClick={() => setServerModal("create")} className="grad mt-4 w-full rounded-xl py-2.5 text-sm font-semibold text-white hover:brightness-110 transition">Criar servidor</button>
+              <button onClick={() => setServerModal("join")} className="mt-2 w-full rounded-xl bg-white/10 hover:bg-white/15 py-2.5 text-sm font-semibold transition">Entrar com convite</button>
+            </div>
+          )}
         </div>
         </>)}
 
@@ -330,7 +341,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
             <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(self.id) ? "bg-emerald-400" : "bg-muted"}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm truncate">{self.username}</div>
+            <div className="text-sm truncate flex items-center gap-1.5">{self.username}<DevBadge user={self} /></div>
             <div className="text-[11px] text-muted">{online.has(self.id) ? "Online" : "Offline"}</div>
           </div>
           <Settings size={16} className="text-muted" />
@@ -366,7 +377,13 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
               </div>
             </div>
           ))}
-        {!dmOpen && (!voice || view === "text") && chatPane(false)}
+        {!dmOpen && (!voice || view === "text") && (
+          !server
+            ? <NoServerHome name={self.username} onCreate={() => setServerModal("create")} onTour={() => setTour(true)} onMenu={wide ? undefined : () => setNavOpen(true)}
+                onJoin={async (code) => { const s = await api.join(code); await afterServerChange(s); }} />
+            : !channel
+              ? <NoChannelHome server={server} isOwner={isOwner} onOpen={(c) => (c.type === "VOICE" ? joinVoice(c) : (setChannel(c), setView("text")))} onInvite={() => setInviteOpen(true)} onNewChannel={(t) => setNewChannelType(t)} onMenu={wide ? undefined : () => setNavOpen(true)} />
+              : chatPane(false))}
       </main>
 
       {tour && <Tour name={self.username} onFinish={closeTour} />}

@@ -38,3 +38,4 @@ Histórico (antes da Versão 1 eram "versões de teste" 1 a 13, numeração `0.1
 - **Versão 5 (0.0.5):** ao fechar a janela o Cohle fica na bandeja do sistema (menu: abrir, verificar atualização, iniciar com o computador e sair) e a barra lateral de servidores pode ser expandida para mostrar nomes e botões.
 - **Versão 6 (0.0.6):** cadastro com confirmação por e-mail (código de 6 dígitos), "Esqueci minha senha", e-mail de boas-vindas, tour de boas-vindas para contas novas e mensagens de erro em português.
 - **Versão 7 (0.0.7):** olhinho para mostrar/ocultar a senha, "Lembrar de mim" no login (e-mail lembrado) e código do e-mail em um só bloco, fácil de copiar.
+- **Versão 8 (0.0.8):** telas de boas-vindas quando não há servidor ou canal (cartões para criar ou entrar com convite) e selo de Desenvolvedor para a conta da equipe.

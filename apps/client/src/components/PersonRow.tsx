@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Crown, ScreenShare, Volume2, MicOff, HeadphoneOff, MessageCircle } from "lucide-react";
 import type { UserDTO } from "@cohle/shared";
 import { Avatar } from "./Avatar";
+import { DevBadge } from "./Badge";
 import type { VoiceApi } from "./VoiceRoom";
 import { PersonPanel, panelAt, saveVol, loadVols, DEFAULT_VOL, type Moderation, type PanelPos, type Vol } from "./PersonPanel";
 
@@ -39,7 +40,7 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
       onMouseEnter={show} onMouseLeave={hide} onClick={() => { hide(); onClick(); }}
       className="group flex items-center gap-2 pl-9 pr-2 py-1 text-xs text-muted rounded-lg cursor-pointer hover:bg-white/5 hover:text-ink">
       <Avatar user={user} size={20} speaking={speaking} />
-      <span className="truncate">{isSelf ? `${user.username} (você)` : user.username}</span>
+      <span className="truncate">{isSelf ? `${user.username} (você)` : user.username}</span><DevBadge user={user} />
       {user.deaf ? <HeadphoneOff size={12} className="shrink-0 text-accent" aria-label="Áudio desativado" /> : (user.micOff || user.muted) && <MicOff size={12} className="shrink-0 text-accent" aria-label="Microfone desativado" />}
       {onMessage && !isSelf && <button onClick={(e) => { e.stopPropagation(); hide(); onMessage(); }} title="Enviar mensagem" aria-label="Enviar mensagem"
         className={`${live ? "" : "ml-auto"} shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition`}><MessageCircle size={13} /></button>}
@@ -57,7 +58,7 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
             <Avatar user={user} size={44} speaking={speaking} />
             <div className="min-w-0">
               <div className="font-semibold truncate flex items-center gap-1.5">
-                {user.username}{isOwner && <Crown size={13} className="text-amber-400 shrink-0" />}
+                {user.username}<DevBadge user={user} full />{isOwner && <Crown size={13} className="text-amber-400 shrink-0" />}
               </div>
               <div className="text-[11px] text-muted truncate">{isSelf ? "Você" : isOwner ? "Dono do servidor" : "Membro"}</div>
             </div>

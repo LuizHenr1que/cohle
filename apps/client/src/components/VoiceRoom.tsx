@@ -15,12 +15,13 @@ import { sounds } from "../sounds";
 import { CameraConfirm } from "./CameraConfirm";
 import { friendlyMediaError } from "../lib/mediaErrors";
 import { Soundboard } from "./Soundboard";
+import { DevBadge } from "./Badge";
 import { PersonPanel, panelAt, Slider, DEFAULT_VOL, loadVols, VOL_KEY, type Vol, type Moderation, type PanelPos } from "./PersonPanel";
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
 import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
 
-type UserLike = Pick<UserDTO, "username" | "avatarUrl" | "micOff" | "deaf">;
+type UserLike = Pick<UserDTO, "username" | "avatarUrl" | "micOff" | "deaf" | "badge">;
 /** What the sidebar (hover card, clicking a person) can ask of the call it is looking at. */
 export type VoiceApi = {
   watch: (userId: string) => void;                                       // switch to this person's live (replaces any other one)
@@ -118,6 +119,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
         <span className="min-w-0 truncate text-[11px] @sm:text-xs bg-black/55 px-2 @sm:px-3 py-0.5 @sm:py-1 rounded-full">
           {p.isLocal ? `${user.username} (você)` : user.username}
         </span>
+        <DevBadge user={user} />
         {serverMuted
           ? <span title="Silenciado pelo dono do servidor" className="shrink-0 bg-accent/90 rounded-full p-1"><Lock size={13} /></span>
           : user.deaf
