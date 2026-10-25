@@ -8,9 +8,9 @@ import type { VoiceApi } from "./VoiceRoom";
 import { PersonPanel, panelAt, saveVol, loadVols, DEFAULT_VOL, type Moderation, type PanelPos, type Vol } from "./PersonPanel";
 
 /** A person in a voice channel on the sidebar: hover shows a quick card (with a tiny live preview when they are sharing), click goes to their live. */
-export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking, getApi, onClick, onMessage, mod }: {
+export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking, getApi, onClick, onMessage, onProfile, mod }: {
   user: UserDTO; isSelf: boolean; isOwner: boolean; channelName: string; inCall: boolean; speaking: boolean;
-  getApi: () => VoiceApi | null; onClick: () => void; onMessage?: () => void; mod?: Moderation;
+  getApi: () => VoiceApi | null; onClick: () => void; onMessage?: () => void; onProfile?: () => void; mod?: Moderation;
 }) {
   const [ctx, setCtx] = useState<PanelPos>();
   const [vol, setVolState] = useState<Vol>(DEFAULT_VOL);
@@ -51,7 +51,7 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
       )}
       {ctx && <PersonPanel name={user.username} vol={vol} sharing={live && inCall} mod={mod} pos={ctx} onClose={() => setCtx(undefined)}
         onVol={(patch) => { setVolState((v) => ({ ...v, ...patch })); if (inCall) getApi()?.setVol(user.id, patch); else saveVol(user.id, patch); }}
-        onExpand={live || inCall ? onClick : undefined} expandLabel={live ? "Assistir ao vivo" : "Ir para a chamada"} onMessage={onMessage} />}
+        onExpand={live || inCall ? onClick : undefined} expandLabel={live ? "Assistir ao vivo" : "Ir para a chamada"} onMessage={onMessage} onProfile={onProfile} />}
       {rect && createPortal(
         <div style={{ left, top, width: W }} className="fixed z-[80] pointer-events-none rounded-2xl border border-line bg-surface-2/95 shadow-2xl p-3 text-ink">
           <div className="flex items-center gap-3">

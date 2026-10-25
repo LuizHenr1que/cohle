@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { AccountDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -52,6 +52,9 @@ const MESSAGES: Record<string, string> = {
   "email delivery failed": "Não foi possível enviar o e-mail agora. Tente novamente em instantes.",
   "email unavailable": "A recuperação de senha está indisponível no momento.",
   "email not verified": "Confirme o seu e-mail para entrar.",
+  "username already in use": "Este nome de usuário já está em uso.",
+  "forbidden": "Você só vê o perfil de quem está em um servidor com você.",
+  "not found": "Não encontramos essa pessoa.",
 };
 function friendly(raw: unknown, status: number): string {
   const key = typeof raw === "string" ? raw : "";
@@ -84,6 +87,9 @@ export const api = {
   register: (b: { email: string; username: string; password: string }) =>
     req<{ token: string; user: UserDTO } | { needsVerification: true; email: string }>("/auth/register", "POST", b),
   login: (b: { email: string; password: string }) => req<{ token: string; user: UserDTO }>("/auth/login", "POST", b),
+  account: () => req<AccountDTO>("/me/account"),
+  changePassword: (b: { current: string; password: string }) => req<{ ok: true }>("/me/password", "POST", b),
+  profile: (id: string) => req<ProfileDTO>(`/users/${id}/profile`),
   verify: (b: { email: string; code: string }) => req<{ token: string; user: UserDTO }>("/auth/verify", "POST", b),
   resend: (email: string) => req<{ ok: true }>("/auth/resend", "POST", { email }),
   forgot: (email: string) => req<{ ok: true }>("/auth/forgot", "POST", { email }),

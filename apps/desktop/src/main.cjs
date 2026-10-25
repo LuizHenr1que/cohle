@@ -10,6 +10,19 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required"); // 
 
 app.setName("Cohle");
 app.setAppUserModelId("app.cohle.desktop");     // Windows: notifications, taskbar grouping and the firewall prompt use this identity
+const fs = require("fs");
+// App-level preferences chosen in Settings (kept next to the user data)
+let settings = { closeToTray: true };
+const settingsFile = () => path.join(app.getPath("userData"), "settings.json");
+const loadSettings = () => { try { settings = { ...settings, ...JSON.parse(fs.readFileSync(settingsFile(), "utf8")) }; } catch { /* first run */ } };
+const readSettings = () => ({ closeToTray: settings.closeToTray, openAtLogin: app.getLoginItemSettings().openAtLogin, packaged: app.isPackaged, version: app.getVersion(), platform: process.platform });
+ipcMain.handle("settings:get", () => readSettings());
+ipcMain.handle("settings:set", (_e, patch) => {
+  if (typeof patch?.closeToTray === "boolean") settings.closeToTray = patch.closeToTray;
+  if (typeof patch?.openAtLogin === "boolean" && app.isPackaged) app.setLoginItemSettings({ openAtLogin: patch.openAtLogin, args: ["--hidden"] });
+  try { fs.writeFileSync(settingsFile(), JSON.stringify(settings)); } catch { /* not critical */ }
+  return readSettings();
+});
 let quitting = false;                              // true only when the person really quits: closing the window just hides it
 const startHidden = process.argv.includes("--hidden");   // started by "open at login"
 // one Cohle at a time (packaged app): opening it again brings the running one back
@@ -145,6 +158,7 @@ async function createWindow() {
   for (const e of ["focus", "blur", "minimize", "restore", "show", "hide"]) win.on(e, () => setTimeout(syncOverlay, 60));
   win.on("close", (e) => {            // like Discord: the red X sends Cohle to the tray; calls keep going
     if (quitting) return;
+    if (!settings.closeToTray) { quitting = true; app.quit(); return; }      // the person chose "quit when closing"
     e.preventDefault(); win.hide(); trayMod.hintOnce();
   });
   win.on("closed", () => { mainWin = null; if (overlay && !overlay.isDestroyed()) overlay.destroy(); });
@@ -154,6 +168,7 @@ async function createWindow() {
 
 app.whenReady().then(async () => {
   if (!gotLock) return;                                            // another Cohle is already running
+  loadSettings();
   if (process.platform === "darwin") app.dock?.setIcon(nativeImage.createFromPath(ICON));   // dev: the dock shows the real icon
   if ((await updater.launchCheck()) === "restarting") return;      // an update is being installed: the app reopens by itself
   updater.watch();

@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("cohle", {
   platform: process.platform,
   arch: process.arch,
+  getSettings: () => ipcRenderer.invoke("settings:get"),
+  setSettings: (p) => ipcRenderer.invoke("settings:set", p),
+  checkUpdate: () => ipcRenderer.invoke("update:check"),
   getUpdate: () => ipcRenderer.invoke("update:get"),
   installUpdate: () => ipcRenderer.invoke("update:install"),
   onUpdate: (cb) => { const h = (_e, s) => cb(s); ipcRenderer.on("update:state", h); return () => ipcRenderer.removeListener("update:state", h); },

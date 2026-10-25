@@ -10,6 +10,8 @@ import { AutoUpdateBadge, UpdateBadge } from "./UpdateBadge";
 import { DmChat, DmSidebar, useDms } from "./DirectMessages";
 import { Tour } from "./Tour";
 import { DevBadge } from "./Badge";
+import { SettingsModal } from "./SettingsModal";
+import { UserProfile } from "./UserProfile";
 import { NoServerHome, NoChannelHome } from "./EmptyStates";
 const VoiceRoom = lazy(() => import("./VoiceRoom").then((m) => ({ default: m.VoiceRoom })));
 import { Avatar } from "./Avatar";
@@ -61,6 +63,8 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [tour, setTour] = useState(() => { try { return localStorage.getItem(tourKey) === "pending"; } catch { return false; } });
   const closeTour = (next?: "create" | "join") => { setTour(false); try { localStorage.setItem(tourKey, "done"); } catch { /* private mode */ } if (next) setServerModal(next); };
   const auto = useAutoUpdate();
+  const [prefsOpen, setPrefsOpen] = useState(false);          // settings screen
+  const [profileId, setProfileId] = useState<string>();         // whose profile card is open
   const [dmOpen, setDmOpen] = useState(false);              // "home": direct messages instead of a server
   const [dmPeer, setDmPeer] = useState<UserDTO>();
   const deafRef = useRef(false);
@@ -205,7 +209,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {inside.map((u) => (
           <PersonRow key={u.id} user={u} isSelf={u.id === self.id} isOwner={server?.ownerId === u.id} channelName={c.name}
             inCall={voice?.id === c.id} speaking={voice?.id === c.id && speakers.has(u.id)} getApi={() => voiceApi.current}
-            onClick={() => openPerson(c, u)} onMessage={() => openDm(u)}
+            onClick={() => openPerson(c, u)} onMessage={() => openDm(u)} onProfile={() => setProfileId(u.id)}
             mod={isOwner && u.id !== self.id ? { muted: !!u.muted, toggleMute: () => void api.muteMember(c.serverId, u.id, !u.muted).catch(() => {}), disconnect: () => void api.disconnectMember(c.serverId, u.id).catch(() => {}), kick: () => void api.kick(c.serverId, u.id).catch(() => {}), ban: () => void api.ban(c.serverId, u.id).catch(() => {}) } : undefined} />
         ))}
       </div>
@@ -222,9 +226,9 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
             {msgs.map((m) => (
               <div key={m.id} className="flex gap-3">
-                <Avatar user={m.author.id === self.id ? self : m.author} size={38} />
+                <button onClick={() => setProfileId(m.author.id)} title="Ver perfil" className="shrink-0 self-start"><Avatar user={m.author.id === self.id ? self : m.author} size={38} /></button>
                 <div className="min-w-0">
-                  <div className="text-sm"><b>{m.author.username}</b> <DevBadge user={m.author} /> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
+                  <div className="text-sm"><button onClick={() => setProfileId(m.author.id)} className="font-bold hover:underline">{m.author.username}</button> <DevBadge user={m.author} /> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
                   <p className="text-ink/90 whitespace-pre-wrap break-words">{m.content}</p>
                 </div>
               </div>
@@ -335,7 +339,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           </div>
         )}
 
-        <button onClick={() => setProfileOpen(true)} className="mt-2 flex items-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl p-2 text-left transition">
+        <button onClick={() => setPrefsOpen(true)} title="Configurações e perfil" className="mt-2 flex items-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl p-2 text-left transition">
           <div className="relative">
             <Avatar user={self} size={34} />
             <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(self.id) ? "bg-emerald-400" : "bg-muted"}`} />
@@ -361,12 +365,12 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {voice && (
           <div className={view === "call" && !dmOpen ? "flex-1 flex flex-col min-h-0 min-w-0" : "hidden"}>
           <Suspense fallback={<div className="flex-1 grid place-items-center text-muted text-sm">Carregando chamada...</div>}>
-            <VoiceRoom key={voice.id} channel={voice} onApi={(a) => { voiceApi.current = a; }} onMessage={(uid) => { const u = Object.values(voiceUsers).flat().find((x) => x.id === uid); if (u) openDm(u); }} onSound={(id) => socket.current?.emit("voice:sound", id)} onMedia={(micOff, deaf) => { deafRef.current = deaf; socket.current?.emit("voice:media", { micOff, deaf }); }} autoWatch={autoWatch} onAutoWatched={() => setAutoWatch(undefined)} chat={view === "call" && chatOpen ? chatPane(true) : null} chatOpen={chatOpen} unread={unread} onToggleChat={() => setChatOpen((v) => !v)} channelName={channel?.name} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
+            <VoiceRoom key={voice.id} channel={voice} onApi={(a) => { voiceApi.current = a; }} onMessage={(uid) => { const u = Object.values(voiceUsers).flat().find((x) => x.id === uid); if (u) openDm(u); }} onProfile={setProfileId} onSound={(id) => socket.current?.emit("voice:sound", id)} onMedia={(micOff, deaf) => { deafRef.current = deaf; socket.current?.emit("voice:media", { micOff, deaf }); }} autoWatch={autoWatch} onAutoWatched={() => setAutoWatch(undefined)} chat={view === "call" && chatOpen ? chatPane(true) : null} chatOpen={chatOpen} unread={unread} onToggleChat={() => setChatOpen((v) => !v)} channelName={channel?.name} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
           </Suspense>
           </div>
         )}
         {dmOpen && (dmPeer
-          ? <DmChat key={dmPeer.id} peer={dmPeer} self={self} online={online.has(dmPeer.id)} getSocket={() => socket.current} onRead={dms.markRead} onMenu={wide ? undefined : () => setNavOpen(true)} />
+          ? <DmChat key={dmPeer.id} peer={dmPeer} self={self} online={online.has(dmPeer.id)} getSocket={() => socket.current} onRead={dms.markRead} onProfile={setProfileId} onMenu={wide ? undefined : () => setNavOpen(true)} />
           : (
             <div className="flex-1 grid place-items-center text-center px-6 text-muted">
               <div>
@@ -386,13 +390,16 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
               : chatPane(false))}
       </main>
 
+      {prefsOpen && <SettingsModal user={self} onClose={() => setPrefsOpen(false)} onEditProfile={() => { setPrefsOpen(false); setProfileOpen(true); }} onTour={() => setTour(true)} onLogout={onLogout}
+        fx={fx} onToggleFx={onToggleFx} lite={lite} onToggleLite={onToggleLite} rail={rail} onToggleRail={toggleRail} wide={wide} />}
+      {profileId && <UserProfile id={profileId} onClose={() => setProfileId(undefined)} onMessage={(u) => openDm(u)} onEdit={() => setProfileOpen(true)} />}
       {tour && <Tour name={self.username} onFinish={closeTour} />}
       {serverModal && <ServerModal initial={serverModal} username={self.username} onClose={() => setServerModal(undefined)} onDone={afterServerChange} />}
       {inviteOpen && server && <InviteModal server={server} onClose={() => setInviteOpen(false)} />}
       {newChannelType && server && <ChannelModal serverId={server.id} initialType={newChannelType} onClose={() => setNewChannelType(undefined)} />}
       {settingsOpen && server && (
         <ServerSettings server={server} selfId={self.id} online={online} rev={rev}
-          onClose={() => setSettingsOpen(false)} onAddChannel={(t) => setNewChannelType(t)} onMessage={openDm} />
+          onClose={() => setSettingsOpen(false)} onAddChannel={(t) => setNewChannelType(t)} onMessage={openDm} onProfile={setProfileId} />
       )}
       {profileOpen && (
         <ProfileModal user={self} onClose={() => setProfileOpen(false)} onTour={() => setTour(true)}

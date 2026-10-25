@@ -9,9 +9,9 @@ import { PrismaClient } from "@prisma/client";
 import { hash, verify } from "@node-rs/argon2";
 import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import {
-  registerSchema, loginSchema, verifySchema, forgotSchema, resetSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
+  registerSchema, loginSchema, changePasswordSchema, verifySchema, forgotSchema, resetSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
   type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
-  type DirectMessageDTO, type DmConversationDTO,
+  type DirectMessageDTO, type DmConversationDTO, type ProfileDTO, type AccountDTO,
 } from "@cohle/shared";
 import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail } from "./email.js";
 import { issueCode, checkCode } from "./codes.js";
@@ -54,6 +54,7 @@ const toUser = (u: any): UserDTO => ({
 // The "Desenvolvedor" badge belongs to the team's own accounts. It is granted by the server, only to a CONFIRMED e-mail
 // listed here (plus DEV_EMAILS, comma separated), so nobody can claim it by typing a name.
 const DEV_EMAILS = new Set(["verticeappempresa@gmail.com", ...(process.env.DEV_EMAILS ?? "").split(",")].map((e) => e.trim().toLowerCase()).filter(Boolean));
+prisma.user.updateMany({ where: { email: { in: [...DEV_EMAILS] }, emailVerifiedAt: { not: null }, badge: null }, data: { badge: "DEV" } }).catch(() => {});
 const withBadge = async (user: any) => {
   if (user.badge !== "DEV" && user.emailVerifiedAt && DEV_EMAILS.has(String(user.email).toLowerCase()))
     return prisma.user.update({ where: { id: user.id }, data: { badge: "DEV" } });
@@ -183,8 +184,45 @@ app.post("/auth/reset", authLimit, async (req, reply) => {
 });
 
 app.get("/me", { preHandler: auth }, async (req, reply) => {
-  const u = await prisma.user.findUnique({ where: { id: uid(req) }, ...lightUser });
-  return u ? toUser(u) : reply.code(404).send({ error: "not found" });
+  const full = await prisma.user.findUnique({ where: { id: uid(req) } });
+  if (!full) return reply.code(404).send({ error: "not found" });
+  return toUser(await withBadge(full));            // people who were already signed in get the badge too
+});
+
+// private account details (settings screen)
+app.get("/me/account", { preHandler: auth }, async (req, reply) => {
+  const u = await prisma.user.findUnique({ where: { id: uid(req) } });
+  if (!u) return reply.code(404).send({ error: "not found" });
+  const out: AccountDTO = { email: u.email, createdAt: u.createdAt.toISOString(), emailVerified: !!u.emailVerifiedAt };
+  return out;
+});
+
+app.post("/me/password", { ...authLimit, preHandler: auth }, async (req, reply) => {
+  const p = changePasswordSchema.safeParse(req.body);
+  if (!p.success) return reply.code(400).send({ error: "invalid input" });
+  const u = await prisma.user.findUnique({ where: { id: uid(req) } });
+  if (!u || !(await verify(u.passwordHash, p.data.current))) return reply.code(401).send({ error: "invalid credentials" });
+  await prisma.user.update({ where: { id: u.id }, data: { passwordHash: await hash(p.data.password) } });
+  return { ok: true };
+});
+
+// someone's profile card: only people who share a server with you (or yourself)
+app.get("/users/:id/profile", { preHandler: auth }, async (req: any, reply) => {
+  const me = uid(req), id = String(req.params.id);
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) return reply.code(404).send({ error: "not found" });
+  const [mine, theirs] = await Promise.all([
+    prisma.member.findMany({ where: { userId: me }, select: { serverId: true } }),
+    prisma.member.findMany({ where: { userId: id }, include: { server: { select: { id: true, name: true, iconVersion: true } } } }),
+  ]);
+  const mySet = new Set(mine.map((m) => m.serverId));
+  const mutual = theirs.filter((m) => mySet.has(m.serverId));
+  if (id !== me && !mutual.length) return reply.code(403).send({ error: "forbidden" });
+  const out: ProfileDTO = {
+    user: toUser(await withBadge(target)), createdAt: target.createdAt.toISOString(), isSelf: id === me,
+    mutual: mutual.map((m) => ({ id: m.server.id, name: m.server.name, iconUrl: m.server.iconVersion > 0 ? `/server-icons/${m.server.id}?v=${m.server.iconVersion}` : null, owner: m.role === "OWNER" })),
+  };
+  return out;
 });
 
 app.patch("/me", { preHandler: auth }, async (req, reply) => {

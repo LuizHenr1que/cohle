@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Mic, MicOff, Ban, UserX, PhoneMissed, ShieldAlert, Maximize2, MessageSquare } from "lucide-react";
+import { Mic, MicOff, Ban, UserX, PhoneMissed, ShieldAlert, Maximize2, MessageSquare, UserRound } from "lucide-react";
 
 // Per-person listening settings (only affect me). v/s: 0..2 = 0%..200%; m: muted for me.
 export type Vol = { v: number; s: number; m: boolean };
@@ -27,9 +27,9 @@ export function panelAt(x: number, y: number, alignRight = false): PanelPos {
   const width = Math.min(256, window.innerWidth - 16);
   return { width, left: Math.max(8, Math.min(alignRight ? x - width : x, window.innerWidth - width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - 400)) };
 }
-export function PersonPanel({ name, vol, onVol, sharing, mod, pos, onClose, onExpand, expandLabel, onMessage, ignore }: {
+export function PersonPanel({ name, vol, onVol, sharing, mod, pos, onClose, onExpand, expandLabel, onMessage, onProfile, ignore }: {
   name: string; vol: Vol; onVol: (patch: Partial<Vol>) => void; sharing: boolean; mod?: Moderation; pos: PanelPos; onClose: () => void;
-  onExpand?: () => void; expandLabel?: string; onMessage?: () => void; ignore?: React.RefObject<HTMLElement>;
+  onExpand?: () => void; expandLabel?: string; onMessage?: () => void; onProfile?: () => void; ignore?: React.RefObject<HTMLElement>;
 }) {
   const [confirm, setConfirm] = useState<string>();
   const pop = useRef<HTMLDivElement>(null);
@@ -57,8 +57,9 @@ export function PersonPanel({ name, vol, onVol, sharing, mod, pos, onClose, onEx
       </label>
       <Slider label="Volume da voz" value={vol.v} onChange={(v) => onVol({ v })} />
       {sharing && <Slider label="Volume do ao vivo" value={vol.s} onChange={(s) => onVol({ s })} />}
-      {(onExpand || onMessage) && (
+      {(onExpand || onMessage || onProfile) && (
         <div className="pt-2 border-t border-line space-y-0.5">
+          {onProfile && item("Ver perfil", UserRound, onProfile)}
           {onExpand && item(expandLabel ?? "Ampliar", Maximize2, onExpand)}
           {onMessage && item("Enviar mensagem", MessageSquare, onMessage)}
         </div>

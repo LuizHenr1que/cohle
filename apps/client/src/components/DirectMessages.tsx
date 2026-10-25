@@ -100,8 +100,8 @@ export function DmSidebar({ convs, online, peerId, onOpen }: {
   );
 }
 
-export function DmChat({ peer, self, online, getSocket, onRead, onMenu }: {
-  peer: UserDTO; self: UserDTO; online: boolean; getSocket: () => Socket | null | undefined; onRead: (peerId: string) => void; onMenu?: () => void;
+export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfile }: {
+  peer: UserDTO; self: UserDTO; online: boolean; getSocket: () => Socket | null | undefined; onRead: (peerId: string) => void; onMenu?: () => void; onProfile?: (id: string) => void;
 }) {
   const [msgs, setMsgs] = useState<DirectMessageDTO[]>([]);
   const [more, setMore] = useState(false);
@@ -163,8 +163,8 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu }: {
     <div className="flex-1 flex flex-col min-h-0 min-w-0">
       <header className="px-3 sm:px-6 py-3 border-b border-line flex items-center gap-3 min-w-0">
         {onMenu && <button onClick={onMenu} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={18} /></button>}
-        <span className="relative shrink-0"><Avatar user={peer} size={36} /><span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online ? "bg-emerald-400" : "bg-muted"}`} /></span>
-        <div className="min-w-0"><div className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{peer.username}</span><DevBadge user={peer} full /></div><div className="text-[11px] text-muted">{online ? "Online" : "Offline"}</div></div>
+        <button onClick={() => onProfile?.(peer.id)} className="flex items-center gap-3 min-w-0 text-left rounded-xl hover:bg-white/5 -m-1 p-1 transition" title="Ver perfil"><span className="relative shrink-0"><Avatar user={peer} size={36} /><span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online ? "bg-emerald-400" : "bg-muted"}`} /></span>
+        <div className="min-w-0"><div className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{peer.username}</span><DevBadge user={peer} full /></div><div className="text-[11px] text-muted">{online ? "Online" : "Offline"}</div></div></button>
       </header>
       <div ref={box} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
         {more && <button onClick={older} className="mx-auto mb-3 flex items-center gap-1.5 text-xs text-muted hover:text-ink rounded-full bg-white/5 px-3 py-1.5"><ChevronUp size={14} /> Ver mensagens anteriores</button>}
@@ -186,7 +186,7 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu }: {
               <div className={`flex gap-3 group ${head ? "mt-3" : ""}`}>
                 <div className="w-9 shrink-0">{head && <Avatar user={mine ? self : peer} size={36} />}</div>
                 <div className="min-w-0 flex-1">
-                  {head && <div className="text-sm"><b>{mine ? self.username : peer.username}</b> <DevBadge user={mine ? self : peer} /> <span className="text-muted text-xs ml-1">{clock(m.createdAt)}</span></div>}
+                  {head && <div className="text-sm"><button onClick={() => onProfile?.(mine ? self.id : peer.id)} className="font-bold hover:underline">{mine ? self.username : peer.username}</button> <DevBadge user={mine ? self : peer} /> <span className="text-muted text-xs ml-1">{clock(m.createdAt)}</span></div>}
                   <p className="text-ink/90 whitespace-pre-wrap break-words relative">
                     {m.content}
                     {!head && <span className="absolute -left-12 top-0.5 text-[10px] text-muted opacity-0 group-hover:opacity-100">{clock(m.createdAt)}</span>}

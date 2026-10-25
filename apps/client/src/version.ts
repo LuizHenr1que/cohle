@@ -1,4 +1,4 @@
 // Shown on the login screen so people always know which build they are running.
 // On every release: bump `n` (it matches the last number of the app version, 0.0.N) and rewrite `note` (same sentence as the GitHub release title).
-export const BUILD = { n: 8, note: "Telas de boas-vindas sem servidor e selo de desenvolvedor" };
+export const BUILD = { n: 9, note: "Configurações completas, perfil das pessoas e selo para quem já estava logado" };
 export const BUILD_LABEL = `Versão ${BUILD.n}`;

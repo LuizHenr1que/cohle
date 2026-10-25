@@ -88,6 +88,7 @@ function watch() {
 
 ipcMain.handle("update:get", () => state);
 ipcMain.handle("update:install", () => install());
+ipcMain.handle("update:check", () => checkNow());
 
 /** Manual "check for updates" (tray menu). */
 function checkNow() {

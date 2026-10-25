@@ -1,10 +1,13 @@
 /// <reference types="vite/client" />
 
 interface ScreenSource { id: string; name: string; type: "screen" | "window"; thumbnail: string; appIcon: string | null; }
-interface UpdateState { status: "unsupported" | "idle" | "downloading" | "ready" | "error"; version: string | null; percent: number; }
+interface UpdateState { status: "unsupported" | "idle" | "checking" | "none" | "downloading" | "ready" | "error"; version: string | null; percent: number; }
 interface Window {
   cohle?: {
     platform: string;
+    getSettings: () => Promise<{ closeToTray: boolean; openAtLogin: boolean; packaged: boolean; version: string; platform: string }>;
+    setSettings: (p: { closeToTray?: boolean; openAtLogin?: boolean }) => Promise<{ closeToTray: boolean; openAtLogin: boolean; packaged: boolean; version: string; platform: string }>;
+    checkUpdate: () => Promise<void>;
     getUpdate: () => Promise<UpdateState>;
     installUpdate: () => Promise<void>;
     onUpdate: (cb: (s: UpdateState) => void) => () => void;

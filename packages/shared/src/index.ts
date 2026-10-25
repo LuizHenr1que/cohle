@@ -10,6 +10,7 @@ export const loginSchema = z.object({
   email: emailField,
   password: z.string().min(1),
 });
+export const changePasswordSchema = z.object({ current: z.string().min(1), password: z.string().min(8).max(100) });
 const codeField = z.string().regex(/^\d{6}$/);
 export const verifySchema = z.object({ email: emailField, code: codeField });
 export const forgotSchema = z.object({ email: emailField });
@@ -41,6 +42,8 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export interface UserDTO { id: string; username: string; badge?: "DEV" | null; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
+export interface ProfileDTO { user: UserDTO; createdAt: string; mutual: { id: string; name: string; iconUrl: string | null; owner: boolean }[]; isSelf: boolean; }
+export interface AccountDTO { email: string; createdAt: string; emailVerified: boolean; }
 export interface ChannelDTO { id: string; serverId: string; name: string; type: "TEXT" | "VOICE"; }
 export interface ServerDTO {
   id: string; name: string; inviteCode: string; iconUrl: string | null; ownerId: string; channels: ChannelDTO[];
