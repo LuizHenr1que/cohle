@@ -24,6 +24,13 @@ const se = await http("/admin/series?range=24h", null, a.token);
 ok("série diária cobre 30 dias", se.d.days.length === 30 && se.d.days.at(-1).login >= 1);
 const ug = await http("/admin/usage", null, a.token);
 ok("4 cotas do plano grátis", ug.d.quotas.length === 4 && ug.d.quotas.every((q) => q.limit > 0 && ["ok", "warn", "over"].includes(q.level)), ug.d.quotas.map((q) => `${q.id}=${q.used}/${q.limit}`).join(" "));
+ok("cada limite traz o próximo passo com valor", ug.d.quotas.every((q) => q.next?.usd > 0 && q.next.brl > q.next.usd && q.next.plan && q.next.gives));
+const over = ug.d.quotas.filter((q) => q.level === "over"), notOk = ug.d.quotas.filter((q) => q.level !== "ok");
+const rend = (qs) => Math.max(0, ...qs.filter((q) => q.next.provider === "Render").map((q) => q.next.usd)) + qs.filter((q) => q.next.provider !== "Render").reduce((a, q) => a + q.next.usd, 0);
+ok("custo se continuar no ritmo = soma dos estourados (Render conta uma vez só)", ug.d.costNeeded.usd === rend(over), `US$ ${ug.d.costNeeded.usd} (${over.length} estourado(s))`);
+ok("custo com os em atenção >= custo dos estourados", ug.d.costIfWarn.usd === rend(notOk) && ug.d.costIfWarn.usd >= ug.d.costNeeded.usd, `US$ ${ug.d.costIfWarn.usd}`);
+ok("valor em reais usa o câmbio informado", Math.abs(ug.d.costNeeded.brl - ug.d.costNeeded.usd * ug.d.rate) < 0.02);
+if (process.env.EXPECT_OVER) ok("com limites apertados algo estoura e custa", over.length >= 2 && ug.d.costNeeded.usd > 0, over.map((q) => q.id).join(","));
 // roles
 ok("só o dono muda papéis (comum não)", (await http(`/admin/users/${a.user.id}/role`, { role: "USER" }, b.token)).s === 403);
 ok("o dono não pode ser rebaixado", (await http(`/admin/users/${a.user.id}/role`, { role: "USER" }, a.token)).s === 400);

@@ -11,6 +11,7 @@ Configurações (foto no canto) → **Painel do Cohle**. Só aparece para dono/a
 ## O que mostra
 - **Visão geral:** contas, novas contas (24 h/7 d), quem voltou ao app, online agora, em chamada, servidores, mensagens, memória e banco, gráficos de 24 h/7 d/30 d.
 - **Plano grátis:** Render (horas e memória), Supabase (tamanho do banco) e LiveKit (minutos de chamada), com uso, **previsão para o fim do mês** e a data em que o limite seria atingido no ritmo atual.
+- **Próximo passo e custo:** cada limite mostra o plano que resolve, o que ele traz e o valor estimado em reais; no topo, a linha do tempo (qual limite estoura em qual dia) e o custo mensal "se continuar nesse ritmo". Preços em dólar conferidos nos sites oficiais em 26/10/2026 (Render US$ 7 ou US$ 25, Supabase Pro US$ 25, LiveKit Ship US$ 50); reais pelo câmbio `PLAN_USD_BRL` (padrão 5,50). **Os preços mudam: confirme antes de assinar** e atualize `UPGRADE` em `apps/server/src/admin.ts`.
 - **Pessoas:** busca por nome/e-mail, e-mail confirmado, quando entrou, quando foi visto, papel.
 - **Acessos:** cadastros, logins e aberturas do app (uma por 30 min por pessoa). **Não guarda IP.**
 

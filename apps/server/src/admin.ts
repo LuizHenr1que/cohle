@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import type { AdminOverviewDTO, AdminUserRow, AdminSeriesDTO, AdminAccessRow, QuotaDTO, AdminUsageDTO } from "@cohle/shared";
+import type { AdminOverviewDTO, AdminUserRow, AdminSeriesDTO, AdminAccessRow, QuotaDTO, AdminUsageDTO, UpgradeDTO, CostDTO } from "@cohle/shared";
 
 // The company master account(s): matched by CONFIRMED e-mail only, so the role can never be claimed by typing a name.
 const OWNER_EMAILS = new Set(["verticeappempresa@gmail.com", ...(process.env.OWNER_EMAILS ?? "").split(",")].map((e) => e.trim().toLowerCase()).filter(Boolean));
@@ -20,6 +20,25 @@ const LIMITS = {
   voiceMinutes: Number(process.env.PLAN_LIVEKIT_MINUTES ?? 5000),
 };
 const SAMPLE_MS = 5 * 60_000;
+
+// What to pay when a free limit is not enough. Official prices (USD/month) checked on 2026-10-26 at render.com/pricing,
+// supabase.com/pricing and livekit.com/pricing. BRL is an estimate: the exchange rate is a setting, not a live quote.
+const USD_BRL = Number(process.env.PLAN_USD_BRL ?? 5.5);
+const PRICES_CHECKED = "2026-10-26";
+const up = (provider: string, plan: string, gives: string, usd: number): UpgradeDTO => ({ provider, plan, gives, usd, brl: Math.round(usd * USD_BRL * 100) / 100 });
+const UPGRADE = {
+  "render-hours": up("Render", "Render pago (menos de 1 CPU, 512 MB)", "Não dorme e não tem o limite de 750 horas", 7),
+  "render-mem": up("Render", "Render 1 CPU e 2 GB de memória", "4 vezes mais memória: o servidor para de reiniciar por falta dela", 25),
+  db: up("Supabase", "Supabase Pro", "8 GB de banco, backup diário por 7 dias e nunca pausa", 25),
+  livekit: up("LiveKit", "LiveKit Ship", "150.000 minutos de chamada, 250 GB de banda e 1.000 conexões", 50),
+} as const;
+const cost = (qs: QuotaDTO[]): CostDTO => {
+  // Render hours and Render memory are the same service: the bigger plan covers both, so pay once.
+  const by = new Map<string, UpgradeDTO>();
+  for (const q of qs) { const cur = by.get(q.next.provider); if (!cur || q.next.usd > cur.usd) by.set(q.next.provider, q.next); }
+  const list = [...by.values()], usd = list.reduce((a, b) => a + b.usd, 0);
+  return { usd, brl: Math.round(usd * USD_BRL * 100) / 100, items: list.map((u) => u.plan) };
+};
 
 const day = (d = new Date()) => d.toISOString().slice(0, 10);
 const monthStart = (d = new Date()) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
@@ -149,14 +168,14 @@ export function registerAdmin(app: FastifyInstance, d: {
     const awakeShare = Math.min(awakeH / observedH, 1);
     const projHours = Math.min(awakeShare, 1) * dim * 24;
     const hours: QuotaDTO = {
-      id: "render-hours", label: "Render: horas ligado no mês", unit: "h", used: Math.round(awakeH * 10) / 10, limit: LIMITS.renderHours,
+      id: "render-hours", next: UPGRADE["render-hours"], label: "Render: horas ligado no mês", unit: "h", used: Math.round(awakeH * 10) / 10, limit: LIMITS.renderHours,
       projected: Math.round(projHours), level: level(projHours / LIMITS.renderHours, 0.95), runsOutAt: runsOutAt(awakeH, awakeShare * 24, LIMITS.renderHours, monthEnd),
       note: "Estimado pelas medições do Cohle (uma a cada 5 min enquanto o servidor está acordado). Conta de verdade: painel do Render.",
     };
 
     const rss = mb(process.memoryUsage().rss), peak = Math.max(peakRow._max.rssMb ?? 0, rss);
     const mem: QuotaDTO = {
-      id: "render-mem", label: "Render: memória (pico do mês)", unit: "MB", used: rss, limit: LIMITS.renderMemMb, projected: peak,
+      id: "render-mem", next: UPGRADE["render-mem"], label: "Render: memória (pico do mês)", unit: "MB", used: rss, limit: LIMITS.renderMemMb, projected: peak,
       level: level(peak / LIMITS.renderMemMb, 0.75), runsOutAt: null, note: `Agora ${rss} MB. Passou de ${LIMITS.renderMemMb} MB o Render derruba o processo.`,
     };
 
@@ -164,17 +183,21 @@ export function registerAdmin(app: FastifyInstance, d: {
     const dbPerDay = firstDb && firstDb.dbMb > 0 && dbNow > firstDb.dbMb ? (dbNow - firstDb.dbMb) / Math.max((now.getTime() - new Date(firstDb.day + "T00:00:00Z").getTime()) / 86_400_000, 1) : 0;
     const dbProj = dbNow + dbPerDay * (dim - elapsedDays);
     const db: QuotaDTO = {
-      id: "db", label: "Supabase: tamanho do banco", unit: "MB", used: dbNow, limit: LIMITS.dbMb, projected: Math.round(dbProj),
+      id: "db", next: UPGRADE.db, label: "Supabase: tamanho do banco", unit: "MB", used: dbNow, limit: LIMITS.dbMb, projected: Math.round(dbProj),
       level: level(dbProj / LIMITS.dbMb), runsOutAt: runsOutAt(dbNow, dbPerDay, LIMITS.dbMb, null), note: "Inclui as tabelas do próprio Supabase. Sem backup automático no plano grátis.",
     };
 
     const vUsed = voiceRows._sum.voiceMinutes ?? 0, vPerDay = vUsed / elapsedDays, vProj = Math.round(vPerDay * dim);
     const voice: QuotaDTO = {
-      id: "livekit", label: "LiveKit: minutos de chamada no mês", unit: "min", used: vUsed, limit: LIMITS.voiceMinutes, projected: vProj,
+      id: "livekit", next: UPGRADE.livekit, label: "LiveKit: minutos de chamada no mês", unit: "min", used: vUsed, limit: LIMITS.voiceMinutes, projected: vProj,
       level: level(vProj / LIMITS.voiceMinutes), runsOutAt: runsOutAt(vUsed, vPerDay, LIMITS.voiceMinutes, monthEnd),
       note: "Soma de minutos de cada pessoa na sala, medida pelo Cohle (é como o LiveKit cobra). Confira o limite do seu plano em livekit.io/pricing.",
     };
-    return { month: ms.toISOString().slice(0, 7), resetsAt: monthEnd.toISOString(), quotas: [hours, mem, db, voice] };
+    const quotas = [hours, mem, db, voice];
+    return {
+      month: ms.toISOString().slice(0, 7), resetsAt: monthEnd.toISOString(), quotas, rate: USD_BRL, pricesCheckedAt: PRICES_CHECKED,
+      costNeeded: cost(quotas.filter((q) => q.level === "over")), costIfWarn: cost(quotas.filter((q) => q.level !== "ok")),
+    };
   });
 
   // Only the master (OWNER) hands out or takes back the admin role. The master itself is fixed.

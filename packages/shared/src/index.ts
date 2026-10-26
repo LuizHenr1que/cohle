@@ -77,5 +77,7 @@ export interface AdminSeriesDTO {
   points: { t: string; online: number; peak: number; voice: number; rss: number }[];
   days: { day: string; register: number; login: number; open: number; voiceMinutes: number; dbMb: number }[];
 }
-export interface QuotaDTO { id: string; label: string; unit: string; used: number; limit: number; projected: number; level: "ok" | "warn" | "over"; runsOutAt: string | null; note?: string; }
-export interface AdminUsageDTO { month: string; resetsAt: string; quotas: QuotaDTO[]; }
+export interface UpgradeDTO { provider: string; plan: string; gives: string; usd: number; brl: number; }
+export interface QuotaDTO { id: string; label: string; unit: string; used: number; limit: number; projected: number; level: "ok" | "warn" | "over"; runsOutAt: string | null; note?: string; next: UpgradeDTO; }
+export interface CostDTO { usd: number; brl: number; items: string[]; }
+export interface AdminUsageDTO { month: string; resetsAt: string; quotas: QuotaDTO[]; rate: number; costNeeded: CostDTO; costIfWarn: CostDTO; pricesCheckedAt: string; }

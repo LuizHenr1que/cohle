@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Activity, AlertTriangle, ArrowLeft, BadgeCheck, CheckCircle2, Gauge, KeyRound, LogIn, Search, ShieldCheck, UserPlus, Users, Mic, Server, MessageSquare, X, Eye } from "lucide-react";
+import { Activity, AlertTriangle, CalendarClock, Wallet, ArrowLeft, BadgeCheck, CheckCircle2, Gauge, KeyRound, LogIn, Search, ShieldCheck, UserPlus, Users, Mic, Server, MessageSquare, X, Eye } from "lucide-react";
 import type { AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, QuotaDTO, UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { Logo } from "./Logo";
@@ -120,6 +120,19 @@ function Overview() {
   );
 }
 
+const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const day = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
+
+/** The sentence an owner actually needs: what happens, when, and what it costs to avoid it. */
+function nextStep(q: QuotaDTO) {
+  const n = q.next, price = `${brl(n.brl)}/mês (US$ ${n.usd})`;
+  if (q.level === "over") return q.runsOutAt && new Date(q.runsOutAt) > new Date()
+    ? `No ritmo atual o limite acaba em ${day(q.runsOutAt)}. Para não parar: ${n.plan}, cerca de ${price}.`
+    : `O limite já foi atingido ou será neste mês. Para não parar: ${n.plan}, cerca de ${price}.`;
+  if (q.level === "warn") return `Ainda cabe no grátis, com pouca folga. Plano de reserva: ${n.plan}, cerca de ${price}.`;
+  return `Nada a pagar por enquanto. Quando crescer: ${n.plan}, cerca de ${price}.`;
+}
+
 function Quota({ q }: { q: QuotaDTO }) {
   const L = LEVEL[q.level], isMem = q.id === "render-mem";
   const pct = (v: number) => Math.min((v / q.limit) * 100, 100);
@@ -137,7 +150,12 @@ function Quota({ q }: { q: QuotaDTO }) {
       </div>
       <div className="mt-3 space-y-1 text-xs text-muted">
         <div className="flex justify-between gap-3"><span>{isMem ? "Pico neste mês" : "Previsão para o fim do mês"}</span><b className="text-ink tabular-nums">{num(q.projected)}</b></div>
-        <div className="flex justify-between gap-3"><span>No ritmo de hoje</span><b className="text-ink">{q.id === "render-mem" ? (q.level === "ok" ? "sobra memória" : "risco de reinício") : q.runsOutAt ? `acaba em ${new Date(q.runsOutAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}` : "dura até o fim do mês"}</b></div>
+        <div className="flex justify-between gap-3"><span>No ritmo de hoje</span><b className="text-ink">{isMem ? (q.level === "ok" ? "sobra memória" : "risco de reinício") : q.runsOutAt ? `acaba em ${day(q.runsOutAt)}` : "dura até o fim do mês"}</b></div>
+      </div>
+      <div className="mt-3 rounded-xl px-3 py-2.5 text-xs leading-relaxed border" style={{ borderColor: `${L.c}44`, background: `${L.c}10` }}>
+        <div className="font-semibold text-ink mb-0.5 flex items-center gap-1.5"><Wallet size={13} style={{ color: L.c }} />Próximo passo</div>
+        <div className="text-muted">{nextStep(q)}</div>
+        <div className="text-muted/80 mt-1">{q.next.plan} traz: {q.next.gives.charAt(0).toLowerCase() + q.next.gives.slice(1)}.</div>
       </div>
       {q.note && <p className="text-[11px] text-muted mt-3 leading-relaxed">{q.note}</p>}
     </Card>
@@ -149,20 +167,38 @@ function Plan() {
   const worst = data?.quotas.some((q) => q.level === "over") ? "over" : data?.quotas.some((q) => q.level === "warn") ? "warn" : "ok";
   const L = LEVEL[worst];
   const days = data ? Math.max(0, Math.ceil((new Date(data.resetsAt).getTime() - Date.now()) / 86_400_000)) : 0;
+  const timeline = data?.quotas.filter((q) => q.runsOutAt && q.level !== "ok").sort((a, b) => +new Date(a.runsOutAt!) - +new Date(b.runsOutAt!)) ?? [];
   return (
     <div className="space-y-4">
       <Err msg={err} />
-      {data && (
-        <Card className="flex items-start gap-3" >
+      {data && (<>
+        <Card className="flex items-start gap-3">
           <L.I size={22} style={{ color: L.c }} className="shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">{worst === "over" ? "No ritmo de hoje, algum limite grátis estoura neste mês" : worst === "warn" ? "Dentro do grátis, mas vale ficar de olho" : "Tudo dentro do plano grátis"}</div>
             <div className="text-sm text-muted mt-0.5">Mês de {data.month.split("-").reverse().join("/")} · os contadores mensais zeram em {days} dia(s). As previsões usam o ritmo médio do mês até agora, então ficam mais confiáveis com o passar dos dias.</div>
           </div>
         </Card>
-      )}
+        <div className="grid md:grid-cols-3 gap-3">
+          <Card><div className="flex items-center gap-2 text-xs text-muted"><Wallet size={14} className="text-accent" />Você paga hoje</div><div className="mt-1.5 text-2xl font-bold">{brl(0)}<span className="text-sm text-muted font-normal">/mês</span></div><div className="text-xs text-muted mt-0.5">tudo no plano grátis</div></Card>
+          <Card><div className="flex items-center gap-2 text-xs text-muted"><AlertTriangle size={14} style={{ color: data.costNeeded.usd ? BAD : OK }} />Se continuar nesse ritmo</div>
+            <div className="mt-1.5 text-2xl font-bold">{data.costNeeded.usd ? brl(data.costNeeded.brl) : brl(0)}<span className="text-sm text-muted font-normal">/mês</span></div>
+            <div className="text-xs text-muted mt-0.5">{data.costNeeded.usd ? data.costNeeded.items.join(" + ") : "nenhum limite estoura neste mês"}</div></Card>
+          <Card><div className="flex items-center gap-2 text-xs text-muted"><Gauge size={14} style={{ color: WARN }} />Se pagar também o que está em atenção</div>
+            <div className="mt-1.5 text-2xl font-bold">{brl(data.costIfWarn.brl)}<span className="text-sm text-muted font-normal">/mês</span></div>
+            <div className="text-xs text-muted mt-0.5">{data.costIfWarn.items.length ? data.costIfWarn.items.join(" + ") : "nada em atenção"}</div></Card>
+        </div>
+        <Card>
+          <div className="font-semibold text-sm mb-3 flex items-center gap-2"><CalendarClock size={15} className="text-accent" />Linha do tempo: o que vai exigir upgrade</div>
+          {timeline.length ? (
+            <ol className="space-y-2.5">{timeline.map((q) => (
+              <li key={q.id} className="flex gap-3 text-sm"><span className="shrink-0 w-24 font-semibold tabular-nums" style={{ color: LEVEL[q.level].c }}>{day(q.runsOutAt!)}</span><span className="text-muted"><b className="text-ink">{q.label.split(":")[0]}</b> chega ao limite de {q.label.split(": ")[1] ?? q.label}. Para seguir: {q.next.plan}, cerca de {brl(q.next.brl)}/mês.</span></li>
+            ))}</ol>
+          ) : <div className="text-sm text-muted">Nenhum limite é atingido até o fim do mês no ritmo atual. Os cartões abaixo mostram o plano de reserva de cada serviço.</div>}
+        </Card>
+      </>)}
       <div className="grid md:grid-cols-2 gap-3">{data?.quotas.map((q) => <Quota key={q.id} q={q} />)}</div>
-      <p className="text-xs text-muted leading-relaxed">Os números de horas do Render e minutos do LiveKit são medidos pelo próprio Cohle (os provedores não entregam esse dado por API no plano grátis). Para a conta oficial, confira o painel de cada serviço. Para ajustar os limites caso um plano mude: variáveis <code>PLAN_RENDER_HOURS</code>, <code>PLAN_RENDER_MEM_MB</code>, <code>PLAN_DB_MB</code> e <code>PLAN_LIVEKIT_MINUTES</code> no Render.</p>
+      {data && <p className="text-xs text-muted leading-relaxed">Valores em reais são estimativas (câmbio de R$ {data.rate.toFixed(2).replace(".", ",")} por dólar, ajustável em <code>PLAN_USD_BRL</code>). Preços em dólar conferidos nos sites oficiais do Render, Supabase e LiveKit em {new Date(data.pricesCheckedAt).toLocaleDateString("pt-BR")}: confirme antes de assinar, pois mudam. Horas do Render e minutos do LiveKit são medidos pelo próprio Cohle (os provedores não entregam esse dado por API no plano grátis). Limites ajustáveis no Render: <code>PLAN_RENDER_HOURS</code>, <code>PLAN_RENDER_MEM_MB</code>, <code>PLAN_DB_MB</code>, <code>PLAN_LIVEKIT_MINUTES</code>.</p>}
     </div>
   );
 }
