@@ -28,8 +28,9 @@ export function App() {
   }, [authed, dropSession]);
 
   // Particle backdrop: on by default, user can switch it off from the sidebar (saved per device).
+  // Desktop: on by default. Web: off by default (a browser tab shares the machine with everything else; opt in from the sidebar).
   const [fx, setFx] = useState(() => {
-    try { return localStorage.getItem("fx") !== "off" && !matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return true; }
+    try { const v = localStorage.getItem("fx"); return (v ? v === "on" : !!window.cohle) && !matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return !!window.cohle; }
   });
   const toggleFx = () => setFx((v) => { try { localStorage.setItem("fx", v ? "off" : "on"); } catch {} return !v; });
 

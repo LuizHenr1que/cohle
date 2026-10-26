@@ -70,7 +70,7 @@ async function setupDownloads() {
   const others = $("[data-dl-others]");
   if (d.os === "mac") others.innerHTML = `Mac com chip Intel? <a href="#baixar" data-dl="mac-x64">Baixe esta versão</a>. Prefere Windows? <a href="#baixar" data-dl="win-x64">É por aqui</a>.`;
   else if (d.os === "win") others.innerHTML = `Usa Mac? <a href="#baixar" data-dl="mac-arm64">Apple Silicon</a> ou <a href="#baixar" data-dl="mac-x64">Intel</a>.`;
-  else if (d.os === "mobile") others.innerHTML = `Celular: o app está em construção. Por enquanto o Cohle roda no <a href="https://app.cohle.verticeapp.com.br" rel="noopener">navegador</a>, no <a href="#baixar" data-dl="mac-arm64">Mac</a> e no <a href="#baixar" data-dl="win-x64">Windows</a>.`;
+  else if (d.os === "mobile") others.innerHTML = `Celular: o app está em construção. Por enquanto o Cohle roda no <a href="/app/">navegador</a>, no <a href="#baixar" data-dl="mac-arm64">Mac</a> e no <a href="#baixar" data-dl="win-x64">Windows</a>.`;
   else others.innerHTML = `Disponível para <a href="#baixar" data-dl="mac-arm64">macOS</a> e <a href="#baixar" data-dl="win-x64">Windows</a>.`;
   $$("[data-dl]", others).forEach((a) => wireDownload(a, a.dataset.dl));
   if (d.key) {

@@ -14,3 +14,6 @@ tools/share/.secrets
 infra/prod/.env
 release-prod
 release-*
+
+# web client built into the landing at deploy time (served at /app)
+apps/landing/app
