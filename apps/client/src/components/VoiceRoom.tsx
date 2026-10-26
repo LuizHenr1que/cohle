@@ -189,6 +189,9 @@ type Status = "connecting" | "connected" | "error";
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const GAP = 12;
 
+// Phones' browsers cannot share the screen at all: do not offer a button that can only fail.
+const canShareScreen = !!window.cohle || !!navigator.mediaDevices?.getDisplayMedia;
+
 export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia, onSound, onMessage, onProfile }: {
   channel: ChannelDTO; users: UserDTO[]; serverId: string; isOwner: boolean;
   chat?: React.ReactNode; chatOpen?: boolean; unread?: number; onToggleChat?: () => void; channelName?: string;
@@ -595,7 +598,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
           <button title={deafened ? "Desativar ensurdecer" : "Ensurdecer"} className={btn(!deafened)} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}</button>
           {onSound && <Soundboard onPlay={onSound} disabled={meMuted} btnCls={btn(true)} />}
           <button title="Câmera" className={btn(!!lp?.isCameraEnabled)} onClick={() => toggle("cam")}>{lp?.isCameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}</button>
-          <button title="Compartilhar tela" className={`size-11 sm:size-12 rounded-2xl grid place-items-center ${lp?.isScreenShareEnabled ? "grad text-white" : "bg-white/10"}`} onClick={() => toggle("screen")}><MonitorUp size={20} /></button>
+          {canShareScreen && <button title="Compartilhar tela" className={`size-11 sm:size-12 rounded-2xl grid place-items-center ${lp?.isScreenShareEnabled ? "grad text-white" : "bg-white/10"}`} onClick={() => toggle("screen")}><MonitorUp size={20} /></button>}
           <button title="Sair da chamada" className="size-11 sm:size-12 rounded-2xl grid place-items-center bg-red-600" onClick={onLeave}><PhoneOff size={20} /></button>
         </div>
       </div>

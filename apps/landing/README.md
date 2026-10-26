@@ -33,4 +33,4 @@ As capturas em `shots/` vêm do app real: ver `tools/bots/ui-check/app-shots.cjs
 ## Regras do conteúdo
 - Sem emojis: só ícones (lucide) e ilustrações próprias.
 - Nenhum outro serviço é citado pelo nome, e o rodapé informa que o Cohle é independente.
-- Só se anuncia o que já funciona; o resto fica marcado como "em construção", "planejado" ou "sonhando alto".
+- Só se anuncia o que já funciona; o resto fica marcado como "em construção" (hoje só o app de celular), "planejado" ou "sonhando alto".

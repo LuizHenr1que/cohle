@@ -90,7 +90,9 @@ export function SettingsModal({ user, onAdmin, onClose, onEditProfile, onTour, o
             <Card>
               <Row title="Versão"><span className="text-sm font-semibold">Versão {BUILD.n}</span></Row>
               <Row title="Novidades desta versão"><span className="text-sm text-muted text-right max-w-[60%]">{BUILD.note}</span></Row>
+              <Row title="Você está usando"><span className="text-sm text-muted">{desktop ? "Aplicativo para computador" : "Cohle no navegador"}</span></Row>
               <Row title="Site"><span className="text-sm text-muted">cohle.verticeapp.com.br</span></Row>
+              {!desktop && <Row title="Aplicativo para computador" hint="Mais leve para jogar com o Cohle aberto, com atualização automática e escolha de qual janela compartilhar."><a href="https://cohle.verticeapp.com.br/#baixar" target="_blank" rel="noreferrer" className="grad rounded-xl px-4 py-2 text-sm font-semibold text-white hover:brightness-110">Baixar</a></Row>}
             </Card>
             <p className="text-xs text-muted mt-4 leading-relaxed">Chat, voz e compartilhamento de tela num app só. Leve, bonito e feito para a galera.</p>
           </>)}
