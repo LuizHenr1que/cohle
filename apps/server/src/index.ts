@@ -9,11 +9,11 @@ import { PrismaClient } from "@prisma/client";
 import { hash, verify } from "@node-rs/argon2";
 import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import {
-  registerSchema, loginSchema, changePasswordSchema, friendRequestSchema, verifySchema, forgotSchema, resetSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
-  type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
+  registerSchema, loginSchema, changePasswordSchema, friendRequestSchema, verifySchema, forgotSchema, forgotUsernameSchema, privacySchema, resetSchema, cleanHandle, handleProblem, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
+  type UsernameCheckDTO, type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
   type DirectMessageDTO, type DmConversationDTO, type ProfileDTO, type AccountDTO, type FriendsDTO, type Relation,
 } from "@cohle/shared";
-import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail } from "./email.js";
+import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail, usernameEmail } from "./email.js";
 import { issueCode, checkCode } from "./codes.js";
 import { registerAdmin, roleOf } from "./admin.js";
 
@@ -112,6 +112,21 @@ app.get("/health/db", async () => { await prisma.$queryRaw`SELECT 1`; return { o
 
 // ---- auth ----
 const byEmail = (email: string) => prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
+// The login / recovery box takes an e-mail OR a @username (an @username never contains "@", so there is no ambiguity).
+const byIdentity = (id: string) => (id.includes("@") ? byEmail(id) : prisma.user.findUnique({ where: { username: id } }));
+// Staff accounts may take reserved names (@vertice); everybody else may not.
+const isStaff = (u: { email: string; emailVerifiedAt: Date | null; role: string }) => roleOf(u) !== "USER";
+
+// Failed sign-ins per account (on top of the per-IP limit): 8 misses in 15 minutes lock that account's login for the rest of the window.
+// In memory is enough: one API instance, and a restart only forgives a few tries. Wrong passwords and unknown names count the same,
+// and an unknown name still pays for one password check, so neither the answer nor the time says whether the account exists.
+const FAIL_MAX = 8, FAIL_WINDOW = 15 * 60_000;
+const fails = new Map<string, { n: number; since: number }>();
+const locked = (k: string) => { const f = fails.get(k); return !!f && Date.now() - f.since < FAIL_WINDOW && f.n >= FAIL_MAX; };
+const noteFail = (k: string) => { const f = fails.get(k); fails.set(k, !f || Date.now() - f.since >= FAIL_WINDOW ? { n: 1, since: Date.now() } : { n: f.n + 1, since: f.since }); };
+setInterval(() => { for (const [k, f] of fails) if (Date.now() - f.since >= FAIL_WINDOW) fails.delete(k); }, 10 * 60_000).unref();
+const DUMMY_HASH = await hash("cohle-not-a-real-password");
+const usernameMailAt = new Map<string, number>();                      // userId -> last "forgot username" mail (60 s apart)
 const logAccess = (userId: string, kind: "register" | "login" | "open") => prisma.accessLog.create({ data: { userId, kind } }).catch(() => {});
 const session = async (user: any, kind: "register" | "login" = "login") => {
   const u = await withBadge(user); logAccess(u.id, kind); prisma.user.update({ where: { id: u.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
@@ -131,9 +146,10 @@ app.post("/auth/register", authLimit, async (req, reply) => {
   const p = registerSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
   const exists = await prisma.user.findFirst({
-    where: { OR: [{ email: { equals: p.data.email, mode: "insensitive" } }, { username: p.data.username }] },
+    where: { OR: [{ email: { equals: p.data.email, mode: "insensitive" } }, { username: p.data.username }] },   // usernames are stored lowercase, so this is already case-insensitive
   });
   if (exists) return reply.code(409).send({ error: "email or username already in use" });
+  if (handleProblem(p.data.username)) return reply.code(400).send({ error: "invalid input" });          // reserved names
   const user = await prisma.user.create({
     data: { email: p.data.email, username: p.data.username, tag: genTag(), passwordHash: await hash(p.data.password), emailVerifiedAt: verifying ? null : new Date() },
   });
@@ -150,18 +166,42 @@ app.post("/auth/register", authLimit, async (req, reply) => {
 app.post("/auth/login", authLimit, async (req, reply) => {
   const p = loginSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
-  const user = await byEmail(p.data.email);
-  if (!user || !(await verify(user.passwordHash, p.data.password)))
-    return reply.code(401).send({ error: "invalid credentials" });
+  const key = p.data.email;
+  if (locked(key)) return reply.code(429).send({ error: "too many attempts" });
+  const user = await byIdentity(key);
+  const good = await verify(user?.passwordHash ?? DUMMY_HASH, p.data.password).catch(() => false);
+  if (!user || !good) { noteFail(key); return reply.code(401).send({ error: "invalid credentials" }); }
+  fails.delete(key);
   if (verifying && !user.emailVerifiedAt) return reply.code(403).send({ error: "email not verified", needsVerification: true, email: user.email });
   return await session(user);
+});
+
+// live check while typing the @username on the sign-up screen
+app.get("/auth/username-available", { config: { rateLimit: { max: 40, timeWindow: "1 minute" } } }, async (req: any): Promise<UsernameCheckDTO> => {
+  const h = cleanHandle(String(req.query?.u ?? ""));
+  const bad = handleProblem(h);
+  if (bad) return { available: false, reason: bad };
+  return (await prisma.user.findUnique({ where: { username: h }, select: { id: true } })) ? { available: false, reason: "taken" } : { available: true };
+});
+
+// "I forgot my @username": we e-mail it to the address on the account. Always answers ok, so it never says which e-mails exist.
+app.post("/auth/forgot-username", authLimit, async (req, reply) => {
+  const p = forgotUsernameSchema.safeParse(req.body);
+  if (!p.success) return reply.code(400).send({ error: "invalid input" });
+  if (!verifying) return reply.code(503).send({ error: "email unavailable" });
+  const user = await byEmail(p.data.email);
+  if (user && Date.now() - (usernameMailAt.get(user.id) ?? 0) > 60_000) {
+    usernameMailAt.set(user.id, Date.now());
+    await sendMail({ ...usernameEmail(user.username), to: user.email }).catch((e) => app.log.warn({ err: String(e) }, "username e-mail failed"));
+  }
+  return { ok: true };
 });
 
 // confirm the address with the 6-digit code, then sign in
 app.post("/auth/verify", authLimit, async (req, reply) => {
   const p = verifySchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid code" });
-  const user = await byEmail(p.data.email);
+  const user = await byIdentity(p.data.email);
   const res = user ? await checkCode(prisma, user.id, "VERIFY", p.data.code) : "wrong";
   if (!user || res !== "ok") return reply.code(res === "expired" ? 410 : res === "locked" ? 429 : 400).send({ error: res === "ok" ? "invalid code" : res });
   const wasNew = !user.emailVerifiedAt;
@@ -174,7 +214,7 @@ app.post("/auth/verify", authLimit, async (req, reply) => {
 app.post("/auth/resend", authLimit, async (req) => {
   const p = forgotSchema.safeParse(req.body);
   if (p.success && verifying) {
-    const user = await byEmail(p.data.email);
+    const user = await byIdentity(p.data.email);
     if (user && !user.emailVerifiedAt) await mailCode(user, "VERIFY").catch((e) => app.log.warn({ err: String(e) }, "resend failed"));
   }
   return { ok: true };
@@ -184,7 +224,7 @@ app.post("/auth/forgot", authLimit, async (req, reply) => {
   const p = forgotSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
   if (!verifying) return reply.code(503).send({ error: "email unavailable" });
-  const user = await byEmail(p.data.email);
+  const user = await byIdentity(p.data.email);
   if (user) await mailCode(user, "RESET").catch((e) => app.log.warn({ err: String(e) }, "reset e-mail failed"));
   return { ok: true };                                                  // same answer whether or not the account exists
 });
@@ -192,7 +232,7 @@ app.post("/auth/forgot", authLimit, async (req, reply) => {
 app.post("/auth/reset", authLimit, async (req, reply) => {
   const p = resetSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
-  const user = await byEmail(p.data.email);
+  const user = await byIdentity(p.data.email);
   const res = user ? await checkCode(prisma, user.id, "RESET", p.data.code) : "wrong";
   if (!user || res !== "ok") return reply.code(res === "expired" ? 410 : res === "locked" ? 429 : 400).send({ error: res === "ok" ? "invalid code" : res });
   const done = await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hash(p.data.password), emailVerifiedAt: user.emailVerifiedAt ?? new Date() } });
@@ -210,8 +250,15 @@ app.get("/me", { preHandler: auth }, async (req, reply) => {
 app.get("/me/account", { preHandler: auth }, async (req, reply) => {
   const u = await prisma.user.findUnique({ where: { id: uid(req) } });
   if (!u) return reply.code(401).send({ error: "unauthorized" });
-  const out: AccountDTO = { email: u.email, createdAt: u.createdAt.toISOString(), emailVerified: !!u.emailVerifiedAt };
+  const out: AccountDTO = { email: u.email, createdAt: u.createdAt.toISOString(), emailVerified: !!u.emailVerifiedAt, findByEmail: u.allowEmailFind };
   return out;
+});
+
+app.post("/me/privacy", { preHandler: auth }, async (req, reply) => {
+  const p = privacySchema.safeParse(req.body);
+  if (!p.success) return reply.code(400).send({ error: "invalid input" });
+  await prisma.user.update({ where: { id: uid(req) }, data: { allowEmailFind: p.data.findByEmail } });
+  return { ok: true };
 });
 
 app.post("/me/password", { ...authLimit, preHandler: auth }, async (req, reply) => {
@@ -249,6 +296,9 @@ app.patch("/me", { preHandler: auth }, async (req, reply) => {
   const p = updateProfileSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
   if (p.data.username) {
+    const cur = await prisma.user.findUnique({ where: { id: uid(req) }, select: { email: true, emailVerifiedAt: true, role: true } });
+    if (!cur) return reply.code(401).send({ error: "unauthorized" });
+    if (handleProblem(p.data.username, isStaff(cur))) return reply.code(400).send({ error: "invalid input" });          // reserved names (staff exempt)
     const taken = await prisma.user.findFirst({ where: { username: p.data.username, NOT: { id: uid(req) } } });
     if (taken) return reply.code(409).send({ error: "username already in use" });
   }
@@ -564,7 +614,8 @@ app.post("/dms/:peerId/read", { preHandler: auth }, async (req: any) => {
 });
 
 // ---- friends: add by @name#code, requests, online/offline list ----
-const HANDLE = /^@?\s*([A-Za-z0-9_.-]{2,24})\s*#\s*([A-Za-z0-9]{2,8})$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const HANDLE = /^@?\s*([A-Za-z0-9_.]{3,20})(?:\s*#\s*[A-Za-z0-9]{2,8})?$/;     // "@user", "user", or the old "@user #code" (the code is no longer needed: handles are unique)
 const ping = (...ids: string[]) => ids.forEach((i) => io.to(`user:${i}`).emit("friends:update"));
 const pairOf = (a: string, b: string) => ({ OR: [{ requesterId: a, addresseeId: b }, { requesterId: b, addresseeId: a }] });
 
@@ -581,19 +632,35 @@ app.get("/friends", { preHandler: auth }, async (req: any) => {
   return out;
 });
 
+// One request between two people: sends it, or accepts it when they had already asked me. Returns what happened, or why not.
+async function befriend(me: string, target: { id: string }): Promise<"sent" | "accepted" | "already friends" | "already requested"> {
+  const ex = await prisma.friendship.findFirst({ where: pairOf(me, target.id) });
+  if (ex?.status === "ACCEPTED") return "already friends";
+  if (ex && ex.requesterId === me) return "already requested";
+  if (ex) { await prisma.friendship.update({ where: { id: ex.id }, data: { status: "ACCEPTED" } }); ping(me, target.id); return "accepted"; }   // they had asked me first
+  await prisma.friendship.create({ data: { requesterId: me, addresseeId: target.id } });
+  ping(me, target.id); return "sent";
+}
+
 app.post("/friends/request", { ...authLimit, preHandler: auth }, async (req: any, reply) => {
   const p = friendRequestSchema.safeParse(req.body); const me = uid(req);
-  const m = p.success ? HANDLE.exec(p.data.handle) : null;
+  if (!p.success) return reply.code(400).send({ error: "bad handle" });
+  const raw = p.data.handle.trim();
+  // By e-mail: the answer is the same whether or not the address has an account (or lets itself be found), so this cannot be used
+  // to check which e-mails are registered. Only confirmed accounts that left "find me by e-mail" on can receive the request.
+  if (!raw.startsWith("@") && EMAIL_RE.test(raw)) {
+    const t = await byEmail(raw.toLowerCase());
+    if (t && t.id !== me && t.emailVerifiedAt && t.allowEmailFind) await befriend(me, t);
+    return { status: "sent", user: null };
+  }
+  const m = HANDLE.exec(raw);
   if (!m) return reply.code(400).send({ error: "bad handle" });
-  const target = await prisma.user.findFirst({ where: { username: { equals: m[1], mode: "insensitive" }, tag: m[2].toLowerCase() } });
+  const target = await prisma.user.findUnique({ where: { username: m[1].toLowerCase() } });          // @usernames are public: a clear "not found" is fine
   if (!target) return reply.code(404).send({ error: "user not found" });
   if (target.id === me) return reply.code(400).send({ error: "self" });
-  const ex = await prisma.friendship.findFirst({ where: pairOf(me, target.id) });
-  if (ex?.status === "ACCEPTED") return reply.code(409).send({ error: "already friends" });
-  if (ex && ex.requesterId === me) return reply.code(409).send({ error: "already requested" });
-  if (ex) { await prisma.friendship.update({ where: { id: ex.id }, data: { status: "ACCEPTED" } }); ping(me, target.id); return { status: "accepted", user: toUser(target) }; }   // they had asked me first
-  await prisma.friendship.create({ data: { requesterId: me, addresseeId: target.id } });
-  ping(me, target.id); return { status: "sent", user: toUser(target) };
+  const r = await befriend(me, target);
+  if (r === "already friends" || r === "already requested") return reply.code(409).send({ error: r });
+  return { status: r, user: toUser(target) };
 });
 
 app.post("/friends/:id/accept", { preHandler: auth }, async (req: any, reply) => {

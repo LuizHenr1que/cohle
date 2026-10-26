@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -46,8 +46,9 @@ export const setOnSessionGone = (fn: () => void) => { onSessionGone = fn; };
 // Server messages are in English: show them to the person in clear Portuguese.
 const MESSAGES: Record<string, string> = {
   "unauthorized": "Sua sessão não é mais válida. Entre de novo.",
-  "invalid credentials": "E-mail ou senha incorretos.",
-  "email or username already in use": "Este e-mail ou nome de usuário já está em uso.",
+  "invalid credentials": "E-mail, @usuário ou senha incorretos.",
+  "too many attempts": "Muitas tentativas de entrada nessa conta. Aguarde cerca de 15 minutos ou redefina a senha.",
+  "email or username already in use": "Este e-mail ou @usuário já está em uso.",
   "invalid input": "Confira os dados informados.",
   "invalid code": "Código inválido. Confira e tente de novo.",
   "wrong": "Código incorreto. Confira e tente de novo.",
@@ -56,13 +57,13 @@ const MESSAGES: Record<string, string> = {
   "email delivery failed": "Não foi possível enviar o e-mail agora. Tente novamente em instantes.",
   "email unavailable": "A recuperação de senha está indisponível no momento.",
   "email not verified": "Confirme o seu e-mail para entrar.",
-  "username already in use": "Este nome de usuário já está em uso.",
+  "username already in use": "Esse @usuário já está em uso.",
   "forbidden": "Você não tem permissão para isso.",
   "owner is fixed": "A conta do dono da empresa não pode ser alterada.",
   "not found": "Não encontramos essa pessoa.",
-  "user not found": "Não encontramos ninguém com esse nome e código. Confira, por exemplo: @nome #br21.",
-  "bad handle": "Digite no formato @nome #código, por exemplo @luiz #br21.",
-  "self": "Esse é o seu próprio código de amigo.",
+  "user not found": "Não encontramos ninguém com esse @usuário. Confira se está escrito certo.",
+  "bad handle": "Digite um @usuário (por exemplo @luiz) ou um e-mail.",
+  "self": "Esse é o seu próprio @usuário.",
   "already friends": "Vocês já são amigos.",
   "already requested": "Você já enviou um pedido para essa pessoa. Agora é só esperar.",
 };
@@ -111,7 +112,10 @@ export const api = {
   adminAccesses: () => req<AdminAccessRow[]>("/admin/accesses"),
   adminRole: (id: string, role: "USER" | "ADMIN") => req<{ ok: true }>(`/admin/users/${id}/role`, "POST", { role }),
   friends: () => req<FriendsDTO>("/friends"),
-  friendRequest: (handle: string) => req<{ status: "sent" | "accepted"; user: { username: string } }>("/friends/request", "POST", { handle }),
+  friendRequest: (handle: string) => req<{ status: "sent" | "accepted"; user: { username: string } | null }>("/friends/request", "POST", { handle }),
+  usernameAvailable: (u: string) => req<UsernameCheckDTO>(`/auth/username-available?u=${encodeURIComponent(u)}`),
+  forgotUsername: (email: string) => req<{ ok: true }>("/auth/forgot-username", "POST", { email }),
+  setPrivacy: (findByEmail: boolean) => req<{ ok: true }>("/me/privacy", "POST", { findByEmail }),
   friendAccept: (id: string) => req(`/friends/${id}/accept`, "POST", {}),
   friendDecline: (id: string) => req(`/friends/${id}/decline`, "POST", {}),
   friendRemove: (userId: string) => req(`/friends/${userId}`, "DELETE"),

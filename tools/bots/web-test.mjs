@@ -26,9 +26,12 @@ try {
   ok("tela de entrada abre", /Entrar|Criar conta/.test(await text()));
   ok("manifesto do app instalável está ligado", (await ev(`document.querySelector('link[rel=manifest]')?.href`))?.endsWith("/manifest.webmanifest"));
   ok("página do app pede para não ser indexada", (await ev(`document.querySelector('meta[name=robots]')?.content`)) === "noindex");
+  ok("login: a logo é o atalho discreto para o site, sem cartão", (await ev(`!!document.querySelector('button[title="Ir para o site do Cohle"]')`)) && !/Prefere o aplicativo/.test(await text()));
+  await ev(`window.__opened=[];window.open=(u)=>{window.__opened.push(u)}`); await ev(`document.querySelector('button[title="Ir para o site do Cohle"]').click()`); await sleep(200);
+  ok("clicar na logo abre o site do Cohle", (await ev(`window.__opened[0]`)) === "https://cohle.verticeapp.com.br");
   await shot("web-1-login");
   // real login through the form
-  await setVal('input[type="email"]', "teste1@cohle.dev"); await setVal('input[placeholder^="Senha"]', "teste12345");
+  await setVal('input[placeholder="E-mail ou @usuário"]', "teste1@cohle.dev"); await setVal('input[placeholder^="Senha"]', "teste12345");
   await click("Entrar", "button.grad"); await sleep(4000);
   let tx = await text();
   ok("login pelo formulário leva ao app", /Servidor de Teste/.test(tx) || /geral/.test(tx), tx.slice(0, 80).replace(/\n/g, " | "));
@@ -45,8 +48,10 @@ try {
   tx = await text();
   ok("configurações sem a aba do aplicativo desktop", !/Aplicativo\n/.test(tx) && !/Fechar para a bandeja/.test(tx));
   await click("Sobre"); await sleep(500); tx = await text();
-  ok("Sobre diz que é o Cohle no navegador e oferece o app", /Cohle no navegador/.test(tx) && /Baixar/.test(tx));
-  ok("o botão Baixar leva à seção certa da landing", (await ev(`[...document.querySelectorAll('a')].find(a=>a.innerText.trim()==='Baixar')?.href`)) === "https://cohle.verticeapp.com.br/#baixar");
+  ok("Sobre diz que é o Cohle no navegador e oferece o app", /Cohle no navegador/.test(tx) && /Aplicativo para computador/.test(tx));
+  await ev(`window.__opened=[];window.open=(u)=>{window.__opened.push(u)}`);
+  await click("Baixar", "button"); await sleep(300);
+  ok("o atalho Baixar leva à seção certa da landing", (await ev(`window.__opened[0]`)) === "https://cohle.verticeapp.com.br/#baixar");
   await shot("web-3-sobre");
   await cmd("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }); await sleep(400);
   // phone-size browser

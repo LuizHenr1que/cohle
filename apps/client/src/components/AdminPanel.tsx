@@ -225,7 +225,7 @@ function People({ me }: { me: UserDTO }) {
             <tbody>
               {data?.rows.map((u) => (
                 <tr key={u.id} className="border-b border-line last:border-0 hover:bg-white/[0.03]">
-                  <td className="px-4 py-3"><div className="flex items-center gap-2 font-medium"><span className="size-2 rounded-full shrink-0" style={{ background: u.online ? OK : "rgba(255,255,255,.2)" }} title={u.online ? "Online" : "Offline"} />{u.username}<span className="text-muted font-normal text-xs">#{u.tag}</span></div></td>
+                  <td className="px-4 py-3"><div className="flex items-center gap-2 font-medium"><span className="size-2 rounded-full shrink-0" style={{ background: u.online ? OK : "rgba(255,255,255,.2)" }} title={u.online ? "Online" : "Offline"} />@{u.username}</div></td>
                   <td className="px-4 py-3 text-muted"><span className="selectable">{u.email}</span> {u.verified ? <BadgeCheck size={13} className="inline text-emerald-300 -mt-0.5" aria-label="E-mail confirmado" /> : <span className="text-[11px] text-amber-300 ml-1">não confirmado</span>}</td>
                   <td className="px-4 py-3 text-muted tabular-nums">{dt(u.createdAt)}</td>
                   <td className="px-4 py-3 text-muted">{u.online ? "agora" : ago(u.lastSeenAt)}</td>

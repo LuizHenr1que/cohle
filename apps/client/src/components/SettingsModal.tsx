@@ -5,6 +5,8 @@ import { api } from "../api";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
 import { PasswordInput } from "./PasswordInput";
+import { Switch } from "./Switch";
+import { DOWNLOAD_URL, openLink } from "../lib/links";
 import { BUILD } from "../version";
 import { NOISE_MODES, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
 import { setSoundboardOn, soundboardOn } from "../lib/soundboard";
@@ -12,14 +14,6 @@ import { THEMES, applyTheme, getTheme, getCustomColor, paletteFor, type ThemeId 
 
 type Tab = "account" | "security" | "look" | "audio" | "app" | "about";
 
-function Switch({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} disabled={disabled} onClick={() => onChange(!on)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? "bg-accent" : "bg-white/15"} ${disabled ? "opacity-40" : ""}`}>
-      <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-    </button>
-  );
-}
 const Row = ({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) => (
   <div className="flex items-center gap-4 py-3.5 border-b border-line last:border-0">
     <div className="min-w-0 flex-1"><div className="text-sm font-medium">{title}</div>{hint && <div className="text-xs text-muted mt-0.5 leading-relaxed">{hint}</div>}</div>{children}
@@ -62,7 +56,7 @@ export function SettingsModal({ user, onAdmin, onClose, onEditProfile, onTour, o
                 <div className="ring-4 ring-surface rounded-full"><Avatar user={user} size={72} /></div>
                 <div className="min-w-0 flex-1 pb-1"><div className="text-lg font-bold flex items-center gap-2 flex-wrap">{user.username}<DevBadge user={user} full /></div>
                   <div className="text-xs text-muted truncate">{acc?.email ?? "..."}</div>
-                  {user.tag && <button onClick={() => navigator.clipboard?.writeText(`${user.username}#${user.tag}`).catch(() => {})} title="Copiar o código de amigo" className="mt-1 inline-flex items-center gap-1.5 text-xs text-accent2 hover:underline">Código de amigo: @{user.username} #{user.tag} <Copy size={12} /></button>}</div>
+                  <button onClick={() => navigator.clipboard?.writeText(`@${user.username}`).catch(() => {})} title="Copiar o seu @usuário" className="mt-1 inline-flex items-center gap-1.5 text-xs text-accent2 hover:underline">@{user.username} <Copy size={12} /></button></div>
                 <button onClick={onEditProfile} className="grad rounded-xl px-4 py-2 text-sm font-semibold text-white inline-flex items-center gap-2 hover:brightness-110"><Pencil size={15} /> Editar foto e nome</button>
               </div>
             </div>
@@ -92,7 +86,7 @@ export function SettingsModal({ user, onAdmin, onClose, onEditProfile, onTour, o
               <Row title="Novidades desta versão"><span className="text-sm text-muted text-right max-w-[60%]">{BUILD.note}</span></Row>
               <Row title="Você está usando"><span className="text-sm text-muted">{desktop ? "Aplicativo para computador" : "Cohle no navegador"}</span></Row>
               <Row title="Site"><span className="text-sm text-muted">cohle.verticeapp.com.br</span></Row>
-              {!desktop && <Row title="Aplicativo para computador" hint="Mais leve para jogar com o Cohle aberto, com atualização automática e escolha de qual janela compartilhar."><a href="https://cohle.verticeapp.com.br/#baixar" target="_blank" rel="noreferrer" className="grad rounded-xl px-4 py-2 text-sm font-semibold text-white hover:brightness-110">Baixar</a></Row>}
+              {!desktop && <Row title="Aplicativo para computador" hint="Mais leve para jogar com o Cohle aberto, com atualização automática e escolha de qual janela compartilhar."><button type="button" onClick={() => openLink(DOWNLOAD_URL)} className="grad rounded-xl px-4 py-2 text-sm font-semibold text-white hover:brightness-110">Baixar</button></Row>}
             </Card>
             <p className="text-xs text-muted mt-4 leading-relaxed">Chat, voz e compartilhamento de tela num app só. Leve, bonito e feito para a galera.</p>
           </>)}
@@ -103,6 +97,8 @@ export function SettingsModal({ user, onAdmin, onClose, onEditProfile, onTour, o
 }
 
 function Security() {
+  const [find, setFind] = useState<boolean>();
+  useEffect(() => { api.account().then((a) => setFind(a.findByEmail)).catch(() => {}); }, []);
   const [f, setF] = useState({ current: "", next: "", again: "" });
   const [msg, setMsg] = useState<{ ok: boolean; t: string }>();
   const [busy, setBusy] = useState(false);
@@ -113,7 +109,7 @@ function Security() {
     if (f.next !== f.again) return setMsg({ ok: false, t: "As senhas novas não conferem." });
     setBusy(true);
     try { await api.changePassword({ current: f.current, password: f.next }); setF({ current: "", next: "", again: "" }); setMsg({ ok: true, t: "Senha alterada com sucesso." }); }
-    catch (x: any) { setMsg({ ok: false, t: x.message === "E-mail ou senha incorretos." ? "A senha atual está incorreta." : x.message }); } finally { setBusy(false); }
+    catch (x: any) { setMsg({ ok: false, t: x.message === "E-mail, @usuário ou senha incorretos." ? "A senha atual está incorreta." : x.message }); } finally { setBusy(false); }
   }
   return (<>
     <H>Senha e segurança</H>
@@ -124,6 +120,7 @@ function Security() {
       {msg && <p className={`text-sm ${msg.ok ? "text-emerald-300" : "text-accent"}`}>{msg.t}</p>}
       <button disabled={busy || !f.current || !f.next} className="grad rounded-xl px-5 py-3 font-semibold text-white hover:brightness-110 disabled:opacity-50 transition">{busy ? "Salvando..." : "Alterar senha"}</button>
     </form>
+    <div className="mt-6 max-w-lg"><Card><Row title="Permitir que me achem pelo e-mail" hint="Quando ligado, quem digitar o seu e-mail na aba Amigos consegue te enviar um pedido. Pelo @usuário sempre dá para te achar."><Switch on={!!find} disabled={find === undefined} onChange={(v) => { setFind(v); api.setPrivacy(v).catch(() => setFind(!v)); }} label="Permitir que me achem pelo e-mail" /></Row></Card></div>
     <p className="text-xs text-muted mt-5 max-w-sm leading-relaxed">Esqueceu a senha atual? Saia da conta e use "Esqueci minha senha" na tela de login: enviamos um código por e-mail.</p>
   </>);
 }

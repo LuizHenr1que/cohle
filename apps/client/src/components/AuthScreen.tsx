@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Mic, MonitorUp, MessagesSquare, FlaskConical, MailCheck, KeyRound, ArrowLeft } from "lucide-react";
+import { Mic, MonitorUp, MessagesSquare, FlaskConical, MailCheck, KeyRound, ArrowLeft, UserRound, Check, X, ArrowUpRight } from "lucide-react";
 import { Logo } from "./Logo";
 import { PasswordInput } from "./PasswordInput";
 import { BUILD, BUILD_LABEL } from "../version";
 import { api, API, SERVER_LOCKED, checkServer, normalizeServerUrl, switchServer } from "../api";
-import type { UserDTO } from "@cohle/shared";
+import { cleanHandle, type UserDTO } from "@cohle/shared";
+import { useHandleCheck } from "../lib/handle";
+import { SITE, WEB_URL, isDesktop, openLink } from "../lib/links";
 
 const SLIDES = [
   { icon: MessagesSquare, title: "Conversas em tempo real", text: "Servidores, canais e mensagens instantâneas, organizados do seu jeito." },
@@ -24,7 +26,7 @@ const SHOW_TEST_LOGIN = import.meta.env.DEV || import.meta.env.VITE_TEST_LOGIN =
 
 export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, remember: boolean) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [step, setStep] = useState<"form" | "verify" | "forgot" | "reset">("form");   // e-mail confirmation / password reset
+  const [step, setStep] = useState<"form" | "verify" | "forgot" | "reset" | "forgotUser">("form");   // e-mail confirmation / password reset / "forgot my @username"
   const [code, setCode] = useState("");
   const [pw2, setPw2] = useState("");
   const [wait, setWait] = useState(0);                                               // seconds until another code can be requested
@@ -32,6 +34,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
   const [remember, setRemember] = useState(() => { try { return localStorage.getItem("cohle:remember") !== "off"; } catch { return true; } });
   const [f, setF] = useState(() => { let email = ""; try { email = localStorage.getItem("cohle:last-email") ?? ""; } catch { /* ignore */ } return { email, username: "", password: "" }; });
   const [err, setErr] = useState("");
+  const uname = useHandleCheck(f.username, mode === "register" && step === "form");
   const [busy, setBusy] = useState(false);
   const [slide, setSlide] = useState(0);
   const [editServer, setEditServer] = useState(false);
@@ -67,6 +70,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
   }
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === "register" && (uname.state === "bad" || uname.state === "checking")) return setErr(uname.state === "bad" ? uname.msg : "Aguarde a verificação do @usuário.");
     run(() => (mode === "login" ? api.login({ email: f.email, password: f.password }) : api.register(f)), mode === "register");
   };
   const resendCode = async () => {
@@ -77,9 +81,9 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
   };
   const sendForgot = (e: React.FormEvent) => {
     e.preventDefault(); setErr(""); setInfo("");
-    if (!/^\S+@\S+\.\S+$/.test(f.email)) return setErr("Digite um e-mail válido.");
+    if (f.email.trim().length < 3) return setErr("Digite o e-mail ou o @usuário da conta.");
     setBusy(true);
-    api.forgot(f.email).then(() => { setCode(""); setPw2(""); setWait(45); setStep("reset"); }).catch((x) => setErr(x.message)).finally(() => setBusy(false));
+    api.forgot(f.email.trim()).then(() => { setCode(""); setPw2(""); setWait(45); setStep("reset"); }).catch((x) => setErr(x.message)).finally(() => setBusy(false));
   };
   const confirmCode = (value = code) => { if (value.length === 6) run(() => api.verify({ email: f.email, code: value }), true); };
   const doReset = (e: React.FormEvent) => {
@@ -90,6 +94,12 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
     run(() => api.reset({ email: f.email, code, password: f.password }));
   };
   const back = () => { setStep("form"); setErr(""); setInfo(""); setCode(""); };
+  const sendForgotUser = (e: React.FormEvent) => {
+    e.preventDefault(); setErr(""); setInfo("");
+    if (!/^\S+@\S+\.\S+$/.test(f.email)) return setErr("Digite o e-mail da sua conta.");
+    setBusy(true);
+    api.forgotUsername(f.email.trim()).then(() => setInfo("Se existir uma conta com esse e-mail, enviamos o seu @usuário. Confira a caixa de entrada e o spam.")).catch((x) => setErr(x.message)).finally(() => setBusy(false));
+  };
   const quick = (n: number) => run(() => api.login({ email: `teste${n}@cohle.dev`, password: "teste12345" }));
 
   const input = "w-full rounded-xl bg-white/5 border border-line px-4 py-3 outline-none focus:border-accent focus:bg-white/[0.07] transition placeholder:text-muted";
@@ -103,10 +113,13 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
         <div className="blob size-80 bg-accent/40 -top-16 -left-16" />
         <div className="blob size-72 bg-accent2/30 bottom-0 right-0" style={{ animationDelay: "-6s" }} />
 
-        <div className="relative flex items-center gap-2 self-start">
+        {/* the brand is also a quiet shortcut to the other Cohle: the app opens the web, the web opens the site (to download the app) */}
+        <button type="button" onClick={() => openLink(isDesktop() ? WEB_URL : SITE)} title={isDesktop() ? "Abrir o Cohle na web" : "Ir para o site do Cohle"} aria-label={isDesktop() ? "Abrir o Cohle na web" : "Ir para o site do Cohle"}
+          className="group relative flex items-center gap-2 self-start rounded-xl -m-1.5 p-1.5 hover:bg-white/5 transition">
           <Logo size={40} />
           <span className="text-xl font-bold tracking-tight">Cohle</span>
-        </div>
+          <ArrowUpRight size={15} aria-hidden="true" className="text-white/25 group-hover:text-accent2 transition" />
+        </button>
 
         <div className="relative flex-1 grid place-items-center">
           <div className="orb"><div className="ring" /><div className="ring r2" />
@@ -150,9 +163,18 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
             <form onSubmit={sendForgot} className="space-y-4">
               <div className="size-12 rounded-2xl bg-accent/15 text-accent grid place-items-center"><KeyRound size={24} /></div>
               <h1 className="text-3xl font-bold">Esqueceu a senha?</h1>
-              <p className="text-muted text-sm">Digite o e-mail da sua conta. Enviaremos um código para você escolher uma nova senha.</p>
-              <input className={input} placeholder="E-mail" type="email" autoFocus value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+              <p className="text-muted text-sm">Digite o e-mail ou o @usuário da conta. Enviaremos um código, para o e-mail cadastrado, para você escolher uma nova senha.</p>
+              <input className={input} placeholder="E-mail ou @usuário" autoFocus autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
               <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition disabled:opacity-60">{busy ? "Enviando..." : "Enviar código"}</button>
+            </form>
+          )}
+          {step === "forgotUser" && (
+            <form onSubmit={sendForgotUser} className="space-y-4">
+              <div className="size-12 rounded-2xl bg-accent/15 text-accent grid place-items-center"><UserRound size={24} /></div>
+              <h1 className="text-3xl font-bold">Esqueceu o @usuário?</h1>
+              <p className="text-muted text-sm">Digite o e-mail da conta. Enviaremos o seu @usuário para esse endereço. Depois é só entrar com ele (ou com o próprio e-mail).</p>
+              <input className={input} placeholder="E-mail da conta" type="email" autoFocus autoComplete="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+              <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition disabled:opacity-60">{busy ? "Enviando..." : "Enviar meu @usuário"}</button>
             </form>
           )}
           {step === "reset" && (
@@ -168,7 +190,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
           )}
           {err && <p className="text-accent text-sm">{err}</p>}
           {info && <p className="text-emerald-300 text-sm">{info}</p>}
-          {step !== "forgot" && (
+          {(step === "verify" || step === "reset") && (
             <button type="button" onClick={resendCode} disabled={wait > 0} className="w-full text-sm text-muted hover:text-ink disabled:opacity-60 disabled:hover:text-muted">
               {wait > 0 ? `Reenviar código em ${wait}s` : "Não recebeu? Reenviar código"}
             </button>
@@ -191,12 +213,29 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
 
           <div className="flex items-center gap-3 text-xs text-muted"><span className="flex-1 h-px bg-line" />ou com e-mail<span className="flex-1 h-px bg-line" /></div>
 
-          <input className={input} placeholder="E-mail" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+          {mode === "login"
+            ? <input className={input} placeholder="E-mail ou @usuário" aria-label="E-mail ou @usuário" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+            : <input className={input} placeholder="E-mail" type="email" autoComplete="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />}
           {mode === "register" && (
-            <input className={input} placeholder="Nome de usuário" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
+            <div>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted select-none">@</span>
+                <input className={`${input} pl-9 pr-10`} placeholder="seu_usuario" aria-label="@usuário" aria-describedby="uname-help" maxLength={24} autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off"
+                  value={f.username} onChange={(e) => setF({ ...f, username: cleanHandle(e.target.value) })} />
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2" aria-hidden="true">
+                  {uname.state === "ok" && <Check size={18} className="text-emerald-300" />}{uname.state === "bad" && <X size={18} className="text-accent" />}
+                </span>
+              </div>
+              <p id="uname-help" className={`text-xs mt-1.5 ${uname.state === "ok" ? "text-emerald-300" : uname.state === "bad" ? "text-accent" : "text-muted"}`}>
+                {uname.msg || "É o seu nome único, como no Discord: letras minúsculas, números, _ e ponto. Dá para entrar com ele."}
+              </p>
+            </div>
           )}
           <PasswordInput className={input} placeholder="Senha (mín. 8 caracteres)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
-          {mode === "login" && <button type="button" onClick={() => { setErr(""); setInfo(""); setStep("forgot"); }} className="text-sm text-accent2 hover:underline -mt-1 block ml-auto">Esqueci minha senha</button>}
+          {mode === "login" && <div className="flex justify-between gap-3 text-sm -mt-1">
+            <button type="button" onClick={() => { setErr(""); setInfo(""); setStep("forgotUser"); }} className="text-accent2 hover:underline">Esqueci meu usuário</button>
+            <button type="button" onClick={() => { setErr(""); setInfo(""); setStep("forgot"); }} className="text-accent2 hover:underline">Esqueci minha senha</button>
+          </div>}
           <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none w-fit"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-[#ff3b5c] size-4" /> Lembrar de mim neste computador</label>
           {err && <p className="text-accent text-sm">{err}</p>}
 

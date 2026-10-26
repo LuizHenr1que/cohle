@@ -1,20 +1,50 @@
 import { z } from "zod";
 
 const emailField = z.string().trim().toLowerCase().email().max(200);
+
+// ---- the @username (handle): unique, lowercase, Discord-style ----
+export const HANDLE_MIN = 3, HANDLE_MAX = 20;
+/** Names nobody may take: they would let someone pass as the team or as the system. */
+export const RESERVED_HANDLES = new Set(["admin", "administrator", "administrador", "root", "cohle", "suporte", "support", "system", "sistema", "moderador", "moderator", "mod", "staff", "vertice", "equipe", "team", "everyone", "here", "null", "undefined", "api", "www", "app", "help", "ajuda", "security", "seguranca", "oficial", "official", "bot", "cohlebot"]);
+/** "@Luiz " -> "luiz". Does not validate. */
+export const cleanHandle = (v: string) => v.trim().replace(/^@+/, "").toLowerCase();
+export type HandleProblem = "short" | "long" | "chars" | "edges" | "letters" | "reserved";
+/** `allowReserved`: the company account may take names like @vertice (checked by the server, never by the client). */
+export function handleProblem(h: string, allowReserved = false): HandleProblem | null {
+  if (h.length < HANDLE_MIN) return "short";
+  if (h.length > HANDLE_MAX) return "long";
+  if (!/^[a-z0-9_.]+$/.test(h)) return "chars";
+  if (/^\.|\.$|\.\./.test(h)) return "edges";
+  if (!/[a-z]/.test(h)) return "letters";
+  if (!allowReserved && RESERVED_HANDLES.has(h)) return "reserved";
+  return null;
+}
+export const HANDLE_HELP: Record<HandleProblem, string> = {
+  short: `Use pelo menos ${HANDLE_MIN} caracteres.`, long: `Use no máximo ${HANDLE_MAX} caracteres.`,
+  chars: "Só letras minúsculas, números, _ (sublinhado) e . (ponto).", edges: "Não pode começar nem terminar com ponto, nem ter dois pontos seguidos.",
+  letters: "Precisa ter pelo menos uma letra.", reserved: "Esse nome é reservado. Escolha outro.",
+};
+const handleField = z.string().max(40).transform(cleanHandle).refine((h) => handleProblem(h, true) === null, { message: "invalid handle" });   // reserved names are refused by the server (staff are exempt)
+/** E-mail OR @username (typed in the same box on the login / recovery screens). */
+const identifierField = z.string().trim().min(3).max(200).transform((v) => (v.includes("@") && !v.startsWith("@") ? v.toLowerCase() : cleanHandle(v)));
+
 export const registerSchema = z.object({
   email: emailField,
-  username: z.string().min(2).max(24).regex(/^[a-zA-Z0-9_.-]+$/),
+  username: handleField,
   password: z.string().min(8).max(100),
 });
+// `email` keeps its name so apps installed before @usernames existed keep working: it now carries an e-mail or a @username.
 export const loginSchema = z.object({
-  email: emailField,
-  password: z.string().min(1),
+  email: identifierField,
+  password: z.string().min(1).max(200),
 });
 export const changePasswordSchema = z.object({ current: z.string().min(1), password: z.string().min(8).max(100) });
 const codeField = z.string().regex(/^\d{6}$/);
-export const verifySchema = z.object({ email: emailField, code: codeField });
-export const forgotSchema = z.object({ email: emailField });
-export const resetSchema = z.object({ email: emailField, code: codeField, password: z.string().min(8).max(100) });
+export const verifySchema = z.object({ email: identifierField, code: codeField });
+export const forgotSchema = z.object({ email: identifierField });
+export const forgotUsernameSchema = z.object({ email: emailField });
+export const resetSchema = z.object({ email: identifierField, code: codeField, password: z.string().min(8).max(100) });
+export const privacySchema = z.object({ findByEmail: z.boolean() });
 const IMG_RE = /^data:image\/(png|jpeg|webp|gif);base64,/;
 const iconSchema = z.string().regex(IMG_RE).max(400_000);
 export const SERVER_TEMPLATES = ["custom", "gaming", "friends", "study", "community", "creators"] as const;
@@ -33,7 +63,7 @@ export const createChannelSchema = z.object({
 export const sendMessageSchema = z.object({ content: z.string().min(1).max(4000) });
 
 export const updateProfileSchema = z.object({
-  username: z.string().min(2).max(24).regex(/^[a-zA-Z0-9_.-]+$/).optional(),
+  username: handleField.optional(),
   avatarUrl: iconSchema.nullable().optional(),
 });
 export interface VoiceStateDTO { channelId: string; users: UserDTO[]; }
@@ -47,8 +77,10 @@ export interface ProfileDTO { user: UserDTO; createdAt: string; mutual: { id: st
 export interface FriendDTO { user: UserDTO; since: string; online: boolean; }
 export interface FriendRequestDTO { id: string; user: UserDTO; createdAt: string; }
 export interface FriendsDTO { friends: FriendDTO[]; incoming: FriendRequestDTO[]; outgoing: FriendRequestDTO[]; }
-export const friendRequestSchema = z.object({ handle: z.string().trim().min(3).max(60) });
-export interface AccountDTO { email: string; createdAt: string; emailVerified: boolean; }
+/** "@user", "user", the old "@user #code", or an e-mail address. */
+export const friendRequestSchema = z.object({ handle: z.string().trim().min(2).max(200) });
+export interface UsernameCheckDTO { available: boolean; reason?: HandleProblem | "taken"; }
+export interface AccountDTO { email: string; createdAt: string; emailVerified: boolean; findByEmail: boolean; }
 export interface ChannelDTO { id: string; serverId: string; name: string; type: "TEXT" | "VOICE"; }
 export interface ServerDTO {
   id: string; name: string; inviteCode: string; iconUrl: string | null; ownerId: string; channels: ChannelDTO[];

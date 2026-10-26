@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Camera, X, Trash2 } from "lucide-react";
-import type { UserDTO } from "@cohle/shared";
+import { cleanHandle, type UserDTO } from "@cohle/shared";
+import { useHandleCheck } from "../lib/handle";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
 import { fileToSquareDataUrl } from "../lib/image";
@@ -11,12 +12,14 @@ export function ProfileModal({ user, onClose, onSaved, onTour }: { user: UserDTO
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
+  const check = useHandleCheck(username, true, user.username);
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     try { setAvatar(await fileToSquareDataUrl(f)); setErr(""); } catch (x: any) { setErr(x.message); }
   }
   async function save() {
+    if (check.state === "bad" || check.state === "checking") return setErr(check.state === "bad" ? check.msg : "Aguarde a verificação do @usuário.");
     setBusy(true); setErr("");
     try {
       const u = await api.updateProfile({ username, ...(avatar !== (user.avatarUrl ?? null) ? { avatarUrl: avatar } : {}) }); // resend the image only if it changed
@@ -45,9 +48,13 @@ export function ProfileModal({ user, onClose, onSaved, onTour }: { user: UserDTO
         </div>
 
         <label className="block space-y-1">
-          <span className="text-xs text-muted">Nome de usuário</span>
-          <input value={username} onChange={(e) => setUsername(e.target.value)}
-            className="w-full rounded-xl bg-white/5 border border-line px-4 py-3 outline-none focus:border-accent" />
+          <span className="text-xs text-muted">@usuário (nome único, usado para entrar e para te adicionarem)</span>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted select-none">@</span>
+            <input value={username} onChange={(e) => setUsername(cleanHandle(e.target.value))} maxLength={24} autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-describedby="profile-uname-help"
+              className="w-full rounded-xl bg-white/5 border border-line pl-9 pr-4 py-3 outline-none focus:border-accent" />
+          </div>
+          <p id="profile-uname-help" className={`text-xs ${check.state === "ok" ? "text-emerald-300" : check.state === "bad" ? "text-accent" : "text-muted"}`}>{check.msg || "Letras minúsculas, números, _ e ponto."}</p>
         </label>
         {err && <p className="text-accent text-sm">{err}</p>}
         <button onClick={save} disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white disabled:opacity-60">

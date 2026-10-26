@@ -96,6 +96,21 @@ export function resetEmail(name: string, code: string): Mail {
   };
 }
 
+export function usernameEmail(handle: string): Mail {
+  const h = esc(handle);
+  return {
+    to: "", kind: "username", subject: "Seu usuário no Cohle",
+    html: layout({
+      preheader: `Seu usuário é @${handle}`, title: "Este é o seu usuário",
+      body: p("Recebemos um pedido para lembrar o usuário da conta ligada a este e-mail. Para entrar, use o usuário abaixo ou este próprio e-mail:")
+        + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 14px"><tr><td align="center" style="background:${C.box};border:1px solid #3b202b;border-radius:16px;padding:20px 8px"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:28px;font-weight:800;color:${C.ink};line-height:1">@${h}</span></td></tr></table>`
+        + button(`${SITE}/app/`, "Entrar no Cohle")
+        + small("Esqueceu também a senha? Na tela de entrada, toque em “Esqueci minha senha”. Não pediu isso? Ignore este e-mail: ninguém além de você recebeu o usuário."),
+    }),
+    text: `Este é o seu usuário\n\nSeu usuário no Cohle: @${handle}\nPara entrar, use o usuário ou este e-mail.\n\nNão pediu? Ignore este e-mail.\n\n${SITE}/app/`,
+  };
+}
+
 export function welcomeEmail(name: string): Mail {
   const n = esc(name);
   const row = (t: string, d: string) => `<tr><td style="padding:0 14px 14px 0;vertical-align:top;width:10px"><div style="width:8px;height:8px;border-radius:50%;background:${C.accent};margin-top:7px"></div></td><td style="padding:0 0 14px;font-size:14px;line-height:1.6;color:#d8c6cd"><b style="color:${C.ink}">${t}</b><br>${d}</td></tr>`;

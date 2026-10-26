@@ -35,7 +35,7 @@ export function UserProfile({ id, onClose, onMessage, onEdit, onFriendsChanged }
           {p && (<>
             <div className="ring-4 ring-surface rounded-full w-fit"><Avatar user={p.user} size={88} /></div>
             <div className="mt-3 flex items-center flex-wrap gap-2">
-              <h2 className="text-2xl font-extrabold tracking-tight">{p.user.username}{p.user.tag && <span className="text-muted font-medium text-base ml-1.5">#{p.user.tag}</span>}</h2>
+              <h2 className="text-2xl font-extrabold tracking-tight"><span className="text-muted font-medium">@</span>{p.user.username}</h2>
               <DevBadge user={p.user} full />
             </div>
             {p.isSelf && <p className="text-xs text-muted mt-0.5">Este é o seu perfil</p>}
@@ -56,7 +56,7 @@ export function UserProfile({ id, onClose, onMessage, onEdit, onFriendsChanged }
             </div>
             {!p.isSelf && (
               <div className="mt-4 flex items-center gap-2 flex-wrap">
-                {p.relation === "none" && <button disabled={fbusy} onClick={() => run(() => api.friendRequest(`${p.user.username}#${p.user.tag}`))} className="rounded-xl bg-white/10 hover:bg-white/15 px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 transition"><UserPlus size={16} /> Adicionar amigo</button>}
+                {p.relation === "none" && <button disabled={fbusy} onClick={() => run(() => api.friendRequest(`@${p.user.username}`))} className="rounded-xl bg-white/10 hover:bg-white/15 px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 transition"><UserPlus size={16} /> Adicionar amigo</button>}
                 {p.relation === "incoming" && <button disabled={fbusy} onClick={() => run(() => api.friendAccept(p.requestId!))} className="rounded-xl bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 transition"><UserCheck size={16} /> Aceitar pedido</button>}
                 {p.relation === "outgoing" && <button disabled={fbusy} onClick={() => run(() => api.friendDecline(p.requestId!))} className="rounded-xl bg-white/5 text-muted hover:bg-white/10 px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 transition"><Clock size={16} /> Pedido enviado (cancelar)</button>}
                 {p.relation === "friend" && <><span className="inline-flex items-center gap-2 text-sm text-emerald-300 font-semibold"><UserCheck size={16} /> Vocês são amigos</span><button disabled={fbusy} onClick={() => run(() => api.friendRemove(p.user.id))} className="text-xs text-muted hover:text-red-300 inline-flex items-center gap-1"><UserMinus size={14} /> remover</button></>}

@@ -15,7 +15,7 @@ enum ChannelType {
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
-  username     String    @unique
+  username     String    @unique // the @handle: always lowercase (see cleanHandle in @cohle/shared)
   passwordHash String
   avatarUrl    String?
   avatarVersion Int      @default(0)
@@ -26,6 +26,7 @@ model User {
   badge        String?   // "DEV": shown next to the name (granted by the server, never chosen by the user)
   role         String    @default("USER") // USER | ADMIN | OWNER (OWNER = company master, derived from OWNER_EMAILS, never editable)
   lastSeenAt   DateTime?
+  allowEmailFind Boolean @default(true) // others may find me by e-mail when adding friends
   accesses     AccessLog[]
   emailCodes   EmailCode[]
   createdAt    DateTime  @default(now())
