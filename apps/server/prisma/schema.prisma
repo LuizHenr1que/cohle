@@ -31,6 +31,8 @@ model User {
   bannerColor  String?   // "#rrggbb" cover colour of the profile card
   notesWritten UserNote[] @relation("NoteAuthor")
   notesAbout   UserNote[] @relation("NoteTarget")
+  reactions    Reaction[]
+  uploads      Attachment[]
   allowEmailFind Boolean @default(true) // others may find me by e-mail when adding friends
   accesses     AccessLog[]
   emailCodes   EmailCode[]
@@ -80,6 +82,15 @@ model Message {
   authorId  String
   content   String
   createdAt DateTime @default(now())
+  // a reply keeps a copy of what it answers, so it still reads fine after the original is erased by the 15-message limit
+  replyToId     String?
+  replyAuthorId String?
+  replyAuthorName String?
+  replyText     String?
+  replyTo   Message? @relation("Replies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("Replies")
+  reactions Reaction[]
+  attachments Attachment[]
   channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
@@ -103,6 +114,14 @@ model DirectMessage {
   recipientId String
   content     String
   createdAt   DateTime @default(now())
+  replyToId     String?
+  replyAuthorId String?
+  replyAuthorName String?
+  replyText     String?
+  replyTo     DirectMessage? @relation("DmReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies     DirectMessage[] @relation("DmReplies")
+  reactions   Reaction[]
+  attachments Attachment[]
   sender      User     @relation("DmSender", fields: [senderId], references: [id], onDelete: Cascade)
   recipient   User     @relation("DmRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
@@ -185,4 +204,48 @@ model UserNote {
   target    User     @relation("NoteTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
   @@id([authorId, targetId])
+}
+
+// One icon reaction by one person on one message (a channel message OR a direct message). Gone with its message.
+model Reaction {
+  id        String   @id @default(cuid())
+  messageId String?
+  dmId      String?
+  userId    String
+  key       String   // see REACTION_KEYS in @cohle/shared
+  createdAt DateTime @default(now())
+  message   Message?        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  dm        DirectMessage?  @relation(fields: [dmId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, key])
+  @@unique([dmId, userId, key])
+  @@index([messageId])
+  @@index([dmId])
+}
+
+// A file or image on a message. Uploaded first (messageId and dmId empty = "pending", swept after an hour), linked when the message is sent.
+// Images are re-encoded to WebP by the server (metadata and any hidden payload gone) with a small thumbnail; other files are stored as they came and only ever served as downloads.
+model Attachment {
+  id        String   @id @default(cuid())
+  ownerId   String
+  messageId String?
+  dmId      String?
+  name      String
+  mime      String
+  size      Int      // bytes of `data`
+  kind      String   // "image" | "file"
+  width     Int?
+  height    Int?
+  hasThumb  Boolean  @default(false)
+  data      Bytes
+  thumb     Bytes?
+  createdAt DateTime @default(now())
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  message   Message?       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  dm        DirectMessage? @relation(fields: [dmId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, createdAt])
+  @@index([messageId])
+  @@index([dmId])
 }

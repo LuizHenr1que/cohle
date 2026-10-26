@@ -87,16 +87,16 @@ export function registerAdmin(app: FastifyInstance, d: {
 
   app.get("/admin/overview", pre, async (): Promise<AdminOverviewDTO> => {
     const h = (n: number) => new Date(Date.now() - n * 3_600_000);
-    const [total, verified, new24h, new7d, active24h, active7d, servers, channels, messages, dms, size] = await Promise.all([
+    const [total, verified, new24h, new7d, active24h, active7d, servers, channels, messages, dms, size, files] = await Promise.all([
       prisma.user.count(), prisma.user.count({ where: { emailVerifiedAt: { not: null } } }),
       prisma.user.count({ where: { createdAt: { gt: h(24) } } }), prisma.user.count({ where: { createdAt: { gt: h(168) } } }),
       prisma.user.count({ where: { lastSeenAt: { gt: h(24) } } }), prisma.user.count({ where: { lastSeenAt: { gt: h(168) } } }),
-      prisma.server.count(), prisma.channel.count(), prisma.message.count(), prisma.directMessage.count(), dbSizeMb().catch(() => 0),
+      prisma.server.count(), prisma.channel.count(), prisma.message.count(), prisma.directMessage.count(), dbSizeMb().catch(() => 0), prisma.attachment.aggregate({ _sum: { size: true } }),
     ]);
     const m = process.memoryUsage();
     return {
       users: { total, verified, new24h, new7d, active24h, active7d },
-      live: d.live(), content: { servers, channels, messages, dms },
+      live: d.live(), content: { servers, channels, messages, dms, attachmentsMb: Math.round(((files._sum.size ?? 0) / 1048576) * 10) / 10 },
       process: { rssMb: mb(m.rss), heapMb: mb(m.heapUsed), uptimeSec: Math.round(process.uptime()), node: process.version },
       dbMb: Math.round(size * 10) / 10,
     };

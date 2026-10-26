@@ -9,13 +9,14 @@ import { PrismaClient } from "@prisma/client";
 import { hash, verify } from "@node-rs/argon2";
 import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import {
-  registerSchema, loginSchema, changePasswordSchema, friendRequestSchema, verifySchema, forgotSchema, forgotUsernameSchema, privacySchema, resetSchema, cleanHandle, handleProblem, displayNameReserved, nameOf, noteSchema, type ActivityDTO, type FriendSuggestionDTO, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
+  registerSchema, loginSchema, changePasswordSchema, friendRequestSchema, verifySchema, forgotSchema, forgotUsernameSchema, privacySchema, resetSchema, cleanHandle, handleProblem, displayNameReserved, nameOf, noteSchema, type ActivityDTO, type FriendSuggestionDTO, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema,
   type UsernameCheckDTO, type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
   type DirectMessageDTO, type DmConversationDTO, type ProfileDTO, type AccountDTO, type FriendsDTO, type Relation,
 } from "@cohle/shared";
 import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail, usernameEmail } from "./email.js";
 import { issueCode, checkCode } from "./codes.js";
 import { registerAdmin, roleOf } from "./admin.js";
+import { setupMessaging } from "./messaging.js";
 
 const prisma = new PrismaClient();
 // Admin API of the LiveKit server (mute / disconnect people at the SFU, not just in the UI).
@@ -74,11 +75,6 @@ const withBadge = async (user: any) => {
 // Strip heavy/private columns when a user is only embedded in another payload.
 const lightUser = { omit: { avatarUrl: true, passwordHash: true, email: true } } as const;
 const lightServer = { omit: { iconUrl: true } } as const;
-const toMessage = (m: any): MessageDTO => ({
-  id: m.id, channelId: m.channelId, content: m.content,
-  createdAt: m.createdAt.toISOString(),
-  author: toUser(m.author),
-});
 // Starter channels per server template.
 const TEMPLATE_CHANNELS: Record<string, { name: string; type: "TEXT" | "VOICE" }[]> = {
   custom: [{ name: "geral", type: "TEXT" }, { name: "Sala de voz", type: "VOICE" }],
@@ -590,17 +586,7 @@ async function memberOfChannel(userId: string, channelId: string) {
   return m ? ch : null;
 }
 
-app.get("/channels/:id/messages", { preHandler: auth }, async (req: any, reply) => {
-  if (!(await memberOfChannel(uid(req), req.params.id))) return reply.code(403).send({ error: "forbidden" });
-  const msgs = await prisma.message.findMany({
-    where: { channelId: req.params.id }, include: { author: lightUser },
-    orderBy: { createdAt: "desc" }, take: 50,
-  });
-  return msgs.reverse().map(toMessage);
-});
-
 // ---- direct messages (1:1, with history) ----
-const toDm = (m: any): DirectMessageDTO => ({ id: m.id, fromId: m.senderId, toId: m.recipientId, content: m.content, createdAt: m.createdAt.toISOString() });
 /** people may start a conversation only when they share a server (or already talked): no cold messages to strangers */
 async function canDm(a: string, b: string) {
   if (a === b) return false;
@@ -614,10 +600,14 @@ const unreadFrom = async (me: string, peer: string) => {
   return prisma.directMessage.count({ where: { senderId: peer, recipientId: me, ...(r ? { createdAt: { gt: r.readAt } } : {}) } });
 };
 
+// messages, replies, reactions, files and the 15-message history live in messaging.ts
+const messaging = setupMessaging(app, { prisma, io: () => io, auth, uid, toUser, lightUser, memberOfChannel, isOwner, canDm });
+const { toDm } = messaging;
+
 // conversations I have, newest first, with the unread count
 app.get("/dms", { preHandler: auth }, async (req: any) => {
   const me = uid(req);
-  const recent = await prisma.directMessage.findMany({ where: { OR: [{ senderId: me }, { recipientId: me }] }, orderBy: { createdAt: "desc" }, take: 400 });
+  const recent = await prisma.directMessage.findMany({ where: { OR: [{ senderId: me }, { recipientId: me }] }, include: messaging.withRels, orderBy: { createdAt: "desc" }, take: 400 });
   const lastBy = new Map<string, any>();
   for (const m of recent) { const peer = m.senderId === me ? m.recipientId : m.senderId; if (!lastBy.has(peer)) lastBy.set(peer, m); }
   const peers = [...lastBy.keys()].slice(0, 50);
@@ -635,17 +625,6 @@ app.get("/dms/people", { preHandler: auth }, async (req: any) => {
   const ms = await prisma.member.findMany({ where: { serverId: { in: mine.map((m) => m.serverId) }, userId: { not: me } }, include: { user: lightUser } });
   const seen = new Map<string, UserDTO>(); ms.forEach((m) => seen.set(m.userId, toUser(m.user)));
   return [...seen.values()].sort((a, b) => a.username.localeCompare(b.username));
-});
-
-// history, 50 per page; pass ?before=<message id> for older ones
-app.get("/dms/:peerId/messages", { preHandler: auth }, async (req: any, reply) => {
-  const me = uid(req), peer = String(req.params.peerId);
-  const before = req.query?.before ? await prisma.directMessage.findUnique({ where: { id: String(req.query.before) } }) : null;
-  const msgs = await prisma.directMessage.findMany({
-    where: { OR: [{ senderId: me, recipientId: peer }, { senderId: peer, recipientId: me }], ...(before ? { createdAt: { lt: before.createdAt } } : {}) },
-    orderBy: { createdAt: "desc" }, take: 50,
-  });
-  return { messages: msgs.reverse().map(toDm), more: msgs.length === 50 };
 });
 
 app.post("/dms/:peerId/read", { preHandler: auth }, async (req: any) => {
@@ -882,23 +861,8 @@ io.on("connection", (socket) => {
     await ready;
     if (await memberOfChannel(userId, channelId)) socket.join(channelId);
   });
-  socket.on("message:send", async (data: { channelId: string; content: string }, ack?: Function) => {
-    const p = sendMessageSchema.safeParse({ content: data?.content });
-    if (!p.success || !(await memberOfChannel(userId, data.channelId))) return ack?.({ error: true });
-    const m = await prisma.message.create({
-      data: { channelId: data.channelId, authorId: userId, content: p.data.content }, include: { author: lightUser },
-    });
-    io.to(data.channelId).emit("message:new", toMessage(m));
-    ack?.({ ok: true });
-  });
-  socket.on("dm:send", async (data: { toId: string; content: string }, ack?: Function) => {
-    const p = sendMessageSchema.safeParse({ content: data?.content });
-    if (!p.success || typeof data?.toId !== "string" || !(await canDm(userId, data.toId))) return ack?.({ error: true });
-    const m = await prisma.directMessage.create({ data: { senderId: userId, recipientId: data.toId, content: p.data.content } });
-    const dto = toDm(m);
-    io.to(`user:${data.toId}`).to(`user:${userId}`).emit("dm:new", dto);
-    ack?.({ ok: true, message: dto });
-  });
+  socket.on("message:send", async (data: any, ack?: Function) => { ack?.(await messaging.sendChannel(userId, data).catch(() => ({ error: "failed" }))); });
+  socket.on("dm:send", async (data: any, ack?: Function) => { ack?.(await messaging.sendDirect(userId, data).catch(() => ({ error: "failed" }))); });
   // soundboard: a short sound for everybody in my call (allow-list, 2.5 s cooldown, owner-muted people can't)
   socket.on("voice:sound", (id: string) => {
     if (!SOUND_IDS.has(id)) return;

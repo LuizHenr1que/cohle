@@ -26,17 +26,18 @@ r = await http("/friends/request", { handle: "teste2#te02" }, a.token); ok("pedi
 r = await http(`/friends/${inc[0].id}/accept`, {}, a.token); ok("quem pediu não pode aceitar o próprio pedido", r.s === 404);
 r = await http(`/friends/${inc[0].id}/accept`, {}, b.token); ok("quem recebeu aceita", r.s === 200);
 const la = await fl(a.token);
-ok("viram amigos nos dois lados", la.friends.length === 1 && (await fl(b.token)).friends.length === 1 && la.incoming.length + la.outgoing.length === 0);
+const has = (l, u) => l.friends.some((f) => f.user.id === u.user.id), pend = (l, u) => [...l.incoming, ...l.outgoing].some((r) => r.user.id === u.user.id);       // other tests leave other friends around: look only at this pair
+ok("viram amigos nos dois lados", has(la, b) && has(await fl(b.token), a) && !pend(la, b));
 ok("amigo online aparece como online", la.friends[0].online === true);
 sb.close(); await sleep(800);
 ok("depois que sai, aparece offline", (await fl(a.token)).friends[0].online === false);
 const dm = await new Promise((rr) => { const s = io(API, { auth: { token: a.token }, transports: ["websocket"] }); s.on("connect", () => s.emit("dm:send", { toId: b.user.id, content: "oi amigo" }, (x) => { s.close(); rr(x); })); });
 ok("amigos podem trocar mensagem direta", dm?.ok === true);
 const pr = (await http(`/users/${b.user.id}/profile`, null, a.token)).d; ok("o perfil mostra que são amigos", pr.relation === "friend");
-r = await http(`/friends/${b.user.id}`, null, a.token, "DELETE"); ok("remover amizade", r.s === 200 && (await fl(a.token)).friends.length === 0);
+r = await http(`/friends/${b.user.id}`, null, a.token, "DELETE"); ok("remover amizade", r.s === 200 && !has(await fl(a.token), b));
 // both ask each other: the second request just accepts
 await http("/friends/request", { handle: "teste2#te02" }, a.token); r = await http("/friends/request", { handle: "teste1#te01" }, b.token);
-ok("se os dois pedem, o segundo pedido já aceita", r.d.status === "accepted" && (await fl(a.token)).friends.length === 1);
+ok("se os dois pedem, o segundo pedido já aceita", r.d.status === "accepted" && has(await fl(a.token), b));
 await http(`/friends/${b.user.id}`, null, a.token, "DELETE");
 // cancel / decline
 await http("/friends/request", { handle: "teste2#te02" }, a.token); const out = (await fl(a.token)).outgoing[0];

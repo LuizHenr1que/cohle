@@ -82,7 +82,25 @@ export const createChannelSchema = z.object({
   name: z.string().min(1).max(40),
   type: z.enum(["TEXT", "VOICE"]),
 });
-export const sendMessageSchema = z.object({ content: z.string().min(1).max(4000) });
+// ---- messages: free-plan limits (the same numbers are enforced by the server and shown by the apps) ----
+export const MESSAGE_MAX = 500;      // characters per message: no walls of text
+export const MESSAGE_MAX_LINES = 12;
+export const KEEP_MESSAGES = 15;     // only the last 15 messages of each channel / conversation are kept; sending a new one erases the oldest
+export const MAX_FILES = 4;          // per message
+export const MAX_FILE_MB = 10;       // per file
+export const REACTION_KEYS = ["like", "love", "laugh", "fire", "wow", "sad", "party", "eyes"] as const;   // icons, not emojis (the apps draw them)
+export type ReactionKey = (typeof REACTION_KEYS)[number];
+export const REACTION_LABEL: Record<ReactionKey, string> = { like: "Curtir", love: "Amei", laugh: "Engraçado", fire: "Fogo", wow: "Uau", sad: "Triste", party: "Comemorar", eyes: "Olhando" };
+/** Message text as it is stored: no control or invisible characters, one blank line at most, trimmed. */
+export const cleanMessage = (v: string) => v.normalize("NFC").replace(/[\u0000-\u0009\u000B-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "").replace(/\r\n?/g, "\n").replace(/[ \t]+/g, " ").replace(/ ?\n ?/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+export const sendMessageSchema = z.object({
+  content: z.string().max(4000).default("").transform(cleanMessage)
+    .refine((v) => v.length <= MESSAGE_MAX, { message: "too long" })
+    .refine((v) => v.split("\n").length <= MESSAGE_MAX_LINES, { message: "too many lines" }),
+  replyToId: z.string().max(40).optional(),
+  attachmentIds: z.array(z.string().max(40)).max(MAX_FILES).optional(),
+}).refine((m) => m.content.length > 0 || (m.attachmentIds?.length ?? 0) > 0, { message: "empty" });
+export const reactionSchema = z.object({ key: z.enum(REACTION_KEYS) });
 
 export const updateProfileSchema = z.object({
   username: handleField.optional(),
@@ -120,17 +138,22 @@ export interface MemberDTO { user: UserDTO; role: "OWNER" | "MEMBER"; muted: boo
 export interface BanDTO { user: UserDTO; createdAt: string; }
 export const banSchema = z.object({ userId: z.string().min(1) });
 export const muteSchema = z.object({ muted: z.boolean() });
-export interface DirectMessageDTO { id: string; fromId: string; toId: string; content: string; createdAt: string; }
+export interface ReactionDTO { key: ReactionKey; userIds: string[]; }
+/** A file on a message. `url`/`thumbUrl` are signed paths on the API (cached forever by the browser). Images are always WebP. */
+export interface AttachmentDTO { id: string; name: string; mime: string; size: number; kind: "image" | "file"; width?: number; height?: number; url: string; thumbUrl?: string; }
+/** What a reply points at. A copy is kept, so it still reads fine after the original is erased by the 15-message limit (`id` is then null). */
+export interface ReplyDTO { id: string | null; authorId: string; authorName: string; text: string; }
+export interface DirectMessageDTO { id: string; fromId: string; toId: string; content: string; createdAt: string; replyTo?: ReplyDTO; attachments: AttachmentDTO[]; reactions: ReactionDTO[]; }
 export interface DmConversationDTO { peer: UserDTO; last: DirectMessageDTO; unread: number; }
 export interface MessageDTO {
-  id: string; channelId: string; content: string; createdAt: string; author: UserDTO;
+  id: string; channelId: string; content: string; createdAt: string; author: UserDTO; replyTo?: ReplyDTO; attachments: AttachmentDTO[]; reactions: ReactionDTO[];
 }
 
 // ---- admin panel ----
 export interface AdminOverviewDTO {
   users: { total: number; verified: number; new24h: number; new7d: number; active24h: number; active7d: number };
   live: { online: number; voice: number; rooms: number };
-  content: { servers: number; channels: number; messages: number; dms: number };
+  content: { servers: number; channels: number; messages: number; dms: number; attachmentsMb: number };
   process: { rssMb: number; heapMb: number; uptimeSec: number; node: string };
   dbMb: number;
 }
@@ -146,3 +169,9 @@ export interface CostDTO { usd: number; brl: number; items: string[]; }
 export interface AdminUsageDTO { month: string; resetsAt: string; quotas: QuotaDTO[]; rate: number; costNeeded: CostDTO; costIfWarn: CostDTO; pricesCheckedAt: string; }
 
 export interface FriendSuggestionDTO { user: UserDTO; shared: string[]; count: number; }
+
+/** Live updates of a message list (sent over the socket). */
+export interface MessageReactionsEvent { channelId: string; id: string; reactions: ReactionDTO[]; }
+export interface MessageGoneEvent { channelId: string; ids: string[]; }
+export interface DmReactionsEvent { fromId: string; toId: string; id: string; reactions: ReactionDTO[]; }
+export interface DmGoneEvent { fromId: string; toId: string; ids: string[]; }
