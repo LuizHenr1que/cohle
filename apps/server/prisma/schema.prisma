@@ -26,6 +26,11 @@ model User {
   badge        String?   // "DEV": shown next to the name (granted by the server, never chosen by the user)
   role         String    @default("USER") // USER | ADMIN | OWNER (OWNER = company master, derived from OWNER_EMAILS, never editable)
   lastSeenAt   DateTime?
+  displayName  String?   // shown instead of the @username in chat and calls (1-32 chars, cleaned by cleanDisplayName)
+  bio          String?   // "about me", up to 190 chars
+  bannerColor  String?   // "#rrggbb" cover colour of the profile card
+  notesWritten UserNote[] @relation("NoteAuthor")
+  notesAbout   UserNote[] @relation("NoteTarget")
   allowEmailFind Boolean @default(true) // others may find me by e-mail when adding friends
   accesses     AccessLog[]
   emailCodes   EmailCode[]
@@ -135,6 +140,7 @@ model Friendship {
   addresseeId String
   status      String   @default("PENDING") // PENDING | ACCEPTED
   createdAt   DateTime @default(now())
+  acceptedAt  DateTime? // when the request became a friendship ("friends since")
   requester   User     @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
   addressee   User     @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
 
@@ -167,4 +173,16 @@ model DailyUsage {
   day          String @id // YYYY-MM-DD (UTC)
   voiceMinutes Int    @default(0)
   dbMb         Float  @default(0)
+}
+
+// A private note about another person ("who is this?"). Only its author ever sees it.
+model UserNote {
+  authorId  String
+  targetId  String
+  text      String
+  updatedAt DateTime @updatedAt
+  author    User     @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  target    User     @relation("NoteTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([authorId, targetId])
 }

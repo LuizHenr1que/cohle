@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu, Compass } from "lucide-react";
 import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO } from "@cohle/shared";
+import { nameOf } from "@cohle/shared";
 import { api, connectSocket } from "../api";
 // The call UI (and the LiveKit SDK, the heaviest dependency) loads only when you join a voice channel.
 import type { VoiceApi } from "./VoiceRoom";
@@ -233,7 +234,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
               <div key={m.id} className="flex gap-3">
                 <button onClick={() => setProfileId(m.author.id)} title="Ver perfil" className="shrink-0 self-start"><Avatar user={m.author.id === self.id ? self : m.author} size={38} /></button>
                 <div className="min-w-0">
-                  <div className="text-sm"><button onClick={() => setProfileId(m.author.id)} className="font-bold hover:underline">{m.author.username}</button> <DevBadge user={m.author} /> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
+                  <div className="text-sm"><button onClick={() => setProfileId(m.author.id)} className="font-bold hover:underline">{nameOf(m.author)}</button> <DevBadge user={m.author} /> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
                   <p className="text-ink/90 whitespace-pre-wrap break-words">{m.content}</p>
                 </div>
               </div>
@@ -352,7 +353,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
             <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(self.id) ? "bg-emerald-400" : "bg-muted"}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm truncate flex items-center gap-1.5">{self.username}<DevBadge user={self} /></div>
+            <div className="text-sm truncate flex items-center gap-1.5">{nameOf(self)}<DevBadge user={self} /></div>
             <div className="text-[11px] text-muted">{online.has(self.id) ? "Online" : "Offline"}</div>
           </div>
           <Settings size={16} className="text-muted" />
@@ -381,7 +382,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           : <FriendsPanel self={self} data={friends.data} online={online} onMessage={openDm} onProfile={setProfileId} onChanged={friends.load} onMenu={wide ? undefined : () => setNavOpen(true)} />)}
         {!dmOpen && (!voice || view === "text") && (
           !server
-            ? <NoServerHome name={self.username} onCreate={() => setServerModal("create")} onTour={() => setTour(true)} onMenu={wide ? undefined : () => setNavOpen(true)}
+            ? <NoServerHome name={nameOf(self)} onCreate={() => setServerModal("create")} onTour={() => setTour(true)} onMenu={wide ? undefined : () => setNavOpen(true)}
                 onJoin={async (code) => { const s = await api.join(code); await afterServerChange(s); }} />
             : !channel
               ? <NoChannelHome server={server} isOwner={isOwner} onOpen={(c) => (c.type === "VOICE" ? joinVoice(c) : (setChannel(c), setView("text")))} onInvite={() => setInviteOpen(true)} onNewChannel={(t) => setNewChannelType(t)} onMenu={wide ? undefined : () => setNavOpen(true)} />
@@ -391,9 +392,9 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       {adminOpen && self.role && <Suspense fallback={null}><AdminPanel me={self} onClose={() => setAdminOpen(false)} /></Suspense>}
       {prefsOpen && <SettingsModal user={self} onAdmin={() => setAdminOpen(true)} onClose={() => setPrefsOpen(false)} onEditProfile={() => { setPrefsOpen(false); setProfileOpen(true); }} onTour={() => setTour(true)} onLogout={onLogout}
         fx={fx} onToggleFx={onToggleFx} lite={lite} onToggleLite={onToggleLite} rail={rail} onToggleRail={toggleRail} wide={wide} />}
-      {profileId && <UserProfile id={profileId} onClose={() => setProfileId(undefined)} onMessage={(u) => openDm(u)} onEdit={() => setProfileOpen(true)} onFriendsChanged={friends.load} />}
-      {tour && <Tour name={self.username} onFinish={closeTour} />}
-      {serverModal && <ServerModal initial={serverModal} username={self.username} onClose={() => setServerModal(undefined)} onDone={afterServerChange} />}
+      {profileId && <UserProfile id={profileId} onClose={() => setProfileId(undefined)} onMessage={(u) => openDm(u)} onEdit={() => setProfileOpen(true)} onFriendsChanged={friends.load} onProfile={setProfileId} />}
+      {tour && <Tour name={nameOf(self)} onFinish={closeTour} />}
+      {serverModal && <ServerModal initial={serverModal} username={nameOf(self)} onClose={() => setServerModal(undefined)} onDone={afterServerChange} />}
       {inviteOpen && server && <InviteModal server={server} onClose={() => setInviteOpen(false)} />}
       {newChannelType && server && <ChannelModal serverId={server.id} initialType={newChannelType} onClose={() => setNewChannelType(undefined)} />}
       {settingsOpen && server && (

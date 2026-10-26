@@ -9,7 +9,7 @@ import { PrismaClient } from "@prisma/client";
 import { hash, verify } from "@node-rs/argon2";
 import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import {
-  registerSchema, loginSchema, changePasswordSchema, friendRequestSchema, verifySchema, forgotSchema, forgotUsernameSchema, privacySchema, resetSchema, cleanHandle, handleProblem, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
+  registerSchema, loginSchema, changePasswordSchema, friendRequestSchema, verifySchema, forgotSchema, forgotUsernameSchema, privacySchema, resetSchema, cleanHandle, handleProblem, displayNameReserved, nameOf, noteSchema, type ActivityDTO, type FriendSuggestionDTO, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
   type UsernameCheckDTO, type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
   type DirectMessageDTO, type DmConversationDTO, type ProfileDTO, type AccountDTO, type FriendsDTO, type Relation,
 } from "@cohle/shared";
@@ -52,12 +52,12 @@ const accountGone = (err: any) =>
 
 // Images are never inlined in API payloads: DTOs carry a versioned URL the browser can cache forever.
 const toUser = (u: any): UserDTO => ({
-  id: u.id, username: u.username, avatarUrl: u.avatarVersion > 0 ? `/avatars/${u.id}?v=${u.avatarVersion}` : null,
+  id: u.id, username: u.username, ...(u.displayName ? { displayName: u.displayName } : {}), avatarUrl: u.avatarVersion > 0 ? `/avatars/${u.id}?v=${u.avatarVersion}` : null,
   ...(u.tag ? { tag: u.tag } : {}),
   ...(u.badge === "DEV" ? { badge: "DEV" as const } : {}),
 });
 // the signed-in person's own DTO also says whether they are an admin (the panel is shown only then; the server re-checks every call)
-const toSelf = (u: any): UserDTO => { const r = roleOf(u); return { ...toUser(u), ...(r !== "USER" ? { role: r } : {}) }; };
+const toSelf = (u: any): UserDTO => { const r = roleOf(u); return { ...toUser(u), ...(u.bio ? { bio: u.bio } : {}), ...(u.bannerColor ? { bannerColor: u.bannerColor } : {}), ...(r !== "USER" ? { role: r } : {}) }; };
 const genTag = () => { const L = "abcdefghjkmnpqrstuvwxyz"; return L[randomInt(L.length)] + L[randomInt(L.length)] + String(randomInt(10, 100)); };   // e.g. "br21"
 // accounts created before friend codes existed get theirs now
 // only fill codes that are still empty (never overwrite)
@@ -273,21 +273,41 @@ app.post("/me/password", { ...authLimit, preHandler: auth }, async (req, reply) 
 // someone's profile card: only people who share a server with you (or yourself)
 app.get("/users/:id/profile", { preHandler: auth }, async (req: any, reply) => {
   const me = uid(req), id = String(req.params.id);
-  const target = await prisma.user.findUnique({ where: { id } });
-  if (!target) return reply.code(404).send({ error: "not found" });
-  const [mine, theirs] = await Promise.all([
+  const self = id === me;
+  // everything that does not depend on another answer goes out at once: two round trips to the database instead of seven
+  const [target, mine, theirs, fr, rels, note] = await Promise.all([
+    prisma.user.findUnique({ where: { id } }),
     prisma.member.findMany({ where: { userId: me }, select: { serverId: true } }),
     prisma.member.findMany({ where: { userId: id }, include: { server: { select: { id: true, name: true, iconVersion: true } } } }),
+    self ? null : prisma.friendship.findFirst({ where: pairOf(me, id) }),
+    self ? [] : prisma.friendship.findMany({ where: { status: "ACCEPTED", OR: [{ requesterId: { in: [me, id] } }, { addresseeId: { in: [me, id] } }] }, select: { requesterId: true, addresseeId: true } }),
+    self ? null : prisma.userNote.findUnique({ where: { authorId_targetId: { authorId: me, targetId: id } }, select: { text: true } }),
   ]);
+  if (!target) return reply.code(404).send({ error: "not found" });
   const mySet = new Set(mine.map((m) => m.serverId));
   const mutual = theirs.filter((m) => mySet.has(m.serverId));
-  const fr = id === me ? null : await prisma.friendship.findFirst({ where: { OR: [{ requesterId: me, addresseeId: id }, { requesterId: id, addresseeId: me }] } });
-  if (id !== me && !mutual.length && !fr) return reply.code(403).send({ error: "forbidden" });
-  const relation: Relation = id === me ? "self" : !fr ? "none" : fr.status === "ACCEPTED" ? "friend" : fr.requesterId === me ? "outgoing" : "incoming";
+  if (!self && !mutual.length && !fr) return reply.code(403).send({ error: "forbidden" });
+  const relation: Relation = self ? "self" : !fr ? "none" : fr.status === "ACCEPTED" ? "friend" : fr.requesterId === me ? "outgoing" : "incoming";
+  // mutual friends: people who are friends with both of us
+  const of = (x: string) => new Set(rels.filter((r) => r.requesterId === x || r.addresseeId === x).map((r) => (r.requesterId === x ? r.addresseeId : r.requesterId)));
+  const theirsF = of(id), mutualIds = self ? [] : [...of(me)].filter((x) => theirsF.has(x) && x !== me && x !== id);
+  // what they are doing right now: only the place is shown, and only when the viewer is in that server too
+  let activity: ActivityDTO = { kind: online.has(id) ? "online" : "offline" };
+  const chId = voiceOf.get(id), room = chId ? voice.get(chId) : undefined;
+  const inCall = !!(chId && room && online.has(id));            // nobody shows as "in a call" once their app is gone, even if the call list has not caught up yet
+  if (inCall) activity = { kind: room!.users.get(id)?.sharing ? "sharing" : "voice" };
+  const [friendUsers, ch] = await Promise.all([
+    mutualIds.length ? prisma.user.findMany({ where: { id: { in: mutualIds.slice(0, 12) } }, ...lightUser }) : [],
+    inCall && mySet.has(room!.serverId) ? prisma.channel.findUnique({ where: { id: chId! }, select: { name: true, server: { select: { name: true } } } }) : null,
+  ]);
+  if (ch) activity.where = `${ch.name} · ${ch.server.name}`;
   const out: ProfileDTO = {
     relation, ...(fr && fr.status === "PENDING" ? { requestId: fr.id } : {}),
-    user: toUser(await withBadge(target)), createdAt: target.createdAt.toISOString(), isSelf: id === me,
+    user: toUser(await withBadge(target)), createdAt: target.createdAt.toISOString(), isSelf: self,
     mutual: mutual.map((m) => ({ id: m.server.id, name: m.server.name, iconUrl: m.server.iconVersion > 0 ? `/server-icons/${m.server.id}?v=${m.server.iconVersion}` : null, owner: m.role === "OWNER" })),
+    ...(target.bio ? { bio: target.bio } : {}), ...(target.bannerColor ? { bannerColor: target.bannerColor } : {}),
+    ...(fr?.status === "ACCEPTED" ? { friendSince: (fr.acceptedAt ?? fr.createdAt).toISOString() } : {}),
+    ...(note ? { note: note.text } : {}), activity, mutualFriends: friendUsers.map(toUser), mutualFriendsCount: mutualIds.length,
   };
   return out;
 });
@@ -295,20 +315,42 @@ app.get("/users/:id/profile", { preHandler: auth }, async (req: any, reply) => {
 app.patch("/me", { preHandler: auth }, async (req, reply) => {
   const p = updateProfileSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
-  if (p.data.username) {
+  if (p.data.username || p.data.displayName) {
     const cur = await prisma.user.findUnique({ where: { id: uid(req) }, select: { email: true, emailVerifiedAt: true, role: true } });
     if (!cur) return reply.code(401).send({ error: "unauthorized" });
-    if (handleProblem(p.data.username, isStaff(cur))) return reply.code(400).send({ error: "invalid input" });          // reserved names (staff exempt)
-    const taken = await prisma.user.findFirst({ where: { username: p.data.username, NOT: { id: uid(req) } } });
-    if (taken) return reply.code(409).send({ error: "username already in use" });
+    if (p.data.username) {
+      if (handleProblem(p.data.username, isStaff(cur))) return reply.code(400).send({ error: "invalid input" });          // reserved names (staff exempt)
+      const taken = await prisma.user.findFirst({ where: { username: p.data.username, NOT: { id: uid(req) } } });
+      if (taken) return reply.code(409).send({ error: "username already in use" });
+    }
+    if (p.data.displayName && !isStaff(cur) && displayNameReserved(p.data.displayName)) return reply.code(400).send({ error: "invalid input" });   // would pass for the team
   }
-  const { avatarUrl, ...rest } = p.data;
+  const { avatarUrl, displayName, bio, bannerColor, ...rest } = p.data;
   const u = await prisma.user.update({
     where: { id: uid(req) },
-    data: { ...rest, ...(avatarUrl !== undefined ? { avatarUrl, avatarVersion: avatarUrl ? { increment: 1 } : 0 } : {}) },
-    ...lightUser,
+    data: {
+      ...rest,
+      ...(displayName !== undefined ? { displayName: displayName || null } : {}),
+      ...(bio !== undefined ? { bio: bio || null } : {}),
+      ...(bannerColor !== undefined ? { bannerColor } : {}),
+      ...(avatarUrl !== undefined ? { avatarUrl, avatarVersion: avatarUrl ? { increment: 1 } : 0 } : {}),
+    },
   });
-  return toUser(u);
+  return toSelf(await withBadge(u));            // the full row: the role and the e-mail rules need it (a "light" user would drop the admin entry)
+});
+
+// A private note about another person. Same visibility rule as the profile (a shared server or a friendship). Empty text deletes it.
+app.put("/users/:id/note", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } }, preHandler: auth }, async (req: any, reply) => {
+  const me = uid(req), id = String(req.params.id);
+  const p = noteSchema.safeParse(req.body);
+  if (!p.success || id === me) return reply.code(400).send({ error: "invalid input" });
+  if (!(await prisma.user.findUnique({ where: { id }, select: { id: true } }))) return reply.code(404).send({ error: "not found" });
+  const myServers = (await prisma.member.findMany({ where: { userId: me }, select: { serverId: true } })).map((m) => m.serverId);
+  const sees = (await prisma.friendship.findFirst({ where: pairOf(me, id), select: { id: true } })) || (await prisma.member.findFirst({ where: { userId: id, serverId: { in: myServers } }, select: { userId: true } }));
+  if (!sees) return reply.code(403).send({ error: "forbidden" });
+  if (p.data.text) await prisma.userNote.upsert({ where: { authorId_targetId: { authorId: me, targetId: id } }, create: { authorId: me, targetId: id, text: p.data.text }, update: { text: p.data.text } });
+  else await prisma.userNote.deleteMany({ where: { authorId: me, targetId: id } });
+  return { ok: true };
 });
 
 // ---- cached images ----
@@ -625,7 +667,7 @@ app.get("/friends", { preHandler: auth }, async (req: any) => {
   const out: FriendsDTO = { friends: [], incoming: [], outgoing: [] };
   for (const r of rows) {
     const other = r.requesterId === me ? r.addressee : r.requester;
-    if (r.status === "ACCEPTED") out.friends.push({ user: toUser(other), since: r.createdAt.toISOString(), online: online.has(other.id) });
+    if (r.status === "ACCEPTED") out.friends.push({ user: toUser(other), since: (r.acceptedAt ?? r.createdAt).toISOString(), online: online.has(other.id) });
     else (r.requesterId === me ? out.outgoing : out.incoming).push({ id: r.id, user: toUser(other), createdAt: r.createdAt.toISOString() });
   }
   out.friends.sort((a, b) => Number(b.online) - Number(a.online) || a.user.username.localeCompare(b.user.username));
@@ -637,7 +679,7 @@ async function befriend(me: string, target: { id: string }): Promise<"sent" | "a
   const ex = await prisma.friendship.findFirst({ where: pairOf(me, target.id) });
   if (ex?.status === "ACCEPTED") return "already friends";
   if (ex && ex.requesterId === me) return "already requested";
-  if (ex) { await prisma.friendship.update({ where: { id: ex.id }, data: { status: "ACCEPTED" } }); ping(me, target.id); return "accepted"; }   // they had asked me first
+  if (ex) { await prisma.friendship.update({ where: { id: ex.id }, data: { status: "ACCEPTED", acceptedAt: new Date() } }); ping(me, target.id); return "accepted"; }   // they had asked me first
   await prisma.friendship.create({ data: { requesterId: me, addresseeId: target.id } });
   ping(me, target.id); return "sent";
 }
@@ -663,10 +705,28 @@ app.post("/friends/request", { ...authLimit, preHandler: auth }, async (req: any
   return { status: r, user: toUser(target) };
 });
 
+// People who share a server with me and are not yet friends (nor pending): the most shared servers first. Only what a server member can already see.
+app.get("/friends/suggestions", { preHandler: auth }, async (req: any): Promise<FriendSuggestionDTO[]> => {
+  const me = uid(req);
+  const mine = await prisma.member.findMany({ where: { userId: me }, select: { serverId: true, server: { select: { name: true } } } });
+  if (!mine.length) return [];
+  const names = new Map(mine.map((m) => [m.serverId, m.server.name]));
+  const [others, related] = await Promise.all([
+    prisma.member.findMany({ where: { serverId: { in: [...names.keys()] }, userId: { not: me } }, select: { userId: true, serverId: true }, take: 2000 }),
+    prisma.friendship.findMany({ where: { OR: [{ requesterId: me }, { addresseeId: me }] }, select: { requesterId: true, addresseeId: true } }),
+  ]);
+  const skip = new Set(related.flatMap((r) => [r.requesterId, r.addresseeId]));
+  const shared = new Map<string, string[]>();
+  for (const o of others) if (!skip.has(o.userId)) { const l = shared.get(o.userId) ?? []; l.push(names.get(o.serverId)!); shared.set(o.userId, l); }
+  const ids = [...shared.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 20).map(([id]) => id);
+  const users = await prisma.user.findMany({ where: { id: { in: ids } }, ...lightUser });
+  return ids.flatMap((id) => { const u = users.find((x) => x.id === id); return u ? [{ user: toUser(u), shared: shared.get(id)!.slice(0, 3), count: shared.get(id)!.length }] : []; });
+});
+
 app.post("/friends/:id/accept", { preHandler: auth }, async (req: any, reply) => {
   const f = await prisma.friendship.findUnique({ where: { id: String(req.params.id) } });
   if (!f || f.addresseeId !== uid(req) || f.status !== "PENDING") return reply.code(404).send({ error: "not found" });
-  await prisma.friendship.update({ where: { id: f.id }, data: { status: "ACCEPTED" } }); ping(f.requesterId, f.addresseeId); return { ok: true };
+  await prisma.friendship.update({ where: { id: f.id }, data: { status: "ACCEPTED", acceptedAt: new Date() } }); ping(f.requesterId, f.addresseeId); return { ok: true };
 });
 // decline an incoming request, or cancel one I sent
 app.post("/friends/:id/decline", { preHandler: auth }, async (req: any, reply) => {
@@ -687,7 +747,7 @@ app.post("/channels/:id/voice-token", { preHandler: auth }, async (req: any, rep
   const user = await prisma.user.findUniqueOrThrow({ where: { id: uid(req) }, ...lightUser });
   const member = await prisma.member.findUnique({ where: { userId_serverId: { userId: user.id, serverId: ch.serverId } } });
   const at = new AccessToken(process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!, {
-    identity: user.id, name: user.username,
+    identity: user.id, name: nameOf(user),
   });
   at.addGrant({ roomJoin: true, room: ch.id, canPublish: !member?.muted, canSubscribe: true });
   return { token: await at.toJwt(), url: process.env.LIVEKIT_URL };
@@ -846,7 +906,7 @@ io.on("connection", (socket) => {
     if (!channelId || !v || !me || me.muted) return;
     const now = Date.now(); if (now - (soundAt.get(userId) ?? 0) < 2500) return;
     soundAt.set(userId, now);
-    for (const uid2 of v.users.keys()) io.to(`user:${uid2}`).emit("voice:sound", { id, name: me.username, channelId });
+    for (const uid2 of v.users.keys()) io.to(`user:${uid2}`).emit("voice:sound", { id, name: nameOf(me), channelId });
   });
   socket.on("dm:typing", (toId: string) => { if (typeof toId === "string") io.to(`user:${toId}`).emit("dm:typing", { fromId: userId }); });
   socket.on("server:join", async (serverId: string) => {

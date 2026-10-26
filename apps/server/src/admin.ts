@@ -72,8 +72,9 @@ export function registerAdmin(app: FastifyInstance, d: {
   setInterval(() => { void flushMinutes(); }, 5 * 60_000).unref();
   setInterval(() => { void sample(); }, SAMPLE_MS).unref();
   setTimeout(() => { void sample(); }, 10_000).unref();                                              // a sample right after waking up
-  const shutdown = () => { void flushMinutes(); };
-  process.once("SIGTERM", shutdown);
+  // Save the pending call minutes, then really exit: a signal handler that does not exit keeps the process alive (and a deploy waits for a hard kill).
+  const shutdown = () => { void flushMinutes().finally(() => process.exit(0)); setTimeout(() => process.exit(0), 3000).unref(); };
+  process.once("SIGTERM", shutdown); process.once("SIGINT", shutdown);
 
   // ---- who is an admin: always read from the database, never trusted from the token ----
   const needAdmin = async (req: any, reply: any) => {

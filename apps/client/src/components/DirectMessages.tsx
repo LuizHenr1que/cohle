@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { Users, MessageCircle, Search, Send, Menu, ChevronUp } from "lucide-react";
 import type { Socket } from "socket.io-client";
 import type { DirectMessageDTO, DmConversationDTO, UserDTO } from "@cohle/shared";
+import { nameOf } from "@cohle/shared";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
@@ -46,6 +47,8 @@ export function useDms(getSocket: () => Socket | null | undefined, selfId: strin
   return { convs, load, markRead, unread: convs.reduce((n, c) => n + c.unread, 0) };
 }
 
+/** search matches the display name and the @username */
+const matches = (u: { username: string; displayName?: string | null }, f: string) => nameOf(u).toLowerCase().includes(f) || u.username.includes(f.replace(/^@/, ""));
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const dayLabel = (iso: string) => {
   const d = new Date(iso), t = new Date(), y = new Date(Date.now() - 864e5);
@@ -61,9 +64,9 @@ export function DmSidebar({ convs, online, peerId, onOpen, onFriends, friendsAct
   const [people, setPeople] = useState<UserDTO[]>([]);
   useEffect(() => { api.dmPeople().then(setPeople).catch(() => {}); }, []);
   const f = q.trim().toLowerCase();
-  const shownConvs = convs.filter((c) => !f || c.peer.username.toLowerCase().includes(f));
+  const shownConvs = convs.filter((c) => !f || matches(c.peer, f));
   const talking = new Set(convs.map((c) => c.peer.id));
-  const others = people.filter((p) => !talking.has(p.id) && (!f || p.username.toLowerCase().includes(f)));
+  const others = people.filter((p) => !talking.has(p.id) && (!f || matches(p, f)));
   const dot = (id: string) => <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(id) ? "bg-emerald-400" : "bg-muted"}`} />;
   return (
     <>
@@ -82,7 +85,7 @@ export function DmSidebar({ convs, online, peerId, onOpen, onFriends, friendsAct
             className={`w-full flex items-center gap-3 px-2 py-2 rounded-xl text-left transition ${peerId === c.peer.id ? "bg-accent/15" : "hover:bg-white/5"}`}>
             <span className="relative shrink-0"><Avatar user={c.peer} size={36} />{dot(c.peer.id)}</span>
             <span className="min-w-0 flex-1">
-              <span className={`flex items-center gap-1.5 text-sm ${c.unread ? "font-semibold text-ink" : ""}`}><span className="truncate">{c.peer.username}</span><DevBadge user={c.peer} /></span>
+              <span className={`flex items-center gap-1.5 text-sm ${c.unread ? "font-semibold text-ink" : ""}`}><span className="truncate">{nameOf(c.peer)}</span><DevBadge user={c.peer} /></span>
               <span className={`block text-xs truncate ${c.unread ? "text-ink/80" : "text-muted"}`}>{c.last.fromId !== c.peer.id ? "Você: " : ""}{c.last.content}</span>
             </span>
             {c.unread > 0 && <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">{c.unread > 99 ? "99+" : c.unread}</span>}
@@ -93,7 +96,7 @@ export function DmSidebar({ convs, online, peerId, onOpen, onFriends, friendsAct
         {others.map((p) => (
           <button key={p.id} onClick={() => onOpen(p)} className="w-full flex items-center gap-3 px-2 py-1.5 rounded-xl text-left hover:bg-white/5 transition">
             <span className="relative shrink-0"><Avatar user={p} size={30} />{dot(p.id)}</span>
-            <span className="text-sm truncate text-muted">{p.username}</span>
+            <span className="text-sm truncate text-muted">{nameOf(p)}</span>
           </button>
         ))}
         {f && !shownConvs.length && !others.length && <p className="px-3 py-4 text-xs text-muted">Ninguém encontrado.</p>}
@@ -166,7 +169,7 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfil
       <header className="px-3 sm:px-6 py-3 border-b border-line flex items-center gap-3 min-w-0">
         {onMenu && <button onClick={onMenu} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={18} /></button>}
         <button onClick={() => onProfile?.(peer.id)} className="flex items-center gap-3 min-w-0 text-left rounded-xl hover:bg-white/5 -m-1 p-1 transition" title="Ver perfil"><span className="relative shrink-0"><Avatar user={peer} size={36} /><span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online ? "bg-emerald-400" : "bg-muted"}`} /></span>
-        <div className="min-w-0"><div className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{peer.username}</span><DevBadge user={peer} full /></div><div className="text-[11px] text-muted">{online ? "Online" : "Offline"}</div></div></button>
+        <div className="min-w-0"><div className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{nameOf(peer)}</span><DevBadge user={peer} full /></div><div className="text-[11px] text-muted">{online ? "Online" : "Offline"}</div></div></button>
       </header>
       <div ref={box} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
         {more && <button onClick={older} className="mx-auto mb-3 flex items-center gap-1.5 text-xs text-muted hover:text-ink rounded-full bg-white/5 px-3 py-1.5"><ChevronUp size={14} /> Ver mensagens anteriores</button>}
@@ -174,8 +177,8 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfil
         {!loading && !msgs.length && (
           <div className="text-center py-12">
             <div className="mx-auto mb-3 w-fit"><Avatar user={peer} size={72} /></div>
-            <p className="font-semibold">{peer.username}</p>
-            <p className="text-sm text-muted mt-1">Este é o começo da sua conversa com <b>{peer.username}</b>.</p>
+            <p className="font-semibold">{nameOf(peer)}</p>
+            <p className="text-sm text-muted mt-1">Este é o começo da sua conversa com <b>{nameOf(peer)}</b>.</p>
           </div>
         )}
         {msgs.map((m, i) => {
@@ -188,7 +191,7 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfil
               <div className={`flex gap-3 group ${head ? "mt-3" : ""}`}>
                 <div className="w-9 shrink-0">{head && <Avatar user={mine ? self : peer} size={36} />}</div>
                 <div className="min-w-0 flex-1">
-                  {head && <div className="text-sm"><button onClick={() => onProfile?.(mine ? self.id : peer.id)} className="font-bold hover:underline">{mine ? self.username : peer.username}</button> <DevBadge user={mine ? self : peer} /> <span className="text-muted text-xs ml-1">{clock(m.createdAt)}</span></div>}
+                  {head && <div className="text-sm"><button onClick={() => onProfile?.(mine ? self.id : peer.id)} className="font-bold hover:underline">{mine ? nameOf(self) : nameOf(peer)}</button> <DevBadge user={mine ? self : peer} /> <span className="text-muted text-xs ml-1">{clock(m.createdAt)}</span></div>}
                   <p className="text-ink/90 whitespace-pre-wrap break-words relative">
                     {m.content}
                     {!head && <span className="absolute -left-12 top-0.5 text-[10px] text-muted opacity-0 group-hover:opacity-100">{clock(m.createdAt)}</span>}
@@ -198,13 +201,13 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfil
             </div>
           );
         })}
-        <div className="h-5 text-xs text-muted mt-2">{typing && `${peer.username} está digitando...`}</div>
+        <div className="h-5 text-xs text-muted mt-2">{typing && `${nameOf(peer)} está digitando...`}</div>
         <div ref={bottom} />
       </div>
       <div className="p-2 sm:p-4 border-t border-line">
         {err && <p className="text-xs text-accent mb-2">{err}</p>}
         <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2 items-end">
-          <textarea value={text} rows={1} maxLength={4000} placeholder={`Mensagem para ${peer.username}`}
+          <textarea value={text} rows={1} maxLength={4000} placeholder={`Mensagem para ${nameOf(peer)}`}
             onChange={(e) => {
               setText(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
               if (Date.now() - lastTyping.current > 2000) { lastTyping.current = Date.now(); getSocket()?.emit("dm:typing", peer.id); }

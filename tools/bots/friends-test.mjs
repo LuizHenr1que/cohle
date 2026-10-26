@@ -1,4 +1,4 @@
-// Friends API: add by @name#code, requests, accept, online flag, removal. Dev server.
+// Friends API: add by @username, requests, accept, online flag, removal. Dev server. (E-mail adds, suggestions and privacy: identity-test.mjs / profile-test.mjs)
 import { io } from "../bots/node_modules/socket.io-client/build/esm/index.js";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const API = "http://localhost:3001";
@@ -9,9 +9,9 @@ const a = await login("teste1@cohle.dev"), b = await login("teste2@cohle.dev");
 // clean slate for the pair
 await http(`/friends/${b.user.id}`, null, a.token, "DELETE");
 const fl = async (t) => (await http("/friends", null, t)).d;
-ok("os usuários de teste têm código de amigo", a.user.tag === "te01" && b.user.tag === "te02", `${a.user.username}#${a.user.tag} ${b.user.username}#${b.user.tag}`);
-let r = await http("/friends/request", { handle: "@teste2 #nada" }, a.token);
-ok("código errado: não encontra", r.s === 404);
+ok("os usuários de teste têm @usuário", a.user.username === "teste1" && b.user.username === "teste2", `@${a.user.username} @${b.user.username}`);
+let r = await http("/friends/request", { handle: "@nao_existe_zz" }, a.token);
+ok("@usuário inexistente: não encontra", r.s === 404);
 r = await http("/friends/request", { handle: "@teste1#te01" }, a.token);
 ok("não dá para adicionar a si mesmo", r.s === 400);
 r = await http("/friends/request", { handle: "isso-nao-eh-handle" }, a.token);

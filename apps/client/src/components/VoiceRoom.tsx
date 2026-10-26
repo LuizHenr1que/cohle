@@ -9,6 +9,7 @@ import {
   ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, Ban, UserX, PhoneMissed, ShieldAlert, Menu, Eye, EyeOff, AudioLines, Check, ChevronUp, MessageSquare,
 } from "lucide-react";
 import type { ChannelDTO, UserDTO } from "@cohle/shared";
+import { nameOf } from "@cohle/shared";
 import { api, assetUrl } from "../api";
 import { Avatar } from "./Avatar";
 import { sounds } from "../sounds";
@@ -21,7 +22,7 @@ import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
 import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
 
-type UserLike = Pick<UserDTO, "username" | "avatarUrl" | "micOff" | "deaf" | "badge">;
+type UserLike = Pick<UserDTO, "username" | "displayName" | "avatarUrl" | "micOff" | "deaf" | "badge">;
 /** What the sidebar (hover card, clicking a person) can ask of the call it is looking at. */
 export type VoiceApi = {
   watch: (userId: string) => void;                                       // switch to this person's live (replaces any other one)
@@ -105,7 +106,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
 
       {!compact && (
         <div className="absolute top-2 right-2 @sm:top-3 @sm:right-3 flex gap-1.5 items-start">
-          {!p.isLocal && <PersonMenu name={user.username} vol={vol} onVol={onVol} sharing={sharing} mod={mod} onExpand={onOpen} onMessage={onMessage} onProfile={onProfile} />}
+          {!p.isLocal && <PersonMenu name={nameOf(user)} vol={vol} onVol={onVol} sharing={sharing} mod={mod} onExpand={onOpen} onMessage={onMessage} onProfile={onProfile} />}
           {p.isLocal && sharing && (
             <button onClick={onTogglePreview} className="bg-black/50 hover:bg-black/70 rounded-full p-1.5 @sm:p-2" title={preview ? "Esconder a prévia da minha tela" : "Mostrar a prévia da minha tela"}>
               {preview ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -117,7 +118,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
 
       <div className="absolute bottom-1.5 inset-x-1.5 @sm:bottom-3 @sm:inset-x-3 flex items-center gap-2 pointer-events-none">
         <span className="min-w-0 truncate text-[11px] @sm:text-xs bg-black/55 px-2 @sm:px-3 py-0.5 @sm:py-1 rounded-full">
-          {p.isLocal ? `${user.username} (você)` : user.username}
+          {p.isLocal ? `${nameOf(user)} (você)` : nameOf(user)}
         </span>
         <DevBadge user={user} />
         {serverMuted
@@ -127,7 +128,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
             : !p.isMicrophoneEnabled && <span title="Microfone desativado" className="shrink-0 bg-black/55 rounded-full p-1"><MicOff size={13} className="text-accent" /></span>}
         <span className="flex-1" />
       </div>
-      {ctx && <PersonPanel name={user.username} vol={vol} onVol={onVol} sharing={sharing} mod={mod} pos={ctx} onClose={() => setCtx(undefined)} onExpand={compact ? undefined : onOpen} onMessage={onMessage} onProfile={onProfile} />}
+      {ctx && <PersonPanel name={nameOf(user)} vol={vol} onVol={onVol} sharing={sharing} mod={mod} pos={ctx} onClose={() => setCtx(undefined)} onExpand={compact ? undefined : onOpen} onMessage={onMessage} onProfile={onProfile} />}
     </div>
   );
 }
@@ -169,7 +170,7 @@ function Stage({ p, user, vol, onVol, speaking, stageRef, onStop, isScreen, mod,
       <div className="shrink-0 flex flex-wrap items-center gap-x-4 gap-y-2 px-3 sm:px-4 py-2 bg-surface border-t border-line">
         <div className="flex items-center gap-2 min-w-0 flex-1 basis-32">
           <Avatar user={user} size={26} />
-          <span className="truncate text-sm font-medium">{user.username}</span>
+          <span className="truncate text-sm font-medium">{nameOf(user)}</span>
         </div>
         {!p.isLocal && <div className="flex items-center gap-2">
           {vol.m || vol.s === 0 ? <VolumeX size={16} className="text-accent shrink-0" /> : <Volume2 size={16} className="text-muted shrink-0" />}
@@ -180,7 +181,7 @@ function Stage({ p, user, vol, onVol, speaking, stageRef, onStop, isScreen, mod,
           <button onClick={onStop} className="bg-white/10 hover:bg-red-500/30 rounded-full p-2" title={isScreen ? "Parar de assistir" : "Voltar à grade"}><X size={16} /></button>
         </div>
       </div>
-      {ctx && <PersonPanel name={user.username} vol={vol} onVol={onVol} sharing={p.isScreenShareEnabled} mod={mod} pos={ctx} onClose={() => setCtx(undefined)} onMessage={onMessage} onProfile={onProfile} />}
+      {ctx && <PersonPanel name={nameOf(user)} vol={vol} onVol={onVol} sharing={p.isScreenShareEnabled} mod={mod} pos={ctx} onClose={() => setCtx(undefined)} onMessage={onMessage} onProfile={onProfile} />}
     </div>
   );
 }
@@ -315,7 +316,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
   useEffect(() => {
     if (!window.cohle?.overlayState) return;
     const sp = speakers.filter((id) => users.some((u) => u.id === id)).map((id) => users.find((u) => u.id === id)).filter((u): u is UserDTO => !!u)
-      .map((u) => ({ id: u.id, name: u.username, avatar: assetUrl(u.avatarUrl) }));
+      .map((u) => ({ id: u.id, name: nameOf(u), avatar: assetUrl(u.avatarUrl) }));
     window.cohle.overlayState({ inCall: status === "connected", channel: channel.name, speakers: sp });
   }, [speakers, users, status, channel.name]);
   useEffect(() => () => window.cohle?.overlayState?.({ inCall: false, channel: "", speakers: [] }), []);

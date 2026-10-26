@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Users, Check, X, MessageCircle, UserRound, UserMinus, Copy, Clock, Menu, Send, Search, AtSign, Mail } from "lucide-react";
-import type { FriendsDTO, UserDTO } from "@cohle/shared";
+import { Users, Check, X, MessageCircle, UserRound, UserMinus, Copy, Clock, Menu, Send, Search, AtSign, Mail, UserPlus, Sparkles } from "lucide-react";
+import { nameOf, type FriendSuggestionDTO, type FriendsDTO, type UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
@@ -8,6 +8,7 @@ import { Switch } from "./Switch";
 
 type Tab = "all" | "online" | "pending" | "add";
 const isEmail = (v: string) => !v.trim().startsWith("@") && /^\S+@\S+\.\S+$/.test(v.trim());
+const pending0 = (d: FriendsDTO) => d.incoming.length + d.outgoing.length;
 const since = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { month: "short", year: "numeric" });
 
 /** Friends home: everyone in one place (online, all, pending) and adding people by @username or e-mail. */
@@ -21,12 +22,15 @@ export function FriendsPanel({ self, data, online, onMessage, onProfile, onChang
   const [msg, setMsg] = useState<{ ok: boolean; t: string }>();
   const [confirm, setConfirm] = useState<string>();
   const [copied, setCopied] = useState(false);
-  const [find, setFind] = useState<boolean>();                       // "let people find me by e-mail"
+  const [find, setFind] = useState<boolean>();
+  const [sugg, setSugg] = useState<FriendSuggestionDTO[]>();          // people from my servers who are not friends yet
+  const [sbusy, setSbusy] = useState("");                       // "let people find me by e-mail"
   useEffect(() => { if (tab === "add" && find === undefined) api.account().then((a) => setFind(a.findByEmail)).catch(() => {}); }, [tab, find]);
 
+  useEffect(() => { if (tab === "add") api.friendSuggestions().then(setSugg).catch(() => setSugg([])); }, [tab, data.friends.length, pending0(data)]);
   const withOnline = useMemo(() => data.friends.map((f) => ({ ...f, online: online.has(f.user.id) })), [data, online]);
   const needle = q.trim().replace(/^@/, "").toLowerCase();
-  const shown = useMemo(() => withOnline.filter((f) => !needle || f.user.username.includes(needle)), [withOnline, needle]);
+  const shown = useMemo(() => withOnline.filter((f) => !needle || f.user.username.includes(needle) || nameOf(f.user).toLowerCase().includes(needle)), [withOnline, needle]);
   const onlineCount = withOnline.filter((f) => f.online).length;
   const pending = data.incoming.length + data.outgoing.length;
   const byEmail = isEmail(handle);
@@ -36,7 +40,7 @@ export function FriendsPanel({ self, data, online, onMessage, onProfile, onChang
     setBusy(true); setMsg(undefined);
     try {
       const r = await api.friendRequest(handle.trim());
-      setMsg({ ok: true, t: !r.user ? "Se existir uma conta com esse e-mail que aceite ser encontrada, o pedido foi enviado." : r.status === "accepted" ? `Você e @${r.user.username} agora são amigos.` : `Pedido enviado para @${r.user.username}.` });
+      setMsg({ ok: true, t: !r.user ? "Se existir uma conta com esse e-mail que aceite ser encontrada, o pedido foi enviado." : r.status === "accepted" ? `Você e ${nameOf(r.user)} (@${r.user.username}) agora são amigos.` : `Pedido enviado para ${nameOf(r.user)} (@${r.user.username}).` });
       setHandle(""); onChanged();
     } catch (x: any) { setMsg({ ok: false, t: x.message }); } finally { setBusy(false); }
   }
@@ -52,8 +56,8 @@ export function FriendsPanel({ self, data, online, onMessage, onProfile, onChang
     <div key={key} className="group flex items-center gap-3 rounded-2xl px-3 py-2.5 hover:bg-white/[0.05] transition">
       <button onClick={() => onProfile(u.id)} className="relative shrink-0" title="Ver perfil"><Avatar user={u} size={42} /><Dot on={on} /></button>
       <button onClick={() => onProfile(u.id)} className="min-w-0 flex-1 text-left">
-        <div className="flex items-center gap-2 text-sm font-semibold min-w-0"><span className="truncate"><span className="text-muted font-normal">@</span>{u.username}</span><DevBadge user={u} /></div>
-        <div className="text-xs text-muted truncate">{status}</div>
+        <div className="flex items-center gap-2 text-sm font-semibold min-w-0"><span className="truncate">{nameOf(u)}</span><DevBadge user={u} /></div>
+        <div className="text-xs text-muted truncate">@{u.username} · {status}</div>
       </button>
       <div className="flex items-center gap-1.5 shrink-0">{actions}</div>
     </div>
@@ -70,7 +74,7 @@ export function FriendsPanel({ self, data, online, onMessage, onProfile, onChang
   const search = (
     <div className="relative mb-4">
       <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar amigo pelo @usuário" aria-label="Buscar amigo" className="w-full rounded-xl bg-white/5 border border-line pl-10 pr-4 py-2.5 text-sm outline-none focus:border-accent transition placeholder:text-muted" />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar amigo pelo nome ou @usuário" aria-label="Buscar amigo" className="w-full rounded-xl bg-white/5 border border-line pl-10 pr-4 py-2.5 text-sm outline-none focus:border-accent transition placeholder:text-muted" />
     </div>
   );
   const none = !data.friends.length;
@@ -115,6 +119,16 @@ export function FriendsPanel({ self, data, online, onMessage, onProfile, onChang
             {handle.trim() && <p className="mt-2 text-xs text-muted">{byEmail ? "Procurando pelo e-mail. Por privacidade, não dizemos se o endereço tem conta." : "Procurando pelo @usuário."}</p>}
             {msg && <p role="status" className={`mt-3 text-sm ${msg.ok ? "text-emerald-300" : "text-accent"}`}>{msg.t}</p>}
 
+            {sugg && sugg.length > 0 && (
+              <section className="mt-8" aria-label="Pessoas que você talvez conheça">
+                <h3 className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-muted"><Sparkles size={13} className="text-accent" />Pessoas que você talvez conheça</h3>
+                <div className="mt-2 space-y-0.5">
+                  {sugg.map((x) => row(x.user, `${x.count > 1 ? `${x.count} servidores em comum` : "Servidor em comum"}: ${x.shared.join(", ")}`, online.has(x.user.id),
+                    <button disabled={sbusy === x.user.id} onClick={async () => { setSbusy(x.user.id); try { await api.friendRequest(`@${x.user.username}`); setSugg((l) => l?.filter((y) => y.user.id !== x.user.id)); onChanged(); } catch { /* shown by reloading the list */ } finally { setSbusy(""); } }}
+                      className="rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold inline-flex items-center gap-1.5 transition"><UserPlus size={14} /> Adicionar</button>, `s-${x.user.id}`))}
+                </div>
+              </section>
+            )}
             <div className="mt-8 rounded-2xl border border-line bg-white/[0.03] p-4">
               <div className="text-[11px] uppercase tracking-widest text-muted">Seu @usuário</div>
               <div className="mt-2 flex items-center gap-3 flex-wrap">

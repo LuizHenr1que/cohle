@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Crown, ScreenShare, Volume2, MicOff, HeadphoneOff, MessageCircle } from "lucide-react";
 import type { UserDTO } from "@cohle/shared";
+import { nameOf } from "@cohle/shared";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
 import type { VoiceApi } from "./VoiceRoom";
@@ -40,7 +41,7 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
       onMouseEnter={show} onMouseLeave={hide} onClick={() => { hide(); onClick(); }}
       className="group flex items-center gap-2 pl-9 pr-2 py-1 text-xs text-muted rounded-lg cursor-pointer hover:bg-white/5 hover:text-ink">
       <Avatar user={user} size={20} speaking={speaking} />
-      <span className="truncate">{isSelf ? `${user.username} (você)` : user.username}</span><DevBadge user={user} />
+      <span className="truncate">{isSelf ? `${nameOf(user)} (você)` : nameOf(user)}</span><DevBadge user={user} />
       {user.deaf ? <HeadphoneOff size={12} className="shrink-0 text-accent" aria-label="Áudio desativado" /> : (user.micOff || user.muted) && <MicOff size={12} className="shrink-0 text-accent" aria-label="Microfone desativado" />}
       {onMessage && !isSelf && <button onClick={(e) => { e.stopPropagation(); hide(); onMessage(); }} title="Enviar mensagem" aria-label="Enviar mensagem"
         className={`${live ? "" : "ml-auto"} shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition`}><MessageCircle size={13} /></button>}
@@ -49,7 +50,7 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
           <ScreenShare size={10} /> AO VIVO
         </span>
       )}
-      {ctx && <PersonPanel name={user.username} vol={vol} sharing={live && inCall} mod={mod} pos={ctx} onClose={() => setCtx(undefined)}
+      {ctx && <PersonPanel name={nameOf(user)} vol={vol} sharing={live && inCall} mod={mod} pos={ctx} onClose={() => setCtx(undefined)}
         onVol={(patch) => { setVolState((v) => ({ ...v, ...patch })); if (inCall) getApi()?.setVol(user.id, patch); else saveVol(user.id, patch); }}
         onExpand={live || inCall ? onClick : undefined} expandLabel={live ? "Assistir ao vivo" : "Ir para a chamada"} onMessage={onMessage} onProfile={onProfile} />}
       {rect && createPortal(
@@ -58,7 +59,7 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
             <Avatar user={user} size={44} speaking={speaking} />
             <div className="min-w-0">
               <div className="font-semibold truncate flex items-center gap-1.5">
-                {user.username}<DevBadge user={user} full />{isOwner && <Crown size={13} className="text-amber-400 shrink-0" />}
+                {nameOf(user)}<DevBadge user={user} full />{isOwner && <Crown size={13} className="text-amber-400 shrink-0" />}
               </div>
               <div className="text-[11px] text-muted truncate">{isSelf ? "Você" : isOwner ? "Dono do servidor" : "Membro"}</div>
             </div>

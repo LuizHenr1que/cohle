@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Crown, Hash, Volume2, Trash2, RefreshCw, Copy, Check, LogOut, UserMinus, Plus, MicOff, Mic, Ban, Undo2, MessageCircle } from "lucide-react";
 import type { ServerDTO, MemberDTO, BanDTO, UserDTO } from "@cohle/shared";
+import { nameOf } from "@cohle/shared";
 import { api } from "../api";
 import { Modal, inputCls, primaryCls, ghostCls } from "./Modal";
 import { IconPicker } from "./IconPicker";
@@ -120,7 +121,7 @@ export function ServerSettings({ server, selfId, online, rev, onClose, onAddChan
             {bans.map((b) => (
               <div key={b.user.id} className="flex items-center gap-3 rounded-2xl bg-white/5 border border-line px-4 py-2.5">
                 <Avatar user={b.user} size={34} />
-                <span className="flex-1 truncate">{b.user.username}<span className="text-muted text-xs"> · banido em {new Date(b.createdAt).toLocaleDateString()}</span></span>
+                <span className="flex-1 truncate">{nameOf(b.user)}<span className="text-muted text-xs"> · banido em {new Date(b.createdAt).toLocaleDateString()}</span></span>
                 <button className="text-xs text-accent2 hover:underline inline-flex items-center gap-1" onClick={() => run(() => api.unban(server.id, b.user.id), "Banimento removido")}><Undo2 size={13} /> Desbanir</button>
               </div>
             ))}
@@ -133,7 +134,7 @@ export function ServerSettings({ server, selfId, online, rev, onClose, onAddChan
               <div key={m.user.id} className="flex items-center gap-3 rounded-2xl bg-white/5 border border-line px-4 py-2.5">
                 <button onClick={() => { onClose(); onProfile?.(m.user.id); }} title="Ver perfil" className="relative"><Avatar user={m.user} size={34} />
                   <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(m.user.id) ? "bg-emerald-400" : "bg-muted"}`} /></button>
-                <span className="flex-1 truncate">{m.user.username} <DevBadge user={m.user} />{m.user.id === selfId && <span className="text-muted text-xs"> (você)</span>}</span>
+                <span className="flex-1 truncate">{nameOf(m.user)} <DevBadge user={m.user} />{m.user.id === selfId && <span className="text-muted text-xs"> (você)</span>}</span>
                 {m.user.id !== selfId && onMessage && <button className="text-muted hover:text-accent" title="Enviar mensagem" onClick={() => { onClose(); onMessage(m.user); }}><MessageCircle size={16} /></button>}
                 {m.role === "OWNER" && <span className="text-xs text-accent2 inline-flex items-center gap-1"><Crown size={13} /> Dono</span>}
                 {owner && m.user.id !== selfId && (<>

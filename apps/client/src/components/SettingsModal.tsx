@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Copy, X, User, ShieldCheck, Palette, Volume2, MonitorCog, Info, LogOut, Check, RefreshCw, Pencil, Sparkles, Gauge } from "lucide-react";
-import type { AccountDTO, UserDTO } from "@cohle/shared";
+import { nameOf, type AccountDTO, type UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
 import { PasswordInput } from "./PasswordInput";
 import { Switch } from "./Switch";
+import { bannerBg } from "../lib/profile";
 import { DOWNLOAD_URL, openLink } from "../lib/links";
 import { BUILD } from "../version";
 import { NOISE_MODES, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
@@ -51,10 +52,10 @@ export function SettingsModal({ user, onAdmin, onClose, onEditProfile, onTour, o
           {tab === "account" && (<>
             <H>Minha conta</H>
             <div className="rounded-2xl overflow-hidden border border-line">
-              <div className="h-20 bg-[radial-gradient(120%_140%_at_30%_0%,rgb(var(--accent-rgb)/0.5),transparent_70%),linear-gradient(135deg,#2a1018,#12080c)]" />
+              <div className="h-20" style={{ background: bannerBg(user.bannerColor) }} />
               <div className="px-4 pb-4 -mt-9 flex items-end gap-4 flex-wrap">
                 <div className="ring-4 ring-surface rounded-full"><Avatar user={user} size={72} /></div>
-                <div className="min-w-0 flex-1 pb-1"><div className="text-lg font-bold flex items-center gap-2 flex-wrap">{user.username}<DevBadge user={user} full /></div>
+                <div className="min-w-0 flex-1 pb-1"><div className="text-lg font-bold flex items-center gap-2 flex-wrap">{nameOf(user)}<DevBadge user={user} full /></div>
                   <div className="text-xs text-muted truncate">{acc?.email ?? "..."}</div>
                   <button onClick={() => navigator.clipboard?.writeText(`@${user.username}`).catch(() => {})} title="Copiar o seu @usuário" className="mt-1 inline-flex items-center gap-1.5 text-xs text-accent2 hover:underline">@{user.username} <Copy size={12} /></button></div>
                 <button onClick={onEditProfile} className="grad rounded-xl px-4 py-2 text-sm font-semibold text-white inline-flex items-center gap-2 hover:brightness-110"><Pencil size={15} /> Editar foto e nome</button>

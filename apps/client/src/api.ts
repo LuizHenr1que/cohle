@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -127,7 +127,9 @@ export const api = {
   forgot: (email: string) => req<{ ok: true }>("/auth/forgot", "POST", { email }),
   reset: (b: { email: string; code: string; password: string }) => req<{ token: string; user: UserDTO }>("/auth/reset", "POST", b),
   me: () => req<UserDTO>("/me"),
-  updateProfile: (b: { username?: string; avatarUrl?: string | null }) => req<UserDTO>("/me", "PATCH", b),
+  updateProfile: (b: { username?: string; displayName?: string | null; bio?: string | null; bannerColor?: string | null; avatarUrl?: string | null }) => req<UserDTO>("/me", "PATCH", b),
+  saveNote: (id: string, text: string) => req<{ ok: true }>(`/users/${id}/note`, "PUT", { text }),
+  friendSuggestions: () => req<FriendSuggestionDTO[]>("/friends/suggestions"),
   servers: () => req<ServerDTO[]>("/servers"),
   createServer: (name: string, iconUrl?: string | null, template?: ServerTemplate) =>
     req<ServerDTO>("/servers", "POST", { name, iconUrl, template }),
