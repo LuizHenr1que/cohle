@@ -13,5 +13,5 @@ window.addEventListener("focus", syncFocus);
 window.addEventListener("blur", syncFocus);
 syncFocus();
 
-ReactDOM.applyTheme(getTheme());
-createRoot(document.getElementById("root")!).render(<App />);
+applyTheme(getTheme());
+ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

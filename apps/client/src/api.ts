@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -57,7 +57,8 @@ const MESSAGES: Record<string, string> = {
   "email unavailable": "A recuperação de senha está indisponível no momento.",
   "email not verified": "Confirme o seu e-mail para entrar.",
   "username already in use": "Este nome de usuário já está em uso.",
-  "forbidden": "Você só vê o perfil de quem está em um servidor com você.",
+  "forbidden": "Você não tem permissão para isso.",
+  "owner is fixed": "A conta do dono da empresa não pode ser alterada.",
   "not found": "Não encontramos essa pessoa.",
   "user not found": "Não encontramos ninguém com esse nome e código. Confira, por exemplo: @nome #br21.",
   "bad handle": "Digite no formato @nome #código, por exemplo @luiz #br21.",
@@ -103,6 +104,12 @@ export const api = {
   register: (b: { email: string; username: string; password: string }) =>
     req<{ token: string; user: UserDTO } | { needsVerification: true; email: string }>("/auth/register", "POST", b),
   login: (b: { email: string; password: string }) => req<{ token: string; user: UserDTO }>("/auth/login", "POST", b),
+  adminOverview: () => req<AdminOverviewDTO>("/admin/overview"),
+  adminUsage: () => req<AdminUsageDTO>("/admin/usage"),
+  adminSeries: (range: "24h" | "7d" | "30d") => req<AdminSeriesDTO>(`/admin/series?range=${range}`),
+  adminUsers: (q: string, page: number) => req<{ rows: AdminUserRow[]; total: number }>(`/admin/users?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  adminAccesses: () => req<AdminAccessRow[]>("/admin/accesses"),
+  adminRole: (id: string, role: "USER" | "ADMIN") => req<{ ok: true }>(`/admin/users/${id}/role`, "POST", { role }),
   friends: () => req<FriendsDTO>("/friends"),
   friendRequest: (handle: string) => req<{ status: "sent" | "accepted"; user: { username: string } }>("/friends/request", "POST", { handle }),
   friendAccept: (id: string) => req(`/friends/${id}/accept`, "POST", {}),

@@ -41,7 +41,7 @@ export interface VoiceStateDTO { channelId: string; users: UserDTO[]; }
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export interface UserDTO { id: string; username: string; tag?: string; badge?: "DEV" | null; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
+export interface UserDTO { id: string; username: string; tag?: string; badge?: "DEV" | null; role?: "ADMIN" | "OWNER"; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
 export type Relation = "self" | "none" | "friend" | "incoming" | "outgoing";
 export interface ProfileDTO { user: UserDTO; createdAt: string; mutual: { id: string; name: string; iconUrl: string | null; owner: boolean }[]; isSelf: boolean; relation: Relation; requestId?: string; }
 export interface FriendDTO { user: UserDTO; since: string; online: boolean; }
@@ -62,3 +62,20 @@ export interface DmConversationDTO { peer: UserDTO; last: DirectMessageDTO; unre
 export interface MessageDTO {
   id: string; channelId: string; content: string; createdAt: string; author: UserDTO;
 }
+
+// ---- admin panel ----
+export interface AdminOverviewDTO {
+  users: { total: number; verified: number; new24h: number; new7d: number; active24h: number; active7d: number };
+  live: { online: number; voice: number; rooms: number };
+  content: { servers: number; channels: number; messages: number; dms: number };
+  process: { rssMb: number; heapMb: number; uptimeSec: number; node: string };
+  dbMb: number;
+}
+export interface AdminUserRow { id: string; username: string; tag: string; email: string; role: "USER" | "ADMIN" | "OWNER"; verified: boolean; createdAt: string; lastSeenAt: string | null; online: boolean; servers: number; }
+export interface AdminAccessRow { id: string; kind: "register" | "login" | "open"; at: string; username: string; email: string; }
+export interface AdminSeriesDTO {
+  points: { t: string; online: number; peak: number; voice: number; rss: number }[];
+  days: { day: string; register: number; login: number; open: number; voiceMinutes: number; dbMb: number }[];
+}
+export interface QuotaDTO { id: string; label: string; unit: string; used: number; limit: number; projected: number; level: "ok" | "warn" | "over"; runsOutAt: string | null; note?: string; }
+export interface AdminUsageDTO { month: string; resetsAt: string; quotas: QuotaDTO[]; }

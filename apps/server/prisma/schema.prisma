@@ -24,6 +24,9 @@ model User {
   friendsSent  Friendship[] @relation("FriendRequester")
   friendsGot   Friendship[] @relation("FriendAddressee")
   badge        String?   // "DEV": shown next to the name (granted by the server, never chosen by the user)
+  role         String    @default("USER") // USER | ADMIN | OWNER (OWNER = company master, derived from OWNER_EMAILS, never editable)
+  lastSeenAt   DateTime?
+  accesses     AccessLog[]
   emailCodes   EmailCode[]
   createdAt    DateTime  @default(now())
   members      Member[]
@@ -136,4 +139,31 @@ model Friendship {
 
   @@unique([requesterId, addresseeId])
   @@index([addresseeId, status])
+}
+
+// Who opened the app / signed in / registered, and when. No IP address is stored. Pruned after 90 days.
+model AccessLog {
+  id     String   @id @default(cuid())
+  userId String
+  kind   String   // register | login | open
+  at     DateTime @default(now())
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([at])
+  @@index([userId, at])
+}
+
+// One row every 5 minutes while the API is awake. Used for the admin charts and to estimate the free-plan hours. Pruned after 60 days.
+model MetricSample {
+  at     DateTime @id @default(now())
+  online Int
+  voice  Int
+  rssMb  Int
+}
+
+// One row per day: voice participant-minutes (what LiveKit bills), database size at the last sample.
+model DailyUsage {
+  day          String @id // YYYY-MM-DD (UTC)
+  voiceMinutes Int    @default(0)
+  dbMb         Float  @default(0)
 }

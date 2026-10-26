@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, X, User, ShieldCheck, Palette, Volume2, MonitorCog, Info, LogOut, Check, RefreshCw, Pencil, Sparkles } from "lucide-react";
+import { Copy, X, User, ShieldCheck, Palette, Volume2, MonitorCog, Info, LogOut, Check, RefreshCw, Pencil, Sparkles, Gauge } from "lucide-react";
 import type { AccountDTO, UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
@@ -28,8 +28,8 @@ const Row = ({ title, hint, children }: { title: string; hint?: string; children
 const Card = ({ children }: { children: React.ReactNode }) => <div className="rounded-2xl border border-line bg-white/[0.03] px-4">{children}</div>;
 const H = ({ children }: { children: React.ReactNode }) => <h2 className="text-xl font-bold mb-4">{children}</h2>;
 
-export function SettingsModal({ user, onClose, onEditProfile, onTour, onLogout, fx, onToggleFx, lite, onToggleLite, rail, onToggleRail, wide }: {
-  user: UserDTO; onClose: () => void; onEditProfile: () => void; onTour: () => void; onLogout: () => void;
+export function SettingsModal({ user, onAdmin, onClose, onEditProfile, onTour, onLogout, fx, onToggleFx, lite, onToggleLite, rail, onToggleRail, wide }: {
+  user: UserDTO; onAdmin: () => void; onClose: () => void; onEditProfile: () => void; onTour: () => void; onLogout: () => void;
   fx: boolean; onToggleFx: () => void; lite: boolean; onToggleLite: () => void; rail: boolean; onToggleRail: (v: boolean) => void; wide: boolean;
 }) {
   const desktop = !!window.cohle?.getSettings;
@@ -47,6 +47,7 @@ export function SettingsModal({ user, onClose, onEditProfile, onTour, onLogout, 
           {tabs.map(([id, label, Icon]) => (
             <button key={id} onClick={() => setTab(id)} className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm whitespace-nowrap transition ${tab === id ? "bg-accent/15 text-ink font-semibold" : "text-muted hover:bg-white/5 hover:text-ink"}`}><Icon size={17} className={tab === id ? "text-accent" : ""} />{label}</button>
           ))}
+          {user.role && <button onClick={() => { onClose(); onAdmin(); }} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-accent2 hover:bg-white/5 whitespace-nowrap font-semibold"><Gauge size={17} /> Painel do Cohle</button>}
           <div className="hidden sm:block flex-1" />
           <button onClick={() => { onClose(); onLogout(); }} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm text-red-300 hover:bg-red-500/10 whitespace-nowrap"><LogOut size={17} /> Sair da conta</button>
         </nav>

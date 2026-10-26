@@ -11,6 +11,7 @@ import { DmChat, DmSidebar, useDms } from "./DirectMessages";
 import { Tour } from "./Tour";
 import { DevBadge } from "./Badge";
 import { SettingsModal } from "./SettingsModal";
+const AdminPanel = lazy(() => import("./AdminPanel"));
 import { UserProfile } from "./UserProfile";
 import { FriendsPanel } from "./FriendsPanel";
 import { useFriends } from "../lib/friends";
@@ -43,6 +44,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [serverModal, setServerModal] = useState<"create" | "join">();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [newChannelType, setNewChannelType] = useState<"TEXT" | "VOICE">();
   const [notice, setNotice] = useState<string>();
   // the call keeps running while you read/write in text channels: `view` only decides what is on screen
@@ -386,7 +388,8 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
               : chatPane(false))}
       </main>
 
-      {prefsOpen && <SettingsModal user={self} onClose={() => setPrefsOpen(false)} onEditProfile={() => { setPrefsOpen(false); setProfileOpen(true); }} onTour={() => setTour(true)} onLogout={onLogout}
+      {adminOpen && self.role && <Suspense fallback={null}><AdminPanel me={self} onClose={() => setAdminOpen(false)} /></Suspense>}
+      {prefsOpen && <SettingsModal user={self} onAdmin={() => setAdminOpen(true)} onClose={() => setPrefsOpen(false)} onEditProfile={() => { setPrefsOpen(false); setProfileOpen(true); }} onTour={() => setTour(true)} onLogout={onLogout}
         fx={fx} onToggleFx={onToggleFx} lite={lite} onToggleLite={onToggleLite} rail={rail} onToggleRail={toggleRail} wide={wide} />}
       {profileId && <UserProfile id={profileId} onClose={() => setProfileId(undefined)} onMessage={(u) => openDm(u)} onEdit={() => setProfileOpen(true)} onFriendsChanged={friends.load} />}
       {tour && <Tour name={self.username} onFinish={closeTour} />}

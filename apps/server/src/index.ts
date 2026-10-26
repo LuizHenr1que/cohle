@@ -15,6 +15,7 @@ import {
 } from "@cohle/shared";
 import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail } from "./email.js";
 import { issueCode, checkCode } from "./codes.js";
+import { registerAdmin, roleOf } from "./admin.js";
 
 const prisma = new PrismaClient();
 // Admin API of the LiveKit server (mute / disconnect people at the SFU, not just in the UI).
@@ -55,6 +56,8 @@ const toUser = (u: any): UserDTO => ({
   ...(u.tag ? { tag: u.tag } : {}),
   ...(u.badge === "DEV" ? { badge: "DEV" as const } : {}),
 });
+// the signed-in person's own DTO also says whether they are an admin (the panel is shown only then; the server re-checks every call)
+const toSelf = (u: any): UserDTO => { const r = roleOf(u); return { ...toUser(u), ...(r !== "USER" ? { role: r } : {}) }; };
 const genTag = () => { const L = "abcdefghjkmnpqrstuvwxyz"; return L[randomInt(L.length)] + L[randomInt(L.length)] + String(randomInt(10, 100)); };   // e.g. "br21"
 // accounts created before friend codes existed get theirs now
 // only fill codes that are still empty (never overwrite)
@@ -109,7 +112,11 @@ app.get("/health/db", async () => { await prisma.$queryRaw`SELECT 1`; return { o
 
 // ---- auth ----
 const byEmail = (email: string) => prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
-const session = async (user: any) => { const u = await withBadge(user); return { token: app.jwt.sign({ sub: u.id }), user: toUser(u) }; };
+const logAccess = (userId: string, kind: "register" | "login" | "open") => prisma.accessLog.create({ data: { userId, kind } }).catch(() => {});
+const session = async (user: any, kind: "register" | "login" = "login") => {
+  const u = await withBadge(user); logAccess(u.id, kind); prisma.user.update({ where: { id: u.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
+  return { token: app.jwt.sign({ sub: u.id }), user: toSelf(u) };
+};
 // Without a mail service configured the address is simply trusted (development, or before the key is set up).
 const verifying = emailMode !== "off";
 const mailCode = async (user: any, kind: "VERIFY" | "RESET") => {
@@ -130,7 +137,7 @@ app.post("/auth/register", authLimit, async (req, reply) => {
   const user = await prisma.user.create({
     data: { email: p.data.email, username: p.data.username, tag: genTag(), passwordHash: await hash(p.data.password), emailVerifiedAt: verifying ? null : new Date() },
   });
-  if (!verifying) return await session(user);
+  if (!verifying) return await session(user, "register");
   try { await mailCode(user, "VERIFY"); }
   catch (e) {
     app.log.error({ err: String(e) }, "could not send the confirmation e-mail");
@@ -160,7 +167,7 @@ app.post("/auth/verify", authLimit, async (req, reply) => {
   const wasNew = !user.emailVerifiedAt;
   const done = await prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: user.emailVerifiedAt ?? new Date() } });
   if (wasNew) sendMail({ ...welcomeEmail(done.username), to: done.email }).catch((e) => app.log.warn({ err: String(e) }, "welcome e-mail failed"));
-  return await session(done);
+  return await session(done, wasNew ? "register" : "login");
 });
 
 // a new confirmation code (always answers ok: it does not reveal which addresses exist)
@@ -196,7 +203,7 @@ app.post("/auth/reset", authLimit, async (req, reply) => {
 app.get("/me", { preHandler: auth }, async (req, reply) => {
   const full = await prisma.user.findUnique({ where: { id: uid(req) } });
   if (!full) return reply.code(401).send({ error: "unauthorized" });
-  return toUser(await withBadge(full));            // people who were already signed in get the badge too
+  return toSelf(await withBadge(full));            // people who were already signed in get the badge too
 });
 
 // private account details (settings screen)
@@ -625,6 +632,7 @@ const online = new Map<string, number>();
 // channelId -> { serverId, users by id }
 const voice = new Map<string, { serverId: string; users: Map<string, UserDTO> }>();
 const voiceOf = new Map<string, string>(); // userId -> channelId
+registerAdmin(app, { prisma, auth, uid, live: () => ({ online: online.size, voice: voiceOf.size, rooms: voice.size }), isOnline: (id) => online.has(id) });
 const voiceDTO = (channelId: string) => ({ channelId, users: [...(voice.get(channelId)?.users.values() ?? [])] });
 
 const joinedAt = new Map<string, number>();   // userId -> when we last heard "voice:join" (grace while the app is still connecting to LiveKit)
@@ -725,6 +733,12 @@ io.on("connection", (socket) => {
   const userId: string = socket.data.userId;
   socket.join(`user:${userId}`);
   online.set(userId, (online.get(userId) ?? 0) + 1);
+  // "last seen" and one "open" access per 30 minutes (a reconnect is not a new visit)
+  prisma.user.findUnique({ where: { id: userId }, select: { lastSeenAt: true } }).then(async (u) => {
+    if (!u) return;
+    if (!u.lastSeenAt || Date.now() - u.lastSeenAt.getTime() > 30 * 60_000) logAccess(userId, "open");
+    await prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date() } });
+  }).catch(() => {});
   io.emit("presence", { userId, online: true });
   socket.emit("presence:snapshot", [...online.keys()]);
 
@@ -821,6 +835,7 @@ io.on("connection", (socket) => {
     const n = (online.get(userId) ?? 1) - 1;
     if (n <= 0) {
       online.delete(userId); io.emit("presence", { userId, online: false });
+      prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date() } }).catch(() => {});
       // do NOT drop them from the voice list now: the chat socket may just have blipped while the call is fine.
       // LiveKit decides; the check is forced only if they did not already reconnect in the meantime.
       setTimeout(() => void reconcileVoice((online.get(userId) ?? 0) === 0 ? userId : undefined), 2500);
