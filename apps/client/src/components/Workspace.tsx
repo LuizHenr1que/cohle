@@ -12,6 +12,8 @@ import { Tour } from "./Tour";
 import { DevBadge } from "./Badge";
 import { SettingsModal } from "./SettingsModal";
 import { UserProfile } from "./UserProfile";
+import { FriendsPanel } from "./FriendsPanel";
+import { useFriends } from "../lib/friends";
 import { NoServerHome, NoChannelHome } from "./EmptyStates";
 const VoiceRoom = lazy(() => import("./VoiceRoom").then((m) => ({ default: m.VoiceRoom })));
 import { Avatar } from "./Avatar";
@@ -71,6 +73,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [soundToast, setSoundToast] = useState<string>();
   const voiceApi = useRef<VoiceApi | null>(null);
   const [autoWatch, setAutoWatch] = useState<string>();     // a live clicked on the sidebar before we were in that call
+  const friends = useFriends(() => socket.current);
   const dms = useDms(() => socket.current, self.id, dmPeer?.id, dmOpen);
   const voiceRef = useRef<ChannelDTO>();
   voiceRef.current = voice;
@@ -252,7 +255,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       {(wide || navOpen) && (
       <div className={wide ? "flex gap-3 shrink-0" : "fixed z-50 left-2 bottom-2 top-[calc(var(--titlebar,0px)+0.5rem)] flex gap-2 w-[min(94vw,400px)]"}>
       {/* servers rail */}
-      <nav className={`glass rounded-3xl shrink-0 flex flex-col gap-2 py-3 overflow-y-auto ${railOpen ? "w-[232px] items-stretch px-2.5" : "w-[72px] items-center"}`}>
+      <nav className={`glass rounded-3xl shrink-0 flex flex-col gap-2 py-3 overflow-y-auto no-scrollbar ${railOpen ? "w-[232px] items-stretch px-2.5" : "w-[72px] items-center"}`}>
         {railOpen ? (
           <div className="flex items-center gap-2.5 px-1 mb-1 shrink-0">
             <Logo size={36} /><span className="font-bold tracking-tight flex-1">Cohle</span>
@@ -262,9 +265,9 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           <div title="Cohle" className="mb-0.5 shrink-0"><Logo size={40} /></div>
           {wide && <button onClick={() => toggleRail(true)} title="Expandir a barra lateral (nomes e botões)" aria-label="Expandir a barra lateral" className="shrink-0 size-9 rounded-xl text-muted grid place-items-center hover:text-ink hover:bg-white/10"><PanelLeftOpen size={18} /></button>}
         </>)}
-        {rb({ title: "Mensagens diretas", icon: <MessageCircle size={20} />, onClick: () => { setDmOpen(true); dms.load(); },
-          cls: dmOpen ? "bg-accent text-white shadow-[0_6px_20px_rgba(255,59,92,0.4)]" : "bg-white/5 text-accent hover:bg-white/10",
-          badge: dms.unread > 0 && <span className={`${railOpen ? "" : "absolute -bottom-1 -right-1 border-2 border-surface"} min-w-5 h-5 px-1 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center`}>{dms.unread > 99 ? "99+" : dms.unread}</span> })}
+        {rb({ title: "Mensagens diretas", icon: <MessageCircle size={20} />, onClick: () => { setDmOpen(true); setDmPeer(undefined); dms.load(); friends.load(); },
+          cls: dmOpen ? "bg-accent text-white shadow-[0_6px_20px_rgb(var(--accent-rgb)/0.4)]" : "bg-white/5 text-accent hover:bg-white/10",
+          badge: dms.unread + friends.pending > 0 && <span className={`${railOpen ? "" : "absolute -bottom-1 -right-1 border-2 border-surface"} min-w-5 h-5 px-1 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center`}>{dms.unread + friends.pending > 99 ? "99+" : dms.unread + friends.pending}</span> })}
         {auto && (auto.status === "downloading" || auto.status === "ready")
           ? <AutoUpdateBadge st={auto} />
           : update && (!auto || auto.status === "error" || auto.status === "unsupported") && <UpdateBadge n={update.n} note={update.note} url={update.url} />}
@@ -272,9 +275,11 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {servers.map((s) => {
           const on = !dmOpen && s.id === serverId;
           return (
-            <button key={s.id} title={s.name} onClick={() => { setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
-              className={`shrink-0 transition ${railOpen ? `w-full flex items-center gap-3 rounded-2xl pr-3 ${on ? "bg-accent/15" : "hover:bg-white/5"}` : ""}`}>
-              <span className={`shrink-0 rounded-2xl transition ${on ? "ring-2 ring-accent shadow-[0_6px_20px_rgba(255,59,92,0.4)]" : railOpen ? "" : "opacity-70 hover:opacity-100"}`}><ServerIcon server={s} size={48} /></span>
+            <button key={s.id} title={s.name} aria-current={on ? "true" : undefined} onClick={() => { setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
+              className={`group relative shrink-0 transition ${railOpen ? `w-full flex items-center gap-3 rounded-2xl pl-2 pr-3 ${on ? "bg-accent/15" : "hover:bg-white/5"}` : ""}`}>
+              {/* active: a bar on the left edge + a clean outline with a gap + a soft glow (inactive ones are dimmed) */}
+              <span className={`absolute ${railOpen ? "left-0" : "-left-[9px]"} top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-accent transition-all duration-200 ${on ? "h-9 opacity-100 shadow-[0_0_12px_rgb(var(--accent-rgb)/0.8)]" : "h-2 opacity-0 group-hover:opacity-70 group-hover:h-5"}`} />
+              <span className={`shrink-0 block rounded-2xl transition-all duration-200 ${on ? "outline outline-2 outline-offset-[3px] outline-white/80 shadow-[0_8px_26px_rgb(var(--accent-rgb)/0.45)]" : "opacity-55 hover:opacity-100 group-hover:scale-105"}`}><ServerIcon server={s} size={48} /></span>
               {railOpen && <span className={`truncate text-sm text-left flex-1 ${on ? "font-semibold text-ink" : "text-muted"}`}>{s.name}</span>}
             </button>
           );
@@ -292,7 +297,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
 
       {/* channels */}
       <aside className={`glass rounded-3xl p-3 flex flex-col min-w-0 ${wide ? "w-64" : "flex-1"}`}>
-        {dmOpen ? <DmSidebar convs={dms.convs} online={online} peerId={dmPeer?.id} onOpen={openDm} /> : (<>
+        {dmOpen ? <DmSidebar convs={dms.convs} online={online} peerId={dmPeer?.id} onOpen={openDm} onFriends={() => { setDmPeer(undefined); setNavOpen(false); }} friendsActive={!dmPeer} pending={friends.pending} /> : (<>
         <div className="px-2 py-2 border-b border-line mb-1">
           <div className="flex items-center gap-2">
             {server && <ServerIcon server={server} size={32} />}
@@ -357,7 +362,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       {/* main */}
       <main className="glass rounded-3xl flex-1 flex flex-col min-w-0 min-h-0 relative">
         {notice && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-accent text-white text-sm font-medium rounded-2xl px-5 py-2.5 shadow-[0_8px_30px_rgba(255,59,92,0.5)] flex items-center gap-3">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-accent text-white text-sm font-medium rounded-2xl px-5 py-2.5 shadow-[0_8px_30px_rgb(var(--accent-rgb)/0.5)] flex items-center gap-3">
             {notice}<button onClick={() => setNotice(undefined)} className="opacity-80 hover:opacity-100">✕</button>
           </div>
         )}
@@ -371,16 +376,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         )}
         {dmOpen && (dmPeer
           ? <DmChat key={dmPeer.id} peer={dmPeer} self={self} online={online.has(dmPeer.id)} getSocket={() => socket.current} onRead={dms.markRead} onProfile={setProfileId} onMenu={wide ? undefined : () => setNavOpen(true)} />
-          : (
-            <div className="flex-1 grid place-items-center text-center px-6 text-muted">
-              <div>
-                {!wide && <button onClick={() => setNavOpen(true)} className="mb-4 rounded-xl bg-white/5 px-4 py-2 text-sm text-ink">Abrir conversas</button>}
-                <MessageCircle size={40} className="mx-auto mb-3 text-accent" />
-                <p className="font-semibold text-ink">Suas mensagens diretas</p>
-                <p className="text-sm mt-1">Escolha uma pessoa na lista para conversar em particular.</p>
-              </div>
-            </div>
-          ))}
+          : <FriendsPanel self={self} data={friends.data} online={online} onMessage={openDm} onProfile={setProfileId} onChanged={friends.load} onMenu={wide ? undefined : () => setNavOpen(true)} />)}
         {!dmOpen && (!voice || view === "text") && (
           !server
             ? <NoServerHome name={self.username} onCreate={() => setServerModal("create")} onTour={() => setTour(true)} onMenu={wide ? undefined : () => setNavOpen(true)}
@@ -392,7 +388,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
 
       {prefsOpen && <SettingsModal user={self} onClose={() => setPrefsOpen(false)} onEditProfile={() => { setPrefsOpen(false); setProfileOpen(true); }} onTour={() => setTour(true)} onLogout={onLogout}
         fx={fx} onToggleFx={onToggleFx} lite={lite} onToggleLite={onToggleLite} rail={rail} onToggleRail={toggleRail} wide={wide} />}
-      {profileId && <UserProfile id={profileId} onClose={() => setProfileId(undefined)} onMessage={(u) => openDm(u)} onEdit={() => setProfileOpen(true)} />}
+      {profileId && <UserProfile id={profileId} onClose={() => setProfileId(undefined)} onMessage={(u) => openDm(u)} onEdit={() => setProfileOpen(true)} onFriendsChanged={friends.load} />}
       {tour && <Tour name={self.username} onFinish={closeTour} />}
       {serverModal && <ServerModal initial={serverModal} username={self.username} onClose={() => setServerModal(undefined)} onDone={afterServerChange} />}
       {inviteOpen && server && <InviteModal server={server} onClose={() => setInviteOpen(false)} />}

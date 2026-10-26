@@ -61,7 +61,7 @@ export function NoServerHome({ name, onCreate, onJoin, onTour, onMenu }: {
       <div className="px-4 sm:px-10 pb-10 max-w-5xl mx-auto -mt-1">
         <div className="grid md:grid-cols-2 gap-4">
           <section className="glass rounded-3xl p-5 sm:p-6 flex flex-col gap-3 ha-in" style={{ animationDelay: ".08s" }}>
-            <div className="size-12 rounded-2xl grad grid place-items-center text-white shadow-[0_8px_24px_rgba(255,59,92,0.4)]"><Plus size={22} /></div>
+            <div className="size-12 rounded-2xl grad grid place-items-center text-white shadow-[0_8px_24px_rgb(var(--accent-rgb)/0.4)]"><Plus size={22} /></div>
             <h2 className="text-xl font-bold">Criar o meu servidor</h2>
             <p className="text-sm text-muted">Canais de texto e de voz prontos em segundos, com modelos para cada tipo de grupo. Você é o dono.</p>
             <div className="flex flex-wrap gap-1.5">{TEMPLATES.map((t) => <button key={t} onClick={onCreate} className="rounded-full bg-white/5 hover:bg-accent/20 border border-line px-3 py-1 text-xs transition">{t}</button>)}</div>

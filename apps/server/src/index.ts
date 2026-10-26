@@ -1,5 +1,5 @@
 import "./env.js";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
@@ -9,9 +9,9 @@ import { PrismaClient } from "@prisma/client";
 import { hash, verify } from "@node-rs/argon2";
 import { AccessToken, RoomServiceClient, TrackSource } from "livekit-server-sdk";
 import {
-  registerSchema, loginSchema, changePasswordSchema, verifySchema, forgotSchema, resetSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
+  registerSchema, loginSchema, changePasswordSchema, friendRequestSchema, verifySchema, forgotSchema, resetSchema, updateProfileSchema, createServerSchema, updateServerSchema, banSchema, muteSchema, updateChannelSchema, createChannelSchema, sendMessageSchema,
   type MessageDTO, type ServerDTO, type UserDTO, type MemberDTO, type BanDTO,
-  type DirectMessageDTO, type DmConversationDTO, type ProfileDTO, type AccountDTO,
+  type DirectMessageDTO, type DmConversationDTO, type ProfileDTO, type AccountDTO, type FriendsDTO, type Relation,
 } from "@cohle/shared";
 import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail } from "./email.js";
 import { issueCode, checkCode } from "./codes.js";
@@ -42,15 +42,23 @@ const authLimit = { config: { rateLimit: { max: Number(process.env.AUTH_RATE_MAX
 await app.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret" });
 
 const auth = async (req: any, reply: any) => {
-  try { await req.jwtVerify(); } catch { reply.code(401).send({ error: "unauthorized" }); }
+  try { await req.jwtVerify(); } catch { return reply.code(401).send({ error: "unauthorized" }); }
 };
 const uid = (req: any): string => req.user.sub;
+// Tokens outlive a wiped or deleted account. Writes then hit a user foreign key; that is a dead session.
+const accountGone = (err: any) =>
+  err?.code === "P2003" && ["Member_userId_fkey", "Message_authorId_fkey", "DirectMessage_senderId_fkey", "Friendship_requesterId_fkey"].includes(String(err?.meta?.constraint));
 
 // Images are never inlined in API payloads: DTOs carry a versioned URL the browser can cache forever.
 const toUser = (u: any): UserDTO => ({
   id: u.id, username: u.username, avatarUrl: u.avatarVersion > 0 ? `/avatars/${u.id}?v=${u.avatarVersion}` : null,
+  ...(u.tag ? { tag: u.tag } : {}),
   ...(u.badge === "DEV" ? { badge: "DEV" as const } : {}),
 });
+const genTag = () => { const L = "abcdefghjkmnpqrstuvwxyz"; return L[randomInt(L.length)] + L[randomInt(L.length)] + String(randomInt(10, 100)); };   // e.g. "br21"
+// accounts created before friend codes existed get theirs now
+// only fill codes that are still empty (never overwrite)
+prisma.user.findMany({ where: { tag: null }, select: { id: true } }).then(async (l) => { for (const u of l) await prisma.user.updateMany({ where: { id: u.id, tag: null }, data: { tag: genTag() } }).catch(() => {}); }).catch(() => {});
 // The "Desenvolvedor" badge belongs to the team's own accounts. It is granted by the server, only to a CONFIRMED e-mail
 // listed here (plus DEV_EMAILS, comma separated), so nobody can claim it by typing a name.
 const DEV_EMAILS = new Set(["verticeappempresa@gmail.com", ...(process.env.DEV_EMAILS ?? "").split(",")].map((e) => e.trim().toLowerCase()).filter(Boolean));
@@ -96,6 +104,8 @@ const touch = (serverId: string) => io.to(`server:${serverId}`).emit("server:upd
 // `boot` identifies this process and `up` is its age in seconds: a changing `boot` means restarts, two values at once mean two copies.
 const BOOT = randomBytes(3).toString("hex"), STARTED = Date.now();
 app.get("/health", async () => ({ ok: true, name: "cohle", boot: BOOT, up: Math.round((Date.now() - STARTED) / 1000) }));
+// Touches the database: point the uptime monitor here so a free Supabase project never idles into a pause.
+app.get("/health/db", async () => { await prisma.$queryRaw`SELECT 1`; return { ok: true }; });
 
 // ---- auth ----
 const byEmail = (email: string) => prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
@@ -118,7 +128,7 @@ app.post("/auth/register", authLimit, async (req, reply) => {
   });
   if (exists) return reply.code(409).send({ error: "email or username already in use" });
   const user = await prisma.user.create({
-    data: { email: p.data.email, username: p.data.username, passwordHash: await hash(p.data.password), emailVerifiedAt: verifying ? null : new Date() },
+    data: { email: p.data.email, username: p.data.username, tag: genTag(), passwordHash: await hash(p.data.password), emailVerifiedAt: verifying ? null : new Date() },
   });
   if (!verifying) return await session(user);
   try { await mailCode(user, "VERIFY"); }
@@ -185,14 +195,14 @@ app.post("/auth/reset", authLimit, async (req, reply) => {
 
 app.get("/me", { preHandler: auth }, async (req, reply) => {
   const full = await prisma.user.findUnique({ where: { id: uid(req) } });
-  if (!full) return reply.code(404).send({ error: "not found" });
+  if (!full) return reply.code(401).send({ error: "unauthorized" });
   return toUser(await withBadge(full));            // people who were already signed in get the badge too
 });
 
 // private account details (settings screen)
 app.get("/me/account", { preHandler: auth }, async (req, reply) => {
   const u = await prisma.user.findUnique({ where: { id: uid(req) } });
-  if (!u) return reply.code(404).send({ error: "not found" });
+  if (!u) return reply.code(401).send({ error: "unauthorized" });
   const out: AccountDTO = { email: u.email, createdAt: u.createdAt.toISOString(), emailVerified: !!u.emailVerifiedAt };
   return out;
 });
@@ -217,8 +227,11 @@ app.get("/users/:id/profile", { preHandler: auth }, async (req: any, reply) => {
   ]);
   const mySet = new Set(mine.map((m) => m.serverId));
   const mutual = theirs.filter((m) => mySet.has(m.serverId));
-  if (id !== me && !mutual.length) return reply.code(403).send({ error: "forbidden" });
+  const fr = id === me ? null : await prisma.friendship.findFirst({ where: { OR: [{ requesterId: me, addresseeId: id }, { requesterId: id, addresseeId: me }] } });
+  if (id !== me && !mutual.length && !fr) return reply.code(403).send({ error: "forbidden" });
+  const relation: Relation = id === me ? "self" : !fr ? "none" : fr.status === "ACCEPTED" ? "friend" : fr.requesterId === me ? "outgoing" : "incoming";
   const out: ProfileDTO = {
+    relation, ...(fr && fr.status === "PENDING" ? { requestId: fr.id } : {}),
     user: toUser(await withBadge(target)), createdAt: target.createdAt.toISOString(), isSelf: id === me,
     mutual: mutual.map((m) => ({ id: m.server.id, name: m.server.name, iconUrl: m.server.iconVersion > 0 ? `/server-icons/${m.server.id}?v=${m.server.iconVersion}` : null, owner: m.role === "OWNER" })),
   };
@@ -271,6 +284,8 @@ app.get("/servers", { preHandler: auth }, async (req) => {
 app.post("/servers", { preHandler: auth }, async (req, reply) => {
   const p = createServerSchema.safeParse(req.body);
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
+  if (!(await prisma.user.findUnique({ where: { id: uid(req) }, select: { id: true } })))
+    return reply.code(401).send({ error: "unauthorized" });
   const s = await prisma.server.create({
     data: {
       name: p.data.name, iconUrl: p.data.iconUrl ?? null, iconVersion: p.data.iconUrl ? 1 : 0,
@@ -284,13 +299,16 @@ app.post("/servers", { preHandler: auth }, async (req, reply) => {
 });
 
 app.post("/servers/join/:code", { preHandler: auth }, async (req: any, reply) => {
+  const userId = uid(req);
   const s = await prisma.server.findUnique({ where: { inviteCode: req.params.code }, include: serverInclude, ...lightServer });
   if (!s) return reply.code(404).send({ error: "convite não encontrado" });
-  if (await prisma.ban.findUnique({ where: { serverId_userId: { serverId: s.id, userId: uid(req) } } }))
+  if (!(await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })))
+    return reply.code(401).send({ error: "unauthorized" });
+  if (await prisma.ban.findUnique({ where: { serverId_userId: { serverId: s.id, userId } } }))
     return reply.code(403).send({ error: "você foi banido deste servidor" });
   await prisma.member.upsert({
-    where: { userId_serverId: { userId: uid(req), serverId: s.id } },
-    create: { userId: uid(req), serverId: s.id }, update: {},
+    where: { userId_serverId: { userId, serverId: s.id } },
+    create: { userId, serverId: s.id }, update: {},
   });
   touch(s.id);
   return toServer(s);
@@ -487,6 +505,7 @@ const toDm = (m: any): DirectMessageDTO => ({ id: m.id, fromId: m.senderId, toId
 /** people may start a conversation only when they share a server (or already talked): no cold messages to strangers */
 async function canDm(a: string, b: string) {
   if (a === b) return false;
+  if (await prisma.friendship.findFirst({ where: { status: "ACCEPTED", OR: [{ requesterId: a, addresseeId: b }, { requesterId: b, addresseeId: a }] }, select: { id: true } })) return true;
   const mine = await prisma.member.findMany({ where: { userId: a }, select: { serverId: true } });
   if (mine.length && await prisma.member.findFirst({ where: { userId: b, serverId: { in: mine.map((m) => m.serverId) } }, select: { userId: true } })) return true;
   return !!(await prisma.directMessage.findFirst({ where: { OR: [{ senderId: a, recipientId: b }, { senderId: b, recipientId: a }] }, select: { id: true } }));
@@ -535,6 +554,56 @@ app.post("/dms/:peerId/read", { preHandler: auth }, async (req: any) => {
   await prisma.dmRead.upsert({ where: { userId_peerId: { userId: me, peerId: peer } }, update: { readAt: new Date() }, create: { userId: me, peerId: peer } });
   io.to(`user:${me}`).emit("dm:read", { peerId: peer });                        // other windows/devices clear their badge too
   return { ok: true };
+});
+
+// ---- friends: add by @name#code, requests, online/offline list ----
+const HANDLE = /^@?\s*([A-Za-z0-9_.-]{2,24})\s*#\s*([A-Za-z0-9]{2,8})$/;
+const ping = (...ids: string[]) => ids.forEach((i) => io.to(`user:${i}`).emit("friends:update"));
+const pairOf = (a: string, b: string) => ({ OR: [{ requesterId: a, addresseeId: b }, { requesterId: b, addresseeId: a }] });
+
+app.get("/friends", { preHandler: auth }, async (req: any) => {
+  const me = uid(req);
+  const rows = await prisma.friendship.findMany({ where: { OR: [{ requesterId: me }, { addresseeId: me }] }, include: { requester: true, addressee: true }, orderBy: { createdAt: "desc" } });
+  const out: FriendsDTO = { friends: [], incoming: [], outgoing: [] };
+  for (const r of rows) {
+    const other = r.requesterId === me ? r.addressee : r.requester;
+    if (r.status === "ACCEPTED") out.friends.push({ user: toUser(other), since: r.createdAt.toISOString(), online: online.has(other.id) });
+    else (r.requesterId === me ? out.outgoing : out.incoming).push({ id: r.id, user: toUser(other), createdAt: r.createdAt.toISOString() });
+  }
+  out.friends.sort((a, b) => Number(b.online) - Number(a.online) || a.user.username.localeCompare(b.user.username));
+  return out;
+});
+
+app.post("/friends/request", { ...authLimit, preHandler: auth }, async (req: any, reply) => {
+  const p = friendRequestSchema.safeParse(req.body); const me = uid(req);
+  const m = p.success ? HANDLE.exec(p.data.handle) : null;
+  if (!m) return reply.code(400).send({ error: "bad handle" });
+  const target = await prisma.user.findFirst({ where: { username: { equals: m[1], mode: "insensitive" }, tag: m[2].toLowerCase() } });
+  if (!target) return reply.code(404).send({ error: "user not found" });
+  if (target.id === me) return reply.code(400).send({ error: "self" });
+  const ex = await prisma.friendship.findFirst({ where: pairOf(me, target.id) });
+  if (ex?.status === "ACCEPTED") return reply.code(409).send({ error: "already friends" });
+  if (ex && ex.requesterId === me) return reply.code(409).send({ error: "already requested" });
+  if (ex) { await prisma.friendship.update({ where: { id: ex.id }, data: { status: "ACCEPTED" } }); ping(me, target.id); return { status: "accepted", user: toUser(target) }; }   // they had asked me first
+  await prisma.friendship.create({ data: { requesterId: me, addresseeId: target.id } });
+  ping(me, target.id); return { status: "sent", user: toUser(target) };
+});
+
+app.post("/friends/:id/accept", { preHandler: auth }, async (req: any, reply) => {
+  const f = await prisma.friendship.findUnique({ where: { id: String(req.params.id) } });
+  if (!f || f.addresseeId !== uid(req) || f.status !== "PENDING") return reply.code(404).send({ error: "not found" });
+  await prisma.friendship.update({ where: { id: f.id }, data: { status: "ACCEPTED" } }); ping(f.requesterId, f.addresseeId); return { ok: true };
+});
+// decline an incoming request, or cancel one I sent
+app.post("/friends/:id/decline", { preHandler: auth }, async (req: any, reply) => {
+  const f = await prisma.friendship.findUnique({ where: { id: String(req.params.id) } });
+  const me = uid(req);
+  if (!f || f.status !== "PENDING" || (f.addresseeId !== me && f.requesterId !== me)) return reply.code(404).send({ error: "not found" });
+  await prisma.friendship.delete({ where: { id: f.id } }); ping(f.requesterId, f.addresseeId); return { ok: true };
+});
+app.delete("/friends/:userId", { preHandler: auth }, async (req: any) => {
+  const me = uid(req), other = String(req.params.userId);
+  await prisma.friendship.deleteMany({ where: { status: "ACCEPTED", ...pairOf(me, other) } }); ping(me, other); return { ok: true };
 });
 
 // ---- voice (LiveKit token) ----
@@ -765,8 +834,8 @@ if (process.env.NODE_ENV !== "production" || process.env.SEED_TEST_USERS === "1"
   const users = [];
   for (const n of ["teste1", "teste2"]) {
     users.push(await prisma.user.upsert({
-      where: { username: n }, update: { email: `${n}@cohle.dev`, emailVerifiedAt: new Date() },
-      create: { email: `${n}@cohle.dev`, username: n, passwordHash: await hash("teste12345"), emailVerifiedAt: new Date() },
+      where: { username: n }, update: { email: `${n}@cohle.dev`, emailVerifiedAt: new Date(), tag: n === "teste1" ? "te01" : "te02" },
+      create: { email: `${n}@cohle.dev`, username: n, tag: n === "teste1" ? "te01" : "te02", passwordHash: await hash("teste12345"), emailVerifiedAt: new Date() },
     }));
   }
   if (!(await prisma.server.findFirst({ where: { name: "Servidor de Teste" } }))) {
@@ -779,5 +848,13 @@ if (process.env.NODE_ENV !== "production" || process.env.SEED_TEST_USERS === "1"
     });
   }
 }
+
+app.setErrorHandler((err: any, req, reply) => {
+  if (accountGone(err)) {
+    req.log.info({ constraint: err.meta?.constraint }, "session user missing");
+    return reply.code(401).send({ error: "unauthorized" });
+  }
+  return reply.send(err);
+});
 
 await app.listen({ port: Number(process.env.PORT ?? 3001), host: "0.0.0.0" });

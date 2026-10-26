@@ -35,7 +35,7 @@ export function Tour({ name, onFinish }: { name: string; onFinish: (next?: "crea
           {last ? "Fechar" : "Pular tour"} <X size={13} />
         </button>
 
-        <div className="relative h-52 sm:h-60 shrink-0 grid place-items-center overflow-hidden bg-[radial-gradient(120%_100%_at_50%_0%,rgba(255,59,92,0.28),transparent_65%)]">
+        <div className="relative h-52 sm:h-60 shrink-0 grid place-items-center overflow-hidden bg-[radial-gradient(120%_100%_at_50%_0%,rgb(var(--accent-rgb)/0.28),transparent_65%)]">
           <div className="absolute inset-0 grid-bg opacity-60" />
           <div key={i} className="relative">{S.art}</div>
         </div>
@@ -75,7 +75,7 @@ const STEPS = (name: string): Step[] => [
     art: <div className="relative grid place-items-center"><span className="absolute size-28 rounded-full border border-accent/60 t-ring" /><span className="absolute size-28 rounded-full border border-accent/40 t-ring" style={{ animationDelay: ".9s" }} /><div className="t-float"><Logo size={96} /></div></div> },
   { kicker: "Servidores", title: "Crie um servidor e chame a galera", text: "Servidor é o seu espaço: canais de texto, salas de voz e as pessoas que você convidar.",
     points: ["Modelos prontos: jogos, amigos, estudo, comunidade e mais", "Convide por link ou código, em um clique", "Você é o dono e controla quem entra"],
-    art: <div className="flex items-center gap-5"><div className="flex flex-col gap-3">{["S", "G", "C"].map((l, k) => <span key={l} className={`t-pop size-14 rounded-2xl grid place-items-center text-xl font-bold text-white bg-gradient-to-br from-[#ff5a74] to-[#ff9a62] ${k === 0 ? "ring-2 ring-white/70 shadow-[0_6px_24px_rgba(255,59,92,0.5)]" : "opacity-70"}`} style={{ animationDelay: `${k * 0.15}s` }}>{l}</span>)}</div>
+    art: <div className="flex items-center gap-5"><div className="flex flex-col gap-3">{["S", "G", "C"].map((l, k) => <span key={l} className={`t-pop size-14 rounded-2xl grid place-items-center text-xl font-bold text-white bg-gradient-to-br from-[#ff5a74] to-[#ff9a62] ${k === 0 ? "ring-2 ring-white/70 shadow-[0_6px_24px_rgb(var(--accent-rgb)/0.5)]" : "opacity-70"}`} style={{ animationDelay: `${k * 0.15}s` }}>{l}</span>)}</div>
       <div className="glass rounded-2xl p-4 t-pop" style={{ animationDelay: ".5s" }}><div className="flex items-center gap-2 font-semibold"><Crown size={14} className="text-accent2" /> Squad da Noite</div><div className="mt-3 rounded-xl bg-accent/20 text-accent text-xs font-semibold px-3 py-2 flex items-center gap-2"><Plus size={13} /> Convidar pessoas</div><div className="mt-2 text-[11px] text-muted"># geral &nbsp; # clipes</div></div></div> },
   { kicker: "Voz", title: "Entre numa sala de voz e fale", text: "Clique numa sala e pronto: sem convite de chamada, sem esperar ninguém atender.",
     points: ["O contorno verde mostra quem está falando", "Supressão de ruído já vem ligada", "Botão direito em alguém: volume e silenciar só para você"],
@@ -90,5 +90,5 @@ const STEPS = (name: string): Step[] => [
     points: ["Botão de sons: susto, fogos, risos, chamando e tatakae", "Fechar a janela mantém o Cohle na bandeja do sistema", "Um widget translúcido mostra quem fala por cima do jogo"],
     art: <div className="flex flex-wrap justify-center gap-2.5 max-w-sm">{[[Siren, "Susto"], [PartyPopper, "Fogos"], [Laugh, "Risos"], [PhoneCall, "Chamando"], [Sparkles, "Tatakae"]].map(([I, l], k) => { const Ic = I as typeof Siren; return <span key={l as string} className="t-pop glass rounded-2xl px-4 py-2.5 inline-flex items-center gap-2 text-sm font-semibold" style={{ animationDelay: `${k * 0.12}s` }}><Ic size={16} className="text-accent" /> {l as string}</span>; })}</div> },
   { kicker: "Tudo pronto", title: "Vamos começar?", text: "Crie o seu primeiro servidor ou entre em um que alguém te convidou. O resto você descobre usando.",
-    art: <div className="t-pop grid place-items-center size-24 rounded-full grad shadow-[0_0_60px_rgba(255,59,92,0.6)]"><Check size={46} className="text-white" strokeWidth={3} /></div> },
+    art: <div className="t-pop grid place-items-center size-24 rounded-full grad shadow-[0_0_60px_rgb(var(--accent-rgb)/0.6)]"><Check size={46} className="text-white" strokeWidth={3} /></div> },
 ];

@@ -11,6 +11,9 @@ export function ParticleField() {
     const ctx = canvas.getContext("2d")!;
     let w = 0, h = 0, raf = 0, dots: P[] = [];
     const LINK = 130;
+    let ac = "255, 90, 110", ac2 = "255, 138, 91";                 // theme colors (as "r, g, b"), re-read when the theme changes
+    const readTheme = () => { const cs = getComputedStyle(document.documentElement); const rgb = (v: string, d: string) => (cs.getPropertyValue(v).trim().replace(/\s+/g, ", ") || d); ac = rgb("--accent-rgb", ac); ac2 = rgb("--accent2-rgb", ac2); };
+    readTheme(); window.addEventListener("cohle:theme", readTheme);
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -44,7 +47,7 @@ export function ParticleField() {
         for (let j = i + 1; j < dots.length; j++) {
           const dx = dots[i].x - dots[j].x, dy = dots[i].y - dots[j].y, dist = dx * dx + dy * dy;
           if (dist < LINK * LINK) {
-            ctx.strokeStyle = `rgba(255, 90, 110, ${(1 - Math.sqrt(dist) / LINK) * 0.22})`;
+            ctx.strokeStyle = `rgba(${ac}, ${(1 - Math.sqrt(dist) / LINK) * 0.22})`;
             ctx.lineWidth = 0.6;
             ctx.beginPath(); ctx.moveTo(dots[i].x, dots[i].y); ctx.lineTo(dots[j].x, dots[j].y); ctx.stroke();
           }
@@ -52,16 +55,16 @@ export function ParticleField() {
       }
       for (const d of dots) {
         const warm = d.hue > 0.7;
-        ctx.fillStyle = warm ? "rgba(255, 138, 91, 0.16)" : "rgba(255, 59, 92, 0.16)";
+        ctx.fillStyle = warm ? "rgba(255, 138, 91, 0.16)" : "rgb(var(--accent-rgb)/0.16)";
         ctx.beginPath(); ctx.arc(d.x, d.y, d.r * 3, 0, Math.PI * 2); ctx.fill();               // cheap glow (no shadowBlur)
-        ctx.fillStyle = warm ? "rgba(255, 138, 91, 0.75)" : "rgba(255, 110, 130, 0.7)";
+        ctx.fillStyle = warm ? `rgba(${ac2}, 0.75)` : `rgba(${ac}, 0.7)`;
         ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2); ctx.fill();
       }
     };
 
     resize(); raf = requestAnimationFrame(frame);
     window.addEventListener("resize", resize);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize);  window.removeEventListener("cohle:theme", readTheme); };
   }, []);
 
   return <canvas ref={ref} className="fixed inset-0 w-full h-full pointer-events-none z-0" />;

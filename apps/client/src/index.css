@@ -12,6 +12,13 @@
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* Themes: only the tokens change. The default is Cohle (red). Chosen in Settings, saved per device. */
+:root { --accent-rgb: 255 59 92; --accent2-rgb: 255 138 91; --glass-a: rgba(40, 24, 30, 0.82); --glass-b: rgba(22, 12, 17, 0.9); --orb-core: #ffd0d8; --orb-deep: #5c0b1d; --orb-dark: #1a0409; }
+html[data-theme="ocean"] { --color-bg: #050a12; --color-surface: #0a121c; --color-surface-2: #0f1b2a; --color-ink: #e8f1fb; --color-muted: #8499ad; --color-accent: #3b8cff; --color-accent2: #35c8ff; --accent-rgb: 59 140 255; --accent2-rgb: 53 200 255; --glass-a: rgba(18, 30, 46, 0.82); --glass-b: rgba(10, 18, 28, 0.9); --orb-core: #cfe6ff; --orb-deep: #0b2b5c; --orb-dark: #040a1a; }
+html[data-theme="forest"] { --color-bg: #050b07; --color-surface: #09130d; --color-surface-2: #0f1d14; --color-ink: #eaf6ee; --color-muted: #86a08e; --color-accent: #22b35e; --color-accent2: #9be15d; --accent-rgb: 34 179 94; --accent2-rgb: 155 225 93; --glass-a: rgba(18, 38, 26, 0.82); --glass-b: rgba(10, 20, 14, 0.9); --orb-core: #d4f5de; --orb-deep: #0b4a22; --orb-dark: #031a0b; }
+html[data-theme="violet"] { --color-bg: #08050f; --color-surface: #100a1c; --color-surface-2: #170f2a; --color-ink: #f0eafc; --color-muted: #9a8ab5; --color-accent: #8b5cf6; --color-accent2: #e056d9; --accent-rgb: 139 92 246; --accent2-rgb: 224 86 217; --glass-a: rgba(32, 22, 52, 0.82); --glass-b: rgba(18, 12, 30, 0.9); --orb-core: #e6d8ff; --orb-deep: #3a0f6b; --orb-dark: #11041f; }
+html[data-theme="sunset"] { --color-bg: #0b0604; --color-surface: #170d08; --color-surface-2: #22140b; --color-ink: #fbeee4; --color-muted: #a8907f; --color-accent: #ff6a3d; --color-accent2: #ffb347; --accent-rgb: 255 106 61; --accent2-rgb: 255 179 71; --glass-a: rgba(44, 28, 18, 0.82); --glass-b: rgba(24, 14, 9, 0.9); --orb-core: #ffe2c9; --orb-deep: #6b2a0b; --orb-dark: #1f0c04; }
+
 @custom-variant electron-mac (&:where(.electron-mac, .electron-mac *));
 
 html, body, #root { height: 100%; }
@@ -23,17 +30,17 @@ button, input, a, select { -webkit-app-region: no-drag; }
 body {
   margin: 0; color: var(--color-ink); font-family: var(--font-sans); overflow: hidden;
   background:
-    radial-gradient(900px 520px at 8% -10%, rgba(255, 59, 92, 0.22), transparent 60%),
-    radial-gradient(800px 520px at 100% 110%, rgba(255, 138, 91, 0.14), transparent 60%),
+    radial-gradient(900px 520px at 8% -10%, rgb(var(--accent-rgb) / 0.22), transparent 60%),
+    radial-gradient(800px 520px at 100% 110%, rgb(var(--accent2-rgb) / 0.14), transparent 60%),
     var(--color-bg);
 }
 .glass {
-  background: linear-gradient(160deg, rgba(40, 24, 30, 0.82), rgba(22, 12, 17, 0.9));   /* no backdrop-filter: blurring a full panel every frame is the most expensive effect in the app */
+  background: linear-gradient(160deg, var(--glass-a), var(--glass-b));   /* no backdrop-filter: blurring a full panel every frame is the most expensive effect in the app */
   border: 1px solid var(--color-line);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .grad { background: linear-gradient(135deg, var(--color-accent), var(--color-accent2)); }
-.grad-text { background: linear-gradient(135deg, #ff9db0, #ffb48f); -webkit-background-clip: text; color: transparent; }
+.grad-text { background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 55%, white), color-mix(in srgb, var(--color-accent2) 55%, white)); -webkit-background-clip: text; color: transparent; }
 .speaking { border-color: #3ddc84; box-shadow: 0 0 0 2px #3ddc84, 0 0 26px rgba(61, 220, 132, 0.45); }
 .speaking-ring { box-shadow: 0 0 0 3px #3ddc84, 0 0 18px rgba(61, 220, 132, 0.55); transition: box-shadow .12s ease; }
 ::-webkit-scrollbar { width: 8px; }
@@ -50,14 +57,14 @@ body {
 
 .orb {
   position: relative; width: 260px; height: 260px; border-radius: 50%;
-  background: radial-gradient(circle at 32% 28%, #ffd0d8 0%, #ff3b5c 38%, #5c0b1d 78%, #1a0409 100%);
-  box-shadow: 0 0 80px rgba(255, 59, 92, 0.55), inset -20px -30px 60px rgba(0, 0, 0, 0.45);
+  background: radial-gradient(circle at 32% 28%, var(--orb-core) 0%, var(--color-accent) 38%, var(--orb-deep) 78%, var(--orb-dark) 100%);
+  box-shadow: 0 0 80px rgb(var(--accent-rgb) / 0.55), inset -20px -30px 60px rgba(0, 0, 0, 0.45);
   animation: float 6s ease-in-out infinite;
 }
 .orb::after { content: ""; position: absolute; inset: -40px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 59, 92, 0.35), transparent 65%); animation: pulse-glow 4s ease-in-out infinite; z-index: -1; }
-.ring { position: absolute; inset: -34px; border-radius: 50%; border: 1px solid rgba(255, 138, 91, 0.45); border-top-color: transparent; border-left-color: transparent; animation: spin 14s linear infinite; }
-.ring.r2 { inset: -64px; border-color: rgba(255, 59, 92, 0.35); border-bottom-color: transparent; border-right-color: transparent; animation: spin-rev 22s linear infinite; }
+  background: radial-gradient(circle, rgb(var(--accent-rgb) / 0.35), transparent 65%); animation: pulse-glow 4s ease-in-out infinite; z-index: -1; }
+.ring { position: absolute; inset: -34px; border-radius: 50%; border: 1px solid rgb(var(--accent2-rgb) / 0.45); border-top-color: transparent; border-left-color: transparent; animation: spin 14s linear infinite; }
+.ring.r2 { inset: -64px; border-color: rgb(var(--accent-rgb) / 0.35); border-bottom-color: transparent; border-right-color: transparent; animation: spin-rev 22s linear infinite; }
 .blob { position: absolute; border-radius: 50%; filter: blur(70px); animation: drift 14s ease-in-out infinite; }
 .rise { animation: rise .7s both; }
 .bar { width: 4px; border-radius: 4px; background: linear-gradient(var(--color-accent2), var(--color-accent)); height: 28px; transform-origin: center; animation: wave 1.2s ease-in-out infinite; }

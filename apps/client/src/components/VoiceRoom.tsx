@@ -82,7 +82,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-[2cqmin] px-2 pt-7 pb-8">
           <div className={unwatched && !compact ? "@max-[230px]:hidden" : ""}><Avatar user={user} size={avatarSize} speaking={speaking} /></div>
           {unwatched && !compact && (
-            <button onClick={onWatch} className="grad rounded-xl px-3 @sm:px-4 py-1.5 @sm:py-2 text-xs @sm:text-sm font-semibold text-white whitespace-nowrap shadow-[0_6px_24px_rgba(255,59,92,0.45)] inline-flex items-center gap-1.5 hover:brightness-110">
+            <button onClick={onWatch} className="grad rounded-xl px-3 @sm:px-4 py-1.5 @sm:py-2 text-xs @sm:text-sm font-semibold text-white whitespace-nowrap shadow-[0_6px_24px_rgb(var(--accent-rgb)/0.45)] inline-flex items-center gap-1.5 hover:brightness-110">
               <MonitorPlay size={15} /> <span className="@max-[260px]:hidden">Assistir transmissão</span><span className="@min-[261px]:hidden">Assistir</span>
             </button>
           )}
@@ -90,7 +90,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
       )}
 
       {sharing && (
-        <span className="absolute top-2 left-2 @sm:top-3 @sm:left-3 flex items-center gap-1 bg-accent px-1.5 @sm:px-2.5 py-0.5 @sm:py-1 rounded-full text-[10px] @sm:text-[11px] font-semibold shadow-[0_0_16px_rgba(255,59,92,0.6)]">
+        <span className="absolute top-2 left-2 @sm:top-3 @sm:left-3 flex items-center gap-1 bg-accent px-1.5 @sm:px-2.5 py-0.5 @sm:py-1 rounded-full text-[10px] @sm:text-[11px] font-semibold shadow-[0_0_16px_rgb(var(--accent-rgb)/0.6)]">
           <ScreenShare size={12} /> <span className="@max-[170px]:hidden">AO VIVO</span>
         </span>
       )}
@@ -164,7 +164,7 @@ function Stage({ p, user, vol, onVol, speaking, stageRef, onStop, isScreen, mod,
         {!track && (isScreen
           ? <div className="absolute inset-0 grid place-items-center text-sm text-muted">Carregando transmissão…</div>
           : <div className="absolute inset-0 grid place-items-center"><Avatar user={user} size="clamp(80px, 30cqmin, 220px)" speaking={speaking} /></div>)}
-        {isScreen && <span className="absolute top-3 left-3 flex items-center gap-1.5 bg-accent px-2.5 py-1 rounded-full text-[11px] font-semibold shadow-[0_0_16px_rgba(255,59,92,0.6)]"><ScreenShare size={13} /> AO VIVO</span>}
+        {isScreen && <span className="absolute top-3 left-3 flex items-center gap-1.5 bg-accent px-2.5 py-1 rounded-full text-[11px] font-semibold shadow-[0_0_16px_rgb(var(--accent-rgb)/0.6)]"><ScreenShare size={13} /> AO VIVO</span>}
       </div>
       <div className="shrink-0 flex flex-wrap items-center gap-x-4 gap-y-2 px-3 sm:px-4 py-2 bg-surface border-t border-line">
         <div className="flex items-center gap-2 min-w-0 flex-1 basis-32">

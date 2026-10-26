@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, getToken, setToken, getStored, setStored, clearStored } from "./api";
+import { useCallback, useEffect, useState } from "react";
+import { api, getToken, setToken, getStored, setStored, clearStored, setOnSessionGone } from "./api";
 import { AuthScreen } from "./components/AuthScreen";
 import { Workspace } from "./components/Workspace";
 import { ParticleField } from "./components/ParticleField";
@@ -10,9 +10,22 @@ export function App() {
     JSON.parse(getStored("me") ?? "null"),
   );
 
+  const dropSession = useCallback(() => { setToken(null); clearStored("me"); setAuthed(false); setMe(null); }, []);
+
+  useEffect(() => { setOnSessionGone(dropSession); }, [dropSession]);
+
+  // A stored token can belong to an account that no longer exists. /servers still returns [] in that case.
   useEffect(() => {
-    if (authed) api.servers().catch(() => { setToken(null); setAuthed(false); });
-  }, [authed]);
+    if (!authed) return;
+    api.me().then((u) => {
+      let remember = true;
+      try { remember = localStorage.getItem("token") === getToken(); } catch { /* ignore */ }
+      setStored("me", JSON.stringify(u), remember);
+      setMe(u);
+    }).catch((e: { status?: number }) => {
+      if (e?.status === 401 || e?.status === 404) dropSession();
+    });
+  }, [authed, dropSession]);
 
   // Particle backdrop: on by default, user can switch it off from the sidebar (saved per device).
   const [fx, setFx] = useState(() => {
@@ -44,5 +57,5 @@ export function App() {
         }}
       />,
     );
-  return shell(<Workspace me={me} fx={fx && !lite} onToggleFx={toggleFx} lite={lite} onToggleLite={toggleLite} onLogout={() => { setToken(null); clearStored("me"); setAuthed(false); setMe(null); }} />);
+  return shell(<Workspace me={me} fx={fx && !lite} onToggleFx={toggleFx} lite={lite} onToggleLite={toggleLite} onLogout={dropSession} />);
 }

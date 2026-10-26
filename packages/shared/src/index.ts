@@ -41,8 +41,13 @@ export interface VoiceStateDTO { channelId: string; users: UserDTO[]; }
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export interface UserDTO { id: string; username: string; badge?: "DEV" | null; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
-export interface ProfileDTO { user: UserDTO; createdAt: string; mutual: { id: string; name: string; iconUrl: string | null; owner: boolean }[]; isSelf: boolean; }
+export interface UserDTO { id: string; username: string; tag?: string; badge?: "DEV" | null; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
+export type Relation = "self" | "none" | "friend" | "incoming" | "outgoing";
+export interface ProfileDTO { user: UserDTO; createdAt: string; mutual: { id: string; name: string; iconUrl: string | null; owner: boolean }[]; isSelf: boolean; relation: Relation; requestId?: string; }
+export interface FriendDTO { user: UserDTO; since: string; online: boolean; }
+export interface FriendRequestDTO { id: string; user: UserDTO; createdAt: string; }
+export interface FriendsDTO { friends: FriendDTO[]; incoming: FriendRequestDTO[]; outgoing: FriendRequestDTO[]; }
+export const friendRequestSchema = z.object({ handle: z.string().trim().min(3).max(60) });
 export interface AccountDTO { email: string; createdAt: string; emailVerified: boolean; }
 export interface ChannelDTO { id: string; serverId: string; name: string; type: "TEXT" | "VOICE"; }
 export interface ServerDTO {

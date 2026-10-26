@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { AccountDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -39,9 +39,13 @@ export const setToken = (t: string | null, remember = true) => {
   token = t;
   t ? setStored("token", t, remember) : clearStored("token");
 };
+// Fired when a stored token no longer matches an account (401 unauthorized). The shell drops back to login.
+let onSessionGone: (() => void) | null = null;
+export const setOnSessionGone = (fn: () => void) => { onSessionGone = fn; };
 
 // Server messages are in English: show them to the person in clear Portuguese.
 const MESSAGES: Record<string, string> = {
+  "unauthorized": "Sua sessão não é mais válida. Entre de novo.",
   "invalid credentials": "E-mail ou senha incorretos.",
   "email or username already in use": "Este e-mail ou nome de usuário já está em uso.",
   "invalid input": "Confira os dados informados.",
@@ -55,6 +59,11 @@ const MESSAGES: Record<string, string> = {
   "username already in use": "Este nome de usuário já está em uso.",
   "forbidden": "Você só vê o perfil de quem está em um servidor com você.",
   "not found": "Não encontramos essa pessoa.",
+  "user not found": "Não encontramos ninguém com esse nome e código. Confira, por exemplo: @nome #br21.",
+  "bad handle": "Digite no formato @nome #código, por exemplo @luiz #br21.",
+  "self": "Esse é o seu próprio código de amigo.",
+  "already friends": "Vocês já são amigos.",
+  "already requested": "Você já enviou um pedido para essa pessoa. Agora é só esperar.",
 };
 function friendly(raw: unknown, status: number): string {
   const key = typeof raw === "string" ? raw : "";
@@ -79,7 +88,14 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<T> 
     throw new Error(SERVER_LOCKED ? "Não foi possível conectar ao Cohle. Verifique sua internet e tente novamente." : `Não consegui falar com o servidor (${API}). Confira o endereço e se ele está ligado.`);
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(friendly(data.error ?? data.message, res.status)), { status: res.status, data });
+  if (!res.ok) {
+    if (res.status === 401 && data?.error === "unauthorized" && token) {
+      setToken(null);
+      clearStored("me");
+      onSessionGone?.();
+    }
+    throw Object.assign(new Error(friendly(data.error ?? data.message, res.status)), { status: res.status, data });
+  }
   return data as T;
 }
 
@@ -87,6 +103,11 @@ export const api = {
   register: (b: { email: string; username: string; password: string }) =>
     req<{ token: string; user: UserDTO } | { needsVerification: true; email: string }>("/auth/register", "POST", b),
   login: (b: { email: string; password: string }) => req<{ token: string; user: UserDTO }>("/auth/login", "POST", b),
+  friends: () => req<FriendsDTO>("/friends"),
+  friendRequest: (handle: string) => req<{ status: "sent" | "accepted"; user: { username: string } }>("/friends/request", "POST", { handle }),
+  friendAccept: (id: string) => req(`/friends/${id}/accept`, "POST", {}),
+  friendDecline: (id: string) => req(`/friends/${id}/decline`, "POST", {}),
+  friendRemove: (userId: string) => req(`/friends/${userId}`, "DELETE"),
   account: () => req<AccountDTO>("/me/account"),
   changePassword: (b: { current: string; password: string }) => req<{ ok: true }>("/me/password", "POST", b),
   profile: (id: string) => req<ProfileDTO>(`/users/${id}/profile`),

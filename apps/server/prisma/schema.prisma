@@ -20,6 +20,9 @@ model User {
   avatarUrl    String?
   avatarVersion Int      @default(0)
   emailVerifiedAt DateTime?
+  tag          String?   // friend code shown as #tag next to the name (e.g. @luiz #br21)
+  friendsSent  Friendship[] @relation("FriendRequester")
+  friendsGot   Friendship[] @relation("FriendAddressee")
   badge        String?   // "DEV": shown next to the name (granted by the server, never chosen by the user)
   emailCodes   EmailCode[]
   createdAt    DateTime  @default(now())
@@ -119,4 +122,18 @@ model EmailCode {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, kind, createdAt])
+}
+
+// Friend requests and friendships (one row per pair: who asked, who was asked, and whether it was accepted).
+model Friendship {
+  id          String   @id @default(cuid())
+  requesterId String
+  addresseeId String
+  status      String   @default("PENDING") // PENDING | ACCEPTED
+  createdAt   DateTime @default(now())
+  requester   User     @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee   User     @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
 }

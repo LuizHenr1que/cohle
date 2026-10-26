@@ -71,7 +71,7 @@ export function ScreenPicker({ onCancel, onConfirm }: { onCancel: () => void; on
         <div className="flex-1 overflow-y-auto grid gap-3 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] content-start min-h-[200px]">
           {shown.map((s) => (
             <button key={s.id} onClick={() => setSel(s.id)} onDoubleClick={() => onConfirm(s.id, audio, quality)}
-              className={`text-left rounded-2xl p-2 border transition ${sel === s.id ? "border-accent bg-accent/10 shadow-[0_0_24px_rgba(255,59,92,0.25)]" : "border-line bg-white/5 hover:bg-white/10"}`}>
+              className={`text-left rounded-2xl p-2 border transition ${sel === s.id ? "border-accent bg-accent/10 shadow-[0_0_24px_rgb(var(--accent-rgb)/0.25)]" : "border-line bg-white/5 hover:bg-white/10"}`}>
               <img src={s.thumbnail} alt={s.name} className="w-full aspect-video object-cover rounded-xl bg-black/40" />
               <div className="flex items-center gap-2 mt-2 px-1">
                 {s.appIcon && <img src={s.appIcon} className="size-4" />}

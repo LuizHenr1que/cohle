@@ -1,3 +1,4 @@
+import { applyTheme, getTheme } from "./lib/theme";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
@@ -12,4 +13,5 @@ window.addEventListener("focus", syncFocus);
 window.addEventListener("blur", syncFocus);
 syncFocus();
 
-ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
+ReactDOM.applyTheme(getTheme());
+createRoot(document.getElementById("root")!).render(<App />);

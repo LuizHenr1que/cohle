@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { X, User, ShieldCheck, Palette, Volume2, MonitorCog, Info, LogOut, Check, RefreshCw, Pencil, Sparkles } from "lucide-react";
+import { Copy, X, User, ShieldCheck, Palette, Volume2, MonitorCog, Info, LogOut, Check, RefreshCw, Pencil, Sparkles } from "lucide-react";
 import type { AccountDTO, UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { Avatar } from "./Avatar";
@@ -8,6 +8,7 @@ import { PasswordInput } from "./PasswordInput";
 import { BUILD } from "../version";
 import { NOISE_MODES, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
 import { setSoundboardOn, soundboardOn } from "../lib/soundboard";
+import { THEMES, applyTheme, getTheme, getCustomColor, paletteFor, type ThemeId } from "../lib/theme";
 
 type Tab = "account" | "security" | "look" | "audio" | "app" | "about";
 
@@ -55,11 +56,12 @@ export function SettingsModal({ user, onClose, onEditProfile, onTour, onLogout, 
           {tab === "account" && (<>
             <H>Minha conta</H>
             <div className="rounded-2xl overflow-hidden border border-line">
-              <div className="h-20 bg-[radial-gradient(120%_140%_at_30%_0%,rgba(255,59,92,0.5),transparent_70%),linear-gradient(135deg,#2a1018,#12080c)]" />
+              <div className="h-20 bg-[radial-gradient(120%_140%_at_30%_0%,rgb(var(--accent-rgb)/0.5),transparent_70%),linear-gradient(135deg,#2a1018,#12080c)]" />
               <div className="px-4 pb-4 -mt-9 flex items-end gap-4 flex-wrap">
                 <div className="ring-4 ring-surface rounded-full"><Avatar user={user} size={72} /></div>
                 <div className="min-w-0 flex-1 pb-1"><div className="text-lg font-bold flex items-center gap-2 flex-wrap">{user.username}<DevBadge user={user} full /></div>
-                  <div className="text-xs text-muted truncate">{acc?.email ?? "..."}</div></div>
+                  <div className="text-xs text-muted truncate">{acc?.email ?? "..."}</div>
+                  {user.tag && <button onClick={() => navigator.clipboard?.writeText(`${user.username}#${user.tag}`).catch(() => {})} title="Copiar o código de amigo" className="mt-1 inline-flex items-center gap-1.5 text-xs text-accent2 hover:underline">Código de amigo: @{user.username} #{user.tag} <Copy size={12} /></button>}</div>
                 <button onClick={onEditProfile} className="grad rounded-xl px-4 py-2 text-sm font-semibold text-white inline-flex items-center gap-2 hover:brightness-110"><Pencil size={15} /> Editar foto e nome</button>
               </div>
             </div>
@@ -73,6 +75,7 @@ export function SettingsModal({ user, onClose, onEditProfile, onTour, onLogout, 
           {tab === "security" && <Security />}
           {tab === "look" && (<>
             <H>Aparência e desempenho</H>
+            <ThemePicker />
             <Card>
               <Row title="Animação de fundo" hint="Partículas flutuando atrás do app. Desligue para economizar processador."><Switch on={fx} onChange={onToggleFx} /></Row>
               <Row title="Modo leve" hint="Menos efeitos, sem desfoque e sem animações. Ideal para jogar com o Cohle aberto."><Switch on={lite} onChange={onToggleLite} /></Row>
@@ -166,4 +169,42 @@ function AppTab() {
       </Row>
     </Card>
   </>);
+}
+
+function ThemePicker() {
+  const [t, setT] = useState<ThemeId>(getTheme());
+  const [color, setColor] = useState(getCustomColor());
+  return (
+    <div className="mb-5">
+      <h3 className="text-[11px] uppercase tracking-widest text-muted mb-2">Tema</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        {THEMES.map((x) => (
+          <button key={x.id} onClick={() => { setT(x.id); applyTheme(x.id); }} aria-pressed={t === x.id}
+            className={`rounded-2xl border p-2.5 text-left transition ${t === x.id ? "border-accent ring-2 ring-accent/40" : "border-line hover:border-white/25"}`}>
+            <div className="h-14 rounded-xl overflow-hidden relative" style={{ background: x.bg }}>
+              <div className="absolute -top-4 -left-4 size-16 rounded-full blur-xl opacity-70" style={{ background: x.a }} />
+              <div className="absolute bottom-2 left-2 right-2 h-3 rounded-full" style={{ background: `linear-gradient(90deg, ${x.a}, ${x.b})` }} />
+            </div>
+            <div className="mt-2 text-sm font-medium flex items-center gap-1.5">{x.name}{t === x.id && <Check size={14} className="text-accent" />}</div>
+            <div className="text-[11px] text-muted">{x.hint}</div>
+          </button>
+        ))}
+        <div className={`rounded-2xl border p-2.5 text-left transition ${t === "custom" ? "border-accent ring-2 ring-accent/40" : "border-line hover:border-white/25"}`}>
+          <button onClick={() => { setT("custom"); applyTheme("custom", color); }} aria-pressed={t === "custom"} className="block w-full text-left">
+            <div className="h-14 rounded-xl overflow-hidden relative" style={{ background: paletteFor(color)["--color-surface"] }}>
+              <div className="absolute -top-4 -left-4 size-16 rounded-full blur-xl opacity-70" style={{ background: paletteFor(color)["--color-accent"] }} />
+              <div className="absolute bottom-2 left-2 right-2 h-3 rounded-full" style={{ background: `linear-gradient(90deg, ${paletteFor(color)["--color-accent"]}, ${paletteFor(color)["--color-accent2"]})` }} />
+            </div>
+            <div className="mt-2 text-sm font-medium flex items-center gap-1.5">Sua cor{t === "custom" && <Check size={14} className="text-accent" />}</div>
+          </button>
+          <label className="mt-1 flex items-center gap-2 text-[11px] text-muted cursor-pointer">
+            <input type="color" value={color} aria-label="Escolher uma cor" onChange={(e) => { setColor(e.target.value); setT("custom"); applyTheme("custom", e.target.value); }}
+              className="size-6 rounded-md border border-line bg-transparent p-0 cursor-pointer" />
+            <span className="uppercase tabular-nums">{color}</span>
+          </label>
+        </div>
+      </div>
+      <p className="text-[11px] text-muted mt-2">Escolha uma cor e o Cohle monta o tema inteiro com ela (fundo, painéis e brilho).</p>
+    </div>
+  );
 }

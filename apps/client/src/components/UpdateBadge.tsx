@@ -9,7 +9,7 @@ export function UpdateBadge({ n, note, url }: { n: number; note: string; url: st
     <button
       onClick={() => { window.cohle?.openExternal(url); setStarted(true); setTimeout(() => setStarted(false), 6000); }}
       title={`Versão ${n}${clean ? `: ${clean}` : ""}. Clique para baixar e atualizar`}
-      className="update-badge group relative shrink-0 w-[62px] rounded-2xl grad text-white px-1 pt-2 pb-1.5 flex flex-col items-center gap-1 shadow-[0_6px_18px_rgba(255,59,92,0.45)] ring-1 ring-white/25 hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0 transition">
+      className="update-badge group relative shrink-0 w-[62px] rounded-2xl grad text-white px-1 pt-2 pb-1.5 flex flex-col items-center gap-1 shadow-[0_6px_18px_rgb(var(--accent-rgb)/0.45)] ring-1 ring-white/25 hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0 transition">
       <span className="absolute -top-1 -right-1 size-3">
         <span className="update-ping absolute inset-0 rounded-full bg-emerald-300 opacity-70 animate-ping" />
         <span className="relative block size-3 rounded-full bg-emerald-400 border-2 border-surface" />
@@ -29,7 +29,7 @@ export function AutoUpdateBadge({ st }: { st: UpdateState }) {
   return (
     <button disabled={!ready} onClick={() => void window.cohle?.installUpdate()}
       title={ready ? `Versão ${st.version} pronta. Clique para reiniciar e atualizar` : `Baixando a atualização${st.version ? ` ${st.version}` : ""}...`}
-      className={`relative shrink-0 w-[62px] rounded-2xl px-1 pt-2 pb-1.5 flex flex-col items-center gap-1 text-white ring-1 ring-white/25 transition ${ready ? "grad shadow-[0_6px_18px_rgba(255,59,92,0.45)] hover:brightness-110 hover:-translate-y-0.5" : "bg-white/10 cursor-default"}`}>
+      className={`relative shrink-0 w-[62px] rounded-2xl px-1 pt-2 pb-1.5 flex flex-col items-center gap-1 text-white ring-1 ring-white/25 transition ${ready ? "grad shadow-[0_6px_18px_rgb(var(--accent-rgb)/0.45)] hover:brightness-110 hover:-translate-y-0.5" : "bg-white/10 cursor-default"}`}>
       {ready && <span className="absolute -top-1 -right-1 size-3 rounded-full bg-emerald-400 border-2 border-surface" />}
       <span className="size-8 rounded-xl bg-white/20 grid place-items-center">
         {ready ? <RefreshCw size={17} strokeWidth={2.5} /> : <ArrowDownToLine size={17} strokeWidth={2.5} className="animate-pulse" />}

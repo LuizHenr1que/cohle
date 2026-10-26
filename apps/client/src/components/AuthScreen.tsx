@@ -200,7 +200,7 @@ export function AuthScreen({ onDone }: { onDone: (token: string, user: UserDTO, 
           <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none w-fit"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-[#ff3b5c] size-4" /> Lembrar de mim neste computador</label>
           {err && <p className="text-accent text-sm">{err}</p>}
 
-          <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition shadow-[0_8px_30px_rgba(255,59,92,0.35)] disabled:opacity-60">
+          <button disabled={busy} className="grad w-full rounded-xl py-3 font-semibold text-white hover:brightness-110 transition shadow-[0_8px_30px_rgb(var(--accent-rgb)/0.35)] disabled:opacity-60">
             {busy ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
           </button>
           <button type="button" className="w-full text-sm text-muted hover:text-ink" onClick={() => { setErr(""); setMode(mode === "login" ? "register" : "login"); }}>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { MessageCircle, Search, Send, Menu, ChevronUp } from "lucide-react";
+import { Users, MessageCircle, Search, Send, Menu, ChevronUp } from "lucide-react";
 import type { Socket } from "socket.io-client";
 import type { DirectMessageDTO, DmConversationDTO, UserDTO } from "@cohle/shared";
 import { api } from "../api";
@@ -54,8 +54,8 @@ const dayLabel = (iso: string) => {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 };
 
-export function DmSidebar({ convs, online, peerId, onOpen }: {
-  convs: DmConversationDTO[]; online: Set<string>; peerId?: string; onOpen: (u: UserDTO) => void;
+export function DmSidebar({ convs, online, peerId, onOpen, onFriends, friendsActive, pending }: {
+  convs: DmConversationDTO[]; online: Set<string>; peerId?: string; onOpen: (u: UserDTO) => void; onFriends?: () => void; friendsActive?: boolean; pending?: number;
 }) {
   const [q, setQ] = useState("");
   const [people, setPeople] = useState<UserDTO[]>([]);
@@ -68,6 +68,8 @@ export function DmSidebar({ convs, online, peerId, onOpen }: {
   return (
     <>
       <div className="px-2 py-2 border-b border-line mb-2">
+        {onFriends && <button onClick={onFriends} className={`w-full mb-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${friendsActive ? "bg-accent/15 text-ink" : "text-muted hover:bg-white/5 hover:text-ink"}`}>
+          <Users size={18} className="text-accent" /> Amigos {!!pending && <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">{pending}</span>}</button>}
         <h2 className="font-semibold flex items-center gap-2"><MessageCircle size={18} className="text-accent" /> Mensagens diretas</h2>
         <label className="mt-2 flex items-center gap-2 rounded-xl bg-white/5 border border-line px-3 py-2 text-sm focus-within:border-accent">
           <Search size={14} className="text-muted shrink-0" />
