@@ -100,6 +100,20 @@ const hD = await shop(D), hH = await shop(H);
 ok("fim da temporada: some da vitrine de quem não pegou e não dá para pegar", !hD.collections.some((c) => c.key === "halloween") && (await http(`/shop/items/${item(sh, "halloween.theme").id}/claim`, {}, D.token)).s === 403);
 ok("fim da temporada: quem pegou continua com tudo e pode equipar", HW.every((k) => item(hH, k)) && (await equip(H, "theme", item(sh, "halloween.theme").id)).s === 200);
 await hwSet({ ativo: hwCol.ativo, inicio: hwCol.inicio, fim: hwCol.fim });
+// ---- permanent collections (no season): Auras, Hacker, Gamer, Barbearia, Rainha ----
+const P = await mk("pri"); const sp = await shop(P);
+const perm = ["auras", "hacker", "gamer", "barbearia", "rainha"];
+ok("5 coleções permanentes na vitrine: sem temporada, sem dias restantes, 8 itens cada", perm.every((k) => { const c = sp.collections.find((x) => x.key === k); return c && c.visible && !c.sazonal && c.daysLeft === null && c.itemIds.length === 8; }), JSON.stringify(sp.collections.map((c) => [c.key, c.itemIds.length])));
+ok("as 8 auras são molduras", sp.items.filter((i) => i.key.startsWith("aura.")).length === 8 && sp.items.filter((i) => i.key.startsWith("aura.")).every((i) => i.tipo === "frame"));
+for (const k of ["hacker.theme", "hacker.frame.code", "hacker.name.glitch", "hacker.badge.root", "hacker.entrance.access", "hacker.reactions", "aura.fire"]) await claim(P, sp, k);
+r = await http("/shop/equipped/set", { collectionId: sp.collections.find((c) => c.key === "hacker").id }, P.token);
+const pfx = (await http("/me", null, P.token)).d.fx ?? {};
+ok("equipar o conjunto Hacker entrega tema, moldura, nome e emblema", r.s === 200 && pfx.frame === "hacker.frame.code" && pfx.nameEffect === "hacker.name.glitch" && pfx.badge === "hacker.badge.root", JSON.stringify(pfx));
+ok("aura equipada como moldura", (await equip(P, "frame", item(sp, "aura.fire").id)).s === 200 && (await http("/me", null, P.token)).d.fx?.frame === "aura.fire");
+ok("não dá para equipar uma aura que não é sua (403)", (await equip(P, "frame", item(sp, "aura.gold").id)).s === 403);
+ok("coleção permanente continua pegável a qualquer hora", (await claim(P, sp, "gamer.frame.pad")).s === 200);
+// ---- the real sounds: small files that exist ----
+for (const f of ["santa-hohoho.mp3", "ghost-boo.mp3"]) { const rr = await fetch(`http://localhost:5173/sfx/${f}`); const buf = Buffer.from(await rr.arrayBuffer()); ok(`som real ${f}: existe, é áudio e é leve (< 40 KB)`, rr.status === 200 && /audio|mpeg/.test(rr.headers.get("content-type") ?? "") && buf.length > 3000 && buf.length < 40_000, `${rr.status} ${buf.length} bytes`); }
 // ---- preferences ----
 r = await http("/me/prefs", null, A.token); ok("preferências começam com o padrão", r.d.effectsOff === false && r.d.seasonalAuto === true && r.d.lite === "auto" && r.d.hidePolitical === false);
 r = await http("/me/prefs", { effectsOff: true, lite: "on" }, A.token, "PUT"); ok("salvar preferências (parcial)", r.d.effectsOff === true && r.d.lite === "on" && r.d.seasonalAuto === true);
@@ -141,5 +155,6 @@ ok("contadores de conquista contam as mensagens enviadas", (st?.messages ?? 0) >
 const rr2 = (await Promise.all(Array.from({ length: 33 }, () => http(`/shop/items/${item(sc, "natal.theme").id}/claim`, {}, D.token)))).map((x) => x.s);      // all at once: the limiter is what is being tested, not the network speed
 ok("pegar itens em rajada é limitado (30 por minuto)", rr2.filter((x) => x === 429).length >= 1, rr2.filter((x) => x === 429).length + " bloqueados");
 await prisma.shopItem.delete({ where: { id: pol.id } }); await SET({ ativo: orig.ativo, inicio: orig.inicio, fim: orig.fim });
+for (const slot of ["frame", "badge", "theme", "entrance", "name_effect"]) await equip(owner, slot, null);          // leave the shared teste1 account as found (other suites expect the default theme)
 for (const s of [sA, sB, sO]) s.close(); await prisma.$disconnect();
 console.log(`\n${pass} passaram, ${fail} falharam`); process.exit(fail ? 1 : 0);

@@ -19,7 +19,7 @@ export const Avatar = memo(function Avatar({ user, size = 36, className = "", sp
     : <div style={style} className={`rounded-full grad grid place-items-center text-white font-bold shrink-0 ${ring} ${cls}`}>{nameOf(user)[0]?.toUpperCase()}</div>;
   if (!frame) return face;
   return (
-    <span className={`fx-frame ${live ? "fx-live" : ""} ${speaking ? "fx-speaking" : ""} ${className}`} style={{ width: len, height: len }}>
+    <span className={`fx-frame ${typeof size === "number" && size <= 44 ? "fx-compact" : ""} ${live ? "fx-live" : ""} ${speaking ? "fx-speaking" : ""} ${className}`} style={{ width: len, height: len }}>
       {face}<span className="fx-glow" aria-hidden="true" /><FrameArt frame={frame} />
     </span>
   );

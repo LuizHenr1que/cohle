@@ -90,8 +90,23 @@ export function playSound(id: string) {
 }
 
 // ---- sounds of shop effects (same rule: synthesized, nothing downloaded) ----
-export type FxSound = "hohoho" | "whoosh" | "sleigh" | "boo" | "witch";
+export type FxSound = "hohoho" | "whoosh" | "sleigh" | "boo" | "witch" | "glitch" | "gameon" | "snip" | "tada";
+// Real recordings (CC0, see public/sfx/CREDITS.txt), ~30 KB in total, fetched only the first time they play. If one cannot load or play, the synthesized version below takes over.
+const SAMPLES: Partial<Record<FxSound, { file: string; vol: number }>> = { hohoho: { file: "sfx/santa-hohoho.mp3", vol: 0.9 }, boo: { file: "sfx/ghost-boo.mp3", vol: 0.85 } };
+const sampleCache = new Map<string, HTMLAudioElement>();
 export function playFx(id: FxSound) {
+  const sm = SAMPLES[id];
+  if (sm) {
+    try {
+      let a = sampleCache.get(sm.file); if (!a) { a = new Audio(sm.file); a.preload = "auto"; sampleCache.set(sm.file, a); }
+      a.volume = sm.vol; a.currentTime = 0;
+      void a.play().catch(() => synthFx(id));
+      return;
+    } catch { /* falls back to the synthesized sound */ }
+  }
+  synthFx(id);
+}
+function synthFx(id: FxSound) {
   const c = get(); if (!c) return;
   if (id === "hohoho") {                                              // three falling low notes + a handful of bells and paper
     [0, 0.34, 0.68].forEach((t, i) => tone(c, { type: "triangle", f0: 190 - i * 18, f1: 120 - i * 14, t, d: 0.3, v: 0.22 }));
@@ -100,6 +115,17 @@ export function playFx(id: FxSound) {
   } else if (id === "boo") {                                         // a low ghostly "buuu" that rises and falls, a little wind on top
     tone(c, { type: "sine", f0: 150, f1: 95, t: 0, d: 0.9, v: 0.2 }); tone(c, { type: "triangle", f0: 220, f1: 130, t: 0.1, d: 0.8, v: 0.08 });
     noise(c, { t: 0.2, d: 0.9, v: 0.07, kind: "bandpass", freq: 900, q: 0.7 });
+  } else if (id === "glitch") {                                      // a digital "access granted": quick square-wave bleeps and a burst of static
+    [880, 1320, 660, 1760, 990].forEach((f, i) => tone(c, { type: "square", f0: f, t: i * 0.06, d: 0.05, v: 0.05 }));
+    tone(c, { type: "square", f0: 440, f1: 1760, t: 0.34, d: 0.2, v: 0.05 }); noise(c, { t: 0.05, d: 0.35, v: 0.08, kind: "highpass", freq: 4200 });
+  } else if (id === "gameon") {                                      // an arcade start jingle: rising arpeggio
+    [523, 659, 784, 1047, 1319].forEach((f, i) => tone(c, { type: "square", f0: f, t: i * 0.085, d: 0.11, v: 0.06 })); tone(c, { type: "triangle", f0: 1047, t: 0.5, d: 0.35, v: 0.1 });
+  } else if (id === "snip") {                                        // scissors: three snips and a little bell
+    [0, 0.14, 0.28].forEach((t) => { noise(c, { t, d: 0.06, v: 0.22, kind: "highpass", freq: 5200 }); tone(c, { type: "square", f0: 2600, f1: 1800, t, d: 0.04, v: 0.04 }); });
+    tone(c, { f0: 2093, t: 0.46, d: 0.5, v: 0.07 }); tone(c, { f0: 2637, t: 0.5, d: 0.45, v: 0.05 });
+  } else if (id === "tada") {                                        // a royal fanfare: bright chord with a sparkle
+    [523, 659, 784].forEach((f) => tone(c, { type: "triangle", f0: f, t: 0, d: 0.5, v: 0.08 })); [1047, 1319, 1568].forEach((f, i) => tone(c, { f0: f, t: 0.18 + i * 0.07, d: 0.5, v: 0.06 }));
+    [3136, 3520, 4186, 3729].forEach((f, i) => tone(c, { f0: f, t: 0.4 + i * 0.06, d: 0.25, v: 0.03 }));
   } else if (id === "witch") {                                        // a short cackle: quick rising squeaks
     [0, 0.13, 0.26, 0.39].forEach((t, i) => tone(c, { type: "sawtooth", f0: 520 + i * 40, f1: 900 + i * 60, t, d: 0.1, v: 0.05 }));
   } else if (id === "sleigh") {                                       // bells

@@ -104,7 +104,7 @@ export function setupShop(app: FastifyInstance, d: Deps) {
   };
   const prefsOf = async (userId: string): Promise<PrefsDTO> => {
     const p = await prisma.userPrefs.findUnique({ where: { userId } });
-    return p ? { effectsOff: p.effectsOff, soundsOff: p.soundsOff, seasonalAuto: p.seasonalAuto, hidePolitical: p.hidePolitical, lite: p.lite as PrefsDTO["lite"] } : { ...DEFAULT_PREFS };
+    return p ? { effectsOff: p.effectsOff, soundsOff: p.soundsOff, seasonalAuto: p.seasonalAuto, hidePolitical: p.hidePolitical, lite: p.lite as PrefsDTO["lite"], serverGroups: Array.isArray(p.serverGroups) ? (p.serverGroups as unknown as PrefsDTO["serverGroups"]) : [] } : { ...DEFAULT_PREFS };
   };
 
   // ---- routes ----

@@ -18,6 +18,12 @@
 - Compatibilidade: o servidor atende web e apps já instalados ao mesmo tempo. Nunca renomear nem remover campos da API (ex.: o login continua recebendo `email`, que agora aceita e-mail ou @usuário).
 - Landing: só anuncia o que funciona; o que falta fica marcado como "em construção".
 
+## Temas e efeitos: nada acontece sozinho (regra permanente)
+- **Nenhum tema, coleção ou item pode ter efeito que passe pela tela, toque som ou anime algo grande por conta própria** (nada de trenó/bruxa/personagem cruzando a tela de tempos em tempos, nada de som periódico). Isso incomoda quem está jogando ou conversando.
+- Efeito grande + som **só quando a pessoa clica** em um ícone do tema na tela (ex.: clicou na abóbora, sai a animação com som; clicou na árvore, o trenó passa). Cada tema deixa um ícone clicável discreto no canto e a dica "clique" ao passar o mouse.
+- Permitido sem clique: decoração parada ou quase parada e **silenciosa** (luzes de borda, moldura/aura que só anima no hover/perfil/chamada) e o efeito causado por **outra pessoa** de propósito (entrada na sala, reação gigante), que respeita "Desligar efeitos" e "Sons".
+- Todo item novo da Loja segue esta regra e o teste dele deve provar que **nada aparece nem toca sem clique**.
+
 ## Outras preferências
 - Landing e app: ícones e imagens, nunca emojis. Responsivo em tudo.
 - Prefira testes reais de ponta a ponta com medições reais.

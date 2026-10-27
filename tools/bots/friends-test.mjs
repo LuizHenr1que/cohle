@@ -18,7 +18,7 @@ r = await http("/friends/request", { handle: "isso-nao-eh-handle" }, a.token);
 ok("formato inválido é recusado", r.s === 400);
 const sb = io(API, { auth: { token: b.token }, transports: ["websocket"] }); await new Promise((rr) => sb.on("connect", rr)); let pinged = 0; sb.on("friends:update", () => pinged++);
 r = await http("/friends/request", { handle: "@TESTE2 #TE02" }, a.token);
-ok("pedido por @nome #código (sem diferenciar maiúsculas)", r.s === 200 && r.d.status === "sent");
+ok("pedido por @nome #código (sem diferenciar maiúsculas)", r.s === 200 && r.d.status === "sent", `status HTTP ${r.s} ${JSON.stringify(r.d).slice(0, 120)}`);
 await sleep(400); ok("o outro lado é avisado em tempo real", pinged >= 1);
 ok("aparece como enviado para quem pediu", (await fl(a.token)).outgoing.length === 1);
 const inc = (await fl(b.token)).incoming; ok("e como recebido para quem foi convidado", inc.length === 1 && inc[0].user.username === "teste1");

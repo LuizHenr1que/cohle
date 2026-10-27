@@ -330,6 +330,7 @@ model UserPrefs {
   seasonalAuto  Boolean @default(true)
   hidePolitical Boolean @default(false)
   lite          String  @default("auto") // auto | on | off
+  serverGroups  Json    @default("[]")   // [{ id, name, color, serverIds[], open }]: the person's folders in the server rail
   user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

@@ -8,18 +8,20 @@ const http = async (p, b, tok, m) => { const r = await fetch(API + p, { method: 
 const last = (re) => [...readFileSync(LOG, "utf8").matchAll(re)].at(-1)?.[1];
 const run = Date.now().toString(36).slice(-6);
 const mk = async (name) => { const email = `${name}.${run}@cohle.dev`; const r = await http("/auth/register", { email, username: `${name}_${run}`, password: "senhaSegura123" }); if (r.d.token) return r.d; await sleep(500); return (await http("/auth/verify", { email, code: last(/Seu código do Cohle: (\d{6})/g) })).d; };
-const A = await mk("ana"), B = await mk("bia"), H = await mk("hel");
+const A = await mk("ana"), B = await mk("bia"), H = await mk("hel"), X = await mk("hax");
 const owner = (await http("/auth/login", { email: "teste1@cohle.dev", password: "teste12345" })).d;
 const srv = (await http("/servers", { name: "Loja UI " + run }, owner.token)).d, vch = srv.channels.find((c) => c.type === "VOICE").id;
 await http(`/servers/join/${srv.inviteCode}`, {}, A.token); await http(`/servers/join/${srv.inviteCode}`, {}, B.token);
 // B owns and wears the whole Natal set (entrance included), A starts with nothing
-const shB = (await http("/shop", null, B.token)).d; for (const it of shB.items) await http(`/shop/items/${it.id}/claim`, {}, B.token);
+const shB = (await http("/shop", null, B.token)).d; for (const it of shB.items.filter((i) => i.key.startsWith("natal."))) await http(`/shop/items/${it.id}/claim`, {}, B.token);          // only Natal: claiming is limited to 30 a minute
 await http("/shop/equipped/set", { collectionId: shB.collections.find((c) => c.key === "natal").id }, B.token);
 
 await http("/me/prefs", { seasonalAuto: false }, A.token, "PUT");      // the season's ambient snow would load the effects chunk on its own; first prove the shop stays lazy without it
 // H wears the whole Halloween set from the start
 const shH = (await http("/shop", null, H.token)).d; for (const it of shH.items.filter((i) => i.key.startsWith("halloween."))) await http(`/shop/items/${it.id}/claim`, {}, H.token);
 await http("/shop/equipped/set", { collectionId: shH.collections.find((c) => c.key === "halloween").id }, H.token);
+const shX = (await http("/shop", null, X.token)).d; for (const it of shX.items.filter((i) => i.key.startsWith("hacker."))) await http(`/shop/items/${it.id}/claim`, {}, X.token);
+await http("/shop/equipped/set", { collectionId: shX.collections.find((c) => c.key === "hacker").id }, X.token);
 let t; if (ATTACH) t = (await (await fetch(`http://localhost:${ATTACH}/json`)).json()).find((x) => x.type === "page" && x.url.startsWith("http://localhost:5173"));
 const chrome = ATTACH ? null : spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", ["--headless=new", "--remote-debugging-port=9361", `--user-data-dir=${mkdtempSync(tmpdir() + "/su-")}`, "--window-size=1280,860", "--no-first-run", "about:blank"], { stdio: "ignore" });
 for (let i = 0; i < 40 && !t; i++) { await sleep(300); try { t = (await (await fetch("http://localhost:9361/json")).json()).find((x) => x.type === "page"); } catch {} }
@@ -38,6 +40,8 @@ const tab = async (name) => { await ev(`[...document.querySelectorAll('[role=tab
 const effects = () => ev(`({ lights: document.querySelectorAll('.fx-lights').length, tree: !!document.querySelector('.fx-tree'), canvas: !!document.querySelector('[id^="fx-snow-"] canvas'), count: /Faltam \\d+ dias? para o Natal|Natal/.test(document.body.innerText) })`);
 try {
   await cmd("Runtime.enable"); await cmd("Page.enable");
+  // counts every sound the page starts (sample elements and synthesized oscillators/noise): the rule is that none starts without a click
+  await cmd("Page.addScriptToEvaluateOnNewDocument", { source: `window.__snd=0;const pl=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__snd++;return pl.apply(this,arguments)};for(const k of ['createOscillator','createBufferSource']){const o=AudioContext.prototype[k];AudioContext.prototype[k]=function(){window.__snd++;return o.apply(this,arguments)}}0` });
   if (ATTACH) { await cmd("Page.bringToFront"); await cmd("Emulation.setFocusEmulationEnabled", { enabled: true }); }
   await cmd("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }).catch(() => {});
   await cmd("Page.navigate", { url: "http://localhost:5173/" }); await sleep(1500);
@@ -57,7 +61,7 @@ try {
   await shot(`shop-1-vitrine-${TAG}`);
 
   // ---- claim, wear one piece ----
-  await ev(`document.querySelector('[data-item="natal.frame.garland"] button.grad, [data-item="natal.frame.garland"] button').click()`);
+  await ev(`[...document.querySelectorAll('[data-item="natal.frame.garland"] button')].find(b=>/Pegar grátis/.test(b.innerText)).click()`);
   ok("'Pegar grátis (Beta)' pega o item", await waitFor(`/Equipar/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'') && !/Pegar grátis/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`));
   await ev(`[...document.querySelectorAll('[data-item="natal.frame.garland"] button')].find(b=>b.innerText.trim()==='Equipar').click()`);
   ok("equipar a moldura: o servidor passa a entregar a chave aos outros", await waitFor(`/Equipado/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`) && (await http("/me", null, A.token)).d.fx?.frame === "natal.frame.garland");
@@ -81,8 +85,36 @@ try {
   const snowCount = await ev(`(()=>{const c=document.querySelector('[id^="fx-snow-"] canvas');return c?c.width+'x'+c.height:null})()`);
   ok("a neve usa um único canvas", !!snowCount, String(snowCount));
 
-  ok("o Papai Noel aparece no trenó que cruza a tela (barba, gorro e rena)", await waitFor(`!!document.querySelector('.fx-cross svg path[fill="#fff"]') && !!document.querySelector('.fx-cross svg circle[fill="#f2d3b3"]')`, 40000));
+  // the rule (CLAUDE.md): nothing crosses the screen or makes noise on its own; the corner icon does it when clicked
+  await sleep(24000);
+  ok("sem clique, nada cruza a tela e nenhum som toca (o trenó antigo vinha sozinho aos 20 s)", !(await ev(`!!document.querySelector('.fx-cross')`)) && (await ev(`window.__snd`)) === 0, `sons=${await ev(`window.__snd`)}`);
+  ok("a árvore do canto é um botão clicável", !!(await ev(`!!document.querySelector('button.fx-tree[aria-label*="Papai Noel"]')`)));
+  await ev(`document.querySelector('button.fx-tree').click()`);
+  ok("clicou na árvore: o Papai Noel passa no trenó (barba, gorro e rena) e toca o som", await waitFor(`!!document.querySelector('.fx-cross svg path[fill="#fff"]') && !!document.querySelector('.fx-cross svg circle[fill="#f2d3b3"]')`, 6000) && (await ev(`window.__snd`)) > 0);
+  ok("o trenó some sozinho depois de passar", await waitFor(`!document.querySelector('.fx-cross')`, 12000));
   await shot(`shop-2b-papai-noel-${TAG}`);
+
+  // ---- the Loja as a sales window: banners, big preview, click-see-leave ----
+  await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500); await tab("Coleções");
+  const banners = await ev(`[...document.querySelectorAll('section[aria-label^="Coleção "]')].map(x=>x.getAttribute('aria-label').replace('Coleção ',''))`);
+  ok("Coleções: banners de Natal, Halloween, Auras, Hacker, Gamer, Barbearia e Rainha", ["Natal", "Halloween", "Auras", "Hacker", "Gamer", "Barbearia", "Rainha"].every((n) => banners.includes(n)), banners.join(","));
+  ok("coleção completa vira faixa: 'Já é seu', 'Ativo' (equipada) e 8/8", await ev(`(()=>{const t=document.querySelector('[aria-label="Coleção Natal"]').innerText;return /Já é seu/i.test(t)&&/Ativo/i.test(t)&&/8\\/8 itens/.test(t)&&!/Neve caindo/.test(t)})()`));
+  ok("banner de temporada que ainda não é seu vende: texto, edição limitada com dias e 'quem pegou, fica'", await ev(`(()=>{const t=document.querySelector('[aria-label="Coleção Halloween"]').innerText;return /Lua cheia/.test(t)&&/Edição Limitada · \\d+ dias?/.test(t)&&/Quem pegou, fica/.test(t)})()`));
+  ok("banner mostra a arte real dos itens (moldura, nome, emblema, entrada, reações)", await ev(`(()=>{const sh=document.querySelector('[aria-label="Coleção Halloween"] [aria-label="O que vem no conjunto"]');return !!sh&&/moldura/i.test(sh.innerText)&&/emblema/i.test(sh.innerText)&&/entrada/i.test(sh.innerText)&&/rea[cç][oõ]es/i.test(sh.innerText)})()`));
+  ok("banner das Auras mostra as 8 auras", (await ev(`document.querySelectorAll('[aria-label="Coleção Auras"] [aria-label="Todas as auras"] > div').length`)) === 8);
+  await clickIn("Natal", "Ver prévia do conjunto");
+  ok("'Ver prévia do conjunto' abre a prévia grande, com você usando o conjunto", await waitFor(`!!document.querySelector('[role=dialog][aria-label^="Prévia:"] [aria-label="Como fica em você"] .fx-frame')`, 6000));
+  ok("a prévia toca a entrada sozinha ao abrir", await waitFor(`/Ho ho ho!/.test(document.querySelector('.fx-ent-text')?.innerText||'')`, 6000));
+  await shot(`shop-2c-previa-${TAG}`);
+  await ev(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+  ok("Esc fecha só a prévia (a Loja continua aberta)", await waitFor(`!document.querySelector('[role=dialog][aria-label^="Prévia:"]') && !!document.querySelector('[role=dialog][aria-label="Loja"]')`, 4000));
+  await tab("Itens"); await click("Auras"); await sleep(800);
+  await ev(`[...document.querySelectorAll('[data-item="aura.fire"]')][0]?.click()`); await sleep(300);
+  ok("clicar num item abre a prévia dele", await waitFor(`!!document.querySelector('[role=dialog][aria-label="Prévia: Aura de Fogo"]')`, 5000));
+  ok("prévia do item: aura animada no seu avatar", await ev(`!!document.querySelector('[aria-label="Prévia: Aura de Fogo"] .fx-frame.fx-live .fx-aura')`));
+  await ev(`[...document.querySelectorAll('[aria-label="Prévia: Aura de Fogo"] button')].find(b=>/Sair/.test(b.innerText)).click()`);
+  ok("'Sair' fecha a prévia", await waitFor(`!document.querySelector('[role=dialog][aria-label^="Prévia:"]')`, 4000));
+  await ev(`[...document.querySelectorAll('button[aria-label="Voltar"],button[aria-label="Fechar"]')][0].click()`); await sleep(600);
 
   // ---- preferences switch everything off ----
   await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500); await tab("Preferências");
@@ -97,7 +129,7 @@ try {
 
   // ---- filters and inventory ----
   await tab("Itens"); await click("Molduras");
-  ok("filtro por tipo: só molduras (2 de Natal e 2 de Halloween)", await waitFor(`(()=>{const c=[...document.querySelectorAll('[data-item]')].map(x=>x.dataset.item);return c.length===4&&c.every(k=>k.includes('frame'))})()`));
+  ok("filtro por tipo: só molduras (Natal, Halloween, 8 auras, Hacker, Gamer, Barbearia e Rainha)", await waitFor(`(()=>{const c=[...document.querySelectorAll('[data-item]')].map(x=>x.dataset.item);return c.length===20&&c.every(k=>/frame|aura/.test(k))})()`));
   await click("Todos"); await click("Épico"); await sleep(600);
   ok("filtro por raridade: só épicos", await waitFor(`(()=>{const c=[...document.querySelectorAll('[data-item]')];return c.length>=1&&c.every(x=>/Épico/i.test(x.innerText))})()`));
   await tab("Inventário"); ok("inventário lista o que eu tenho", (await ev(`document.querySelectorAll('[data-item]').length`)) >= 8);
@@ -144,13 +176,26 @@ try {
   ok("Halloween: tema roxo e laranja aplicado", await waitFor(`document.documentElement.dataset.theme==='halloween'`, 12000));
   ok("Halloween: luzes laranja e roxas, abóbora no canto e contagem para o Halloween (sem neve)", await waitFor(`document.querySelectorAll('.fx-lights.hw').length===4 && !!document.querySelector('.fx-corner') && /para o Halloween|Halloween é amanhã|Hoje é Halloween|Feliz Halloween/.test(document.body.innerText) && !document.querySelector('[id^="fx-snow-"] canvas')`, 15000));
   await shot(`shop-6-halloween-${TAG}`);
-  ok("Halloween: a bruxa de vassoura cruza a tela", await waitFor(`!!document.querySelector('.fx-cross svg circle[fill="#8bd17c"]')`, 40000));
+  await ev(`window.__snd=0`); await sleep(22000);
+  ok("Halloween: sem clique, nada cruza a tela e nenhum som toca", !(await ev(`!!document.querySelector('.fx-cross')`)) && (await ev(`window.__snd`)) === 0, `sons=${await ev(`window.__snd`)}`);
+  await ev(`document.querySelector('button[aria-label*="bruxa"]').click()`);
+  ok("Halloween: clicou na abóbora, a bruxa de vassoura passa e toca o som", await waitFor(`!!document.querySelector('.fx-cross svg circle[fill="#8bd17c"]')`, 6000) && (await ev(`window.__snd`)) > 0);
   await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500);
   ok("Halloween: a vitrine mostra as duas temporadas", await waitFor(`!!document.querySelector('[aria-label="Coleção Halloween"]') && !!document.querySelector('[aria-label="Coleção Natal"]')`, 8000));
   await ev(`[...document.querySelectorAll('[data-item="halloween.entrance.boo"] button')].find(b=>/Ver ao vivo/.test(b.innerText)).click()`);
   ok("Halloween: 'Ver ao vivo' mostra Buuu! com morcegos e fantasmas", await waitFor(`/Buuu!/.test(document.querySelector('.fx-ent-text')?.innerText||'')`, 6000));
   await shot(`shop-7-buuu-${TAG}`);
   await ev(`[...document.querySelectorAll('button[aria-label="Voltar"],button[aria-label="Fechar"]')][0].click()`); await sleep(500);
+  await ev(`localStorage.setItem('token',${JSON.stringify(A.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(A.user))});location.reload()`); await sleep(4000);
+
+  // ---- a theme without a season (Hacker): nothing on its own, the terminal icon in the corner does the animation + sound ----
+  await ev(`localStorage.setItem('token',${JSON.stringify(X.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(X.user))});localStorage.setItem('cohle:tour:${X.user.id}','done');location.reload()`); await sleep(4500);
+  ok("Hacker: tema verde de terminal aplicado, com luzes verdes e o terminal no canto", await waitFor(`document.documentElement.dataset.theme==='hacker' && document.querySelectorAll('.fx-lights').length===4 && !!document.querySelector('button.fx-corner')`, 12000));
+  await ev(`window.__snd=0`); await sleep(8000);
+  ok("Hacker: sem clique, nada aparece nem toca", !(await ev(`!!document.querySelector('.fx-ent-text')`)) && (await ev(`window.__snd`)) === 0);
+  await ev(`document.querySelector('button.fx-corner').click()`);
+  ok("Hacker: clicou no terminal, sai a animação com som", await waitFor(`/sudo hack/.test(document.querySelector('.fx-ent-text')?.innerText||'')`, 5000) && (await ev(`window.__snd`)) > 0);
+  await shot(`shop-8-hacker-${TAG}`);
   await ev(`localStorage.setItem('token',${JSON.stringify(A.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(A.user))});location.reload()`); await sleep(4000);
 
   // ---- phone size ----

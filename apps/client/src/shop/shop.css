@@ -21,8 +21,8 @@
 
 /* overlays (entrance, giant reaction, sleigh, tree, lights): created only while an effect plays, removed after */
 .fx-lights { position: fixed; left: 0; right: 0; height: 10px; z-index: 5; pointer-events: none;
-  background: radial-gradient(circle at 6px 5px, #ff5c5c 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x, radial-gradient(circle at 19px 5px, #ffd166 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x; }
-.fx-lights.alt { background: radial-gradient(circle at 6px 5px, #3ddc84 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x, radial-gradient(circle at 19px 5px, #5cc8ff 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x; }
+  background: radial-gradient(circle at 6px 5px, var(--l1, #ff5c5c) 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x, radial-gradient(circle at 19px 5px, var(--l2, #ffd166) 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x; }
+.fx-lights.alt { background: radial-gradient(circle at 6px 5px, var(--l3, #3ddc84) 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x, radial-gradient(circle at 19px 5px, var(--l4, #5cc8ff) 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x; }
 .fx-lights.hw { background: radial-gradient(circle at 6px 5px, #ff7a1a 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x, radial-gradient(circle at 19px 5px, #ffb347 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x; }
 .fx-lights.hw.alt { background: radial-gradient(circle at 6px 5px, #a06bff 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x, radial-gradient(circle at 19px 5px, #ff7a1a 0 3px, transparent 4px) 0 0 / 26px 10px repeat-x; }
 .fx-lights.a { animation: fx-fade-rev 1.6s ease-in-out infinite; } .fx-lights.b { animation: fx-fade 1.6s ease-in-out infinite; }
@@ -31,3 +31,37 @@
 @keyframes fx-pop { 0% { opacity: 0; transform: scale(.4) } 18% { opacity: 1; transform: scale(1.12) } 30% { transform: scale(1) } 80% { opacity: 1 } 100% { opacity: 0; transform: scale(1.04) translateY(-14px) } }
 @keyframes fx-fall { from { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 1 } to { transform: translate3d(var(--dx, 0), 108vh, 0) rotate(var(--rot, 180deg)); opacity: .9 } }
 .lite .fx-lights, .lite .fx-ent-text { animation: none; }
+
+/* ---- more name effects (static gradients; the cross-fade layers run only when live) ---- */
+.fx-name-terminal { background-image: linear-gradient(90deg, #3dff7a, #b6ffd0, #19c2ff); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: .02em; }
+.fx-name-glitch { background-image: linear-gradient(90deg, #19e0ff, #3dff7a, #ff4fd8); }
+.fx-name-glitch::after { content: attr(data-text); position: absolute; left: 0; top: 0; white-space: nowrap; opacity: 0; background-image: linear-gradient(90deg, #ff4fd8, #19e0ff, #3dff7a); background-clip: text; -webkit-background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.fx-name-glitch:hover::after, .fx-name-glitch.fx-live::after { animation: fx-glitch 1.1s steps(1, end) infinite; }
+@keyframes fx-glitch { 0%, 100% { opacity: 0; transform: translate(0, 0) } 20% { opacity: 1; transform: translate(-1.5px, 0) } 40% { opacity: 0; transform: translate(0, 0) } 60% { opacity: 1; transform: translate(1.5px, 0) } 80% { opacity: 0 } }
+.fx-name-neon { background-image: linear-gradient(90deg, #19e0ff, #ff4fd8, #19e0ff); }
+.fx-name-boss { background-image: linear-gradient(90deg, #ffd166, #ff3b3b, #ffd166); }
+.fx-name-gold { background-image: linear-gradient(90deg, #b8860b, #ffe08a, #e0b050, #fff3c4, #b8860b); }
+.fx-name-pole { background-image: repeating-linear-gradient(45deg, #c8312f 0 7px, #ffffff 7px 14px, #2a6fd6 14px 21px); }
+.fx-name-rose { background-image: linear-gradient(90deg, #ff8fcf, #ffd0ea, #b794ff); }
+.fx-name-diamond { background-image: linear-gradient(90deg, #ffffff, #9fe8ff, #ffffff, #c8d8ff); }
+.fx-name-diamond::after { content: attr(data-text); position: absolute; left: 0; top: 0; white-space: nowrap; opacity: 0; background-image: linear-gradient(90deg, #9fe8ff, #ffffff, #c8d8ff, #ffffff); background-clip: text; -webkit-background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.fx-name-diamond:hover::after, .fx-name-diamond.fx-live::after { animation: fx-fade 1.4s ease-in-out infinite; }
+
+/* ---- frames and auras: transform + opacity only, only while hovered / live ---- */
+.fx-frame > .fx-art.fx-aura { inset: -22%; width: 144%; height: 144%; }
+/* small avatars in lists: the aura spills out less, so it never lands on the name next to it */
+.fx-frame.fx-compact > .fx-art.fx-aura { inset: -10%; width: 120%; height: 120%; }
+.fx-art .spin, .fx-art .spin2, .fx-art .puls, .fx-art .flick { transform-box: view-box; transform-origin: 50px 50px; }
+.fx-frame:hover .spin, .fx-frame.fx-live .spin { animation: fx-spin 9s linear infinite; }
+.fx-frame:hover .spin2, .fx-frame.fx-live .spin2 { animation: fx-spin-rev 14s linear infinite; }
+.fx-frame:hover .puls, .fx-frame.fx-live .puls { animation: fx-puls 1.5s ease-in-out infinite; }
+.fx-frame:hover .flick, .fx-frame.fx-live .flick { animation: fx-flick .9s ease-in-out infinite; }
+.fx-frame:hover .flick.b, .fx-frame.fx-live .flick.b { animation-delay: -.45s; }
+.fx-frame:hover .zap-a, .fx-frame.fx-live .zap-a { animation: fx-zap .55s steps(1, end) infinite; }
+.fx-frame:hover .zap-b, .fx-frame.fx-live .zap-b { animation: fx-zap .55s steps(1, end) infinite -.27s; }
+@keyframes fx-spin { to { transform: rotate(360deg) } }
+@keyframes fx-spin-rev { to { transform: rotate(-360deg) } }
+@keyframes fx-puls { 0%, 100% { transform: scale(1); opacity: .85 } 50% { transform: scale(1.07); opacity: 1 } }
+@keyframes fx-flick { 0%, 100% { opacity: 1; transform: scale(1) } 50% { opacity: .55; transform: scale(1.045) } }
+@keyframes fx-zap { 0%, 100% { opacity: 1 } 50% { opacity: .08 } }
+.lite .fx-art * { animation: none !important; }

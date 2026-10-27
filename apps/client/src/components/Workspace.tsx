@@ -35,6 +35,8 @@ import { sounds } from "../sounds";
 import { playSound, soundLabel, soundboardOn } from "../lib/soundboard";
 import { useMedia } from "../lib/hooks";
 import { ServerIcon } from "./ServerIcon";
+import { ServerList } from "./ServerList";
+import { setPrefs, usePrefs } from "../shop/prefs";
 import { Logo } from "./Logo";
 import { ServerModal } from "./ServerModal";
 import { InviteModal } from "./InviteModal";
@@ -100,6 +102,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   voiceRef.current = voice;
   const sharingRef = useRef(false);
 
+  const prefs = usePrefs();
   const server = servers.find((s) => s.id === serverId);
   const isOwner = server?.ownerId === self.id;
   // Left rail: icons only, or expanded with names and labels (remembered)
@@ -297,19 +300,8 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {auto && (auto.status === "downloading" || auto.status === "ready")
           ? <AutoUpdateBadge st={auto} />
           : update && (!auto || auto.status === "error" || auto.status === "unsupported") && <UpdateBadge n={update.n} note={update.note} url={update.url} />}
-        {railOpen && <div className="px-2 pt-1 text-[11px] uppercase tracking-widest text-muted">Servidores</div>}
-        {servers.map((s) => {
-          const on = !dmOpen && s.id === serverId;
-          return (
-            <button key={s.id} title={s.name} aria-current={on ? "true" : undefined} onClick={() => { setHome(false); setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
-              className={`group relative shrink-0 transition ${railOpen ? `w-full flex items-center gap-3 rounded-2xl pl-2 pr-3 ${on ? "bg-accent/15" : "hover:bg-white/5"}` : ""}`}>
-              {/* active: a bar on the left edge + a clean outline with a gap + a soft glow (inactive ones are dimmed) */}
-              <span className={`absolute ${railOpen ? "left-0" : "-left-[9px]"} top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-accent transition-all duration-200 ${on ? "h-9 opacity-100 shadow-[0_0_12px_rgb(var(--accent-rgb)/0.8)]" : "h-2 opacity-0 group-hover:opacity-70 group-hover:h-5"}`} />
-              <span className={`shrink-0 block rounded-2xl transition-all duration-200 ${on ? "outline outline-2 outline-offset-[3px] outline-white/80 shadow-[0_8px_26px_rgb(var(--accent-rgb)/0.45)]" : "opacity-55 hover:opacity-100 group-hover:scale-105"}`}><ServerIcon server={s} size={48} /></span>
-              {railOpen && <span className={`truncate text-sm text-left flex-1 ${on ? "font-semibold text-ink" : "text-muted"}`}>{s.name}</span>}
-            </button>
-          );
-        })}
+        <ServerList servers={servers} serverId={serverId} dmOpen={dmOpen} railOpen={railOpen} groups={prefs.serverGroups} onGroups={(g) => setPrefs({ serverGroups: g })}
+          onSelect={(s) => { setHome(false); setDmOpen(false); setServerId(s.id); setChannel(undefined); }} />
         <div className={`h-px bg-line my-1 shrink-0 ${railOpen ? "w-full" : "w-8"}`} />
         {rb({ title: "Loja", icon: <Store size={20} />, onClick: () => setShopOpen(true), cls: "bg-white/5 text-accent2 hover:bg-white/10" })}
         {rb({ title: "Criar servidor", icon: <Plus size={18} />, onClick: () => setServerModal("create"), cls: "bg-white/5 text-accent2 hover:bg-white/10" })}

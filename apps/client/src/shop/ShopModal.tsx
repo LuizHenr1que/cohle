@@ -1,5 +1,5 @@
 // The shop screen. A lazy chunk: nothing here is downloaded until someone opens the Loja. Framer Motion lives only here.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowLeft, Check, Gift, Package, Play, Sliders, Sparkles, Store, Trophy, X } from "lucide-react";
@@ -11,6 +11,7 @@ import { ItemBadge, UserName } from "./UserName";
 import { GIANT_LABEL, GiantArt } from "./GiantIcons";
 import { ENTRANCE_OF, RARITY_COLOR, THEME_OF, THEME_PREVIEW, SEASON_LOOK } from "./registry";
 import { setPrefs, usePrefs } from "./prefs";
+import { PreviewModal, SeasonDeco, SEASON_STYLE, Showcase, type PreviewReq } from "./ShopShowcase";
 
 type Tab = "vitrine" | "itens" | "colecoes" | "inventario" | "prefs";
 const TABS: [Tab, string, typeof Store][] = [["vitrine", "Vitrine", Sparkles], ["itens", "Itens", Package], ["colecoes", "Coleções", Trophy], ["inventario", "Inventário", Gift], ["prefs", "Preferências", Sliders]];
@@ -19,6 +20,7 @@ const BetaTag = ({ small = false }: { small?: boolean }) => (
   <span title={BETA_NOTE} className={`inline-flex items-center rounded-full font-bold uppercase tracking-wider text-white bg-gradient-to-r from-[#8b5cf6] to-[#e056d9] ${small ? "px-1.5 py-[1px] text-[9px]" : "px-2.5 py-0.5 text-[10px]"}`}>{BETA_LABEL}</span>
 );
 const Rarity = ({ r }: { r: Rarity }) => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: RARITY_COLOR[r], background: `${RARITY_COLOR[r]}22`, border: `1px solid ${RARITY_COLOR[r]}55` }}>{RARITY_LABEL[r]}</span>;
+const OpenPreview = createContext<(r: PreviewReq) => void>(() => {});
 const preview = (kind: "entrance" | "giant", p: object) => window.dispatchEvent(new CustomEvent("cohle:fx-preview", { detail: { kind, ...p } }));
 
 /** The live preview of an item, on the person's own avatar and name. */
@@ -41,7 +43,7 @@ function Preview({ item, me }: { item: ShopItemDTO; me: UserDTO }) {
   if (item.tipo === "entrance") {
     const meta = ENTRANCE_OF[item.key];
     return <div className="grid place-items-center h-28 gap-2"><span className="text-3xl font-black text-white drop-shadow-[0_4px_18px_rgba(230,57,70,0.7)]">{meta?.text ?? item.nome}</span>
-      <button onClick={() => preview("entrance", { text: meta?.text ?? item.nome, who: me.username, look: meta?.kind })} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1 text-xs font-semibold"><Play size={12} /> Ver ao vivo</button></div>;
+      <button onClick={() => preview("entrance", { key: item.key, who: me.username })} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3 py-1 text-xs font-semibold"><Play size={12} /> Ver ao vivo</button></div>;
   }
   if (item.tipo === "reaction") {
     const icons = ((item.meta as any)?.icons ?? []) as string[];
@@ -55,19 +57,22 @@ function Card({ item, me }: { item: ShopItemDTO; me: UserDTO }) {
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const owned = shop.owned.includes(item.id), worn = (SLOTS as readonly string[]).includes(item.tipo) && shop.equipped[item.tipo as Slot] === item.id;
   const col = shop.collections.find((c) => c.id === item.collectionId);
+  const open = useContext(OpenPreview);
+  const show = () => open({ title: item.nome, subtitle: item.descricao, items: [item], collection: undefined });
   const act = async () => {
     setBusy(true); setErr("");
     try { if (!owned) await ctx.claim(item); else if (item.tipo !== "reaction") await ctx.equip(item.tipo as Slot, worn ? null : item); }
     catch (e: any) { setErr(e?.message ?? "Não foi possível."); } finally { setBusy(false); }
   };
   return (
-    <m.div whileHover={{ y: -3 }} transition={{ type: "spring", stiffness: 400, damping: 26 }} className="rounded-2xl border border-line bg-white/[0.03] p-3.5 flex flex-col gap-2 h-full" data-item={item.key}>
-      <div className="flex items-center gap-1.5 flex-wrap"><Rarity r={item.raridade} /><BetaTag small />{col?.sazonal && col.daysLeft !== null && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30">Edição Limitada</span>}</div>
+    <m.div whileHover={{ y: -3 }} transition={{ type: "spring", stiffness: 400, damping: 26 }} onClick={(e) => { if (!(e.target as HTMLElement).closest("button,a")) show(); }} className="rounded-2xl border border-line bg-white/[0.03] p-3.5 flex flex-col gap-2 h-full cursor-pointer" data-item={item.key}>
+      <div className="flex items-center gap-1.5 flex-wrap"><Rarity r={item.raridade} /><BetaTag small />{col?.sazonal && col.daysLeft !== null && !owned && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30">Edição Limitada</span>}{owned && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">Já é seu</span>}{worn && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-white text-black"><span className="size-1.5 rounded-full bg-emerald-500" />Ativo</span>}</div>
       <Preview item={item} me={me} />
       <div><div className="font-semibold">{item.nome}</div><p className="text-xs text-muted leading-relaxed mt-0.5">{item.descricao}</p></div>
-      {col?.sazonal && col.daysLeft !== null && <p className="text-[11px] text-amber-300">{col.daysLeft === 0 ? "Último dia" : `${col.daysLeft} dia${col.daysLeft === 1 ? "" : "s"} restante${col.daysLeft === 1 ? "" : "s"}`}</p>}
+      {col?.sazonal && col.daysLeft !== null && !owned && <p className="text-[11px] text-amber-300">{col.daysLeft === 0 ? "Último dia" : `${col.daysLeft} dia${col.daysLeft === 1 ? "" : "s"} restante${col.daysLeft === 1 ? "" : "s"}`}</p>}
       {err && <p className="text-xs text-accent" role="alert">{err}</p>}
-      <div className="mt-auto pt-1">
+      <div className="mt-auto pt-1 space-y-1.5">
+        <button onClick={show} aria-label={`Ver prévia de ${item.nome}`} className="w-full rounded-xl py-1.5 text-xs font-semibold text-muted hover:text-ink bg-white/5 hover:bg-white/10 inline-flex items-center justify-center gap-1.5"><Play size={12} /> Ver prévia</button>
         {item.tipo === "reaction" && owned
           ? <div className="inline-flex items-center gap-1.5 text-xs text-emerald-300 font-semibold"><Check size={14} /> Você tem</div>
           : <button disabled={busy} onClick={act} className={`w-full rounded-xl py-2 text-sm font-semibold transition disabled:opacity-60 ${worn ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30" : owned ? "bg-white/10 hover:bg-white/15" : "grad text-white hover:brightness-110"}`}>
@@ -100,27 +105,63 @@ function VirtualGrid({ items, me, scroller }: { items: ShopItemDTO[]; me: UserDT
   );
 }
 
-function Collection({ c, items, hero = false }: { c: CollectionDTO; items: ShopItemDTO[]; hero?: boolean }) {
-  const ctx = useShop()!, shop = ctx.shop!;
+function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: ShopItemDTO[]; me: UserDTO; hero?: boolean }) {
+  const ctx = useShop()!, shop = ctx.shop!, open = useContext(OpenPreview);
   const mine = items.filter((i) => shop.owned.includes(i.id)), complete = mine.length === items.length;
   const [busy, setBusy] = useState(""), [msg, setMsg] = useState("");
   const wearable = items.filter((i) => (SLOTS as readonly string[]).includes(i.tipo));
   const wornAll = wearable.length > 0 && wearable.every((i) => shop.equipped[i.tipo as Slot] === i.id);
   const claimAll = async () => { setBusy("claim"); setMsg(""); try { for (const i of items) if (!shop.owned.includes(i.id)) await ctx.claim(i); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
   const wear = async () => { setBusy("wear"); setMsg(""); try { const done = await ctx.equipSet(c.id); setMsg(done && c.bonus ? "Conjunto completo equipado: bônus liberado!" : "Equipei o que você tem desta coleção."); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
-  return (
-    <section style={hero ? { background: `radial-gradient(120% 140% at 20% 0%, ${SEASON_LOOK[c.key]?.tint ?? "rgba(230,57,70,0.28)"}, transparent 70%), linear-gradient(135deg, var(--color-surface-2), var(--color-surface))` } : undefined} className={`rounded-3xl border border-line overflow-hidden ${hero ? "" : "bg-white/[0.03]"}`} aria-label={`Coleção ${c.nome}`}>
-      <div className="p-5 sm:p-6 flex flex-col sm:flex-row gap-4 sm:items-center">
+  const [expanded, setExpanded] = useState(false);
+  const st = SEASON_STYLE[c.key], tint = SEASON_LOOK[c.key]?.tint ?? "rgba(230,57,70,0.28)";
+  const seeSet = () => open({ title: st?.headline ?? c.nome, subtitle: st?.pitch ?? c.descricao, items, collection: c });
+  if (complete && !expanded) return (                                           // already yours: a slim strip instead of the sales banner, with "Ativo" when it is on
+    <section style={{ background: st?.bg }} className="relative rounded-2xl border border-line overflow-hidden" aria-label={`Coleção ${c.nome}`}>
+      <div className="relative px-4 py-3 flex items-center gap-3 flex-wrap">
+        <span className="size-9 rounded-xl grid place-items-center shrink-0 bg-emerald-500/20 text-emerald-300"><Check size={18} strokeWidth={3} /></span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap"><h3 className="text-xl font-extrabold">{c.nome}</h3><BetaTag />{c.sazonal && c.daysLeft !== null && <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30">Edição Limitada · {c.daysLeft} dia{c.daysLeft === 1 ? "" : "s"}</span>}</div>
-          <p className="text-sm text-muted mt-1 max-w-2xl">{c.descricao}</p>
-          <div className="mt-3 flex items-center gap-3"><div className="h-2 w-40 rounded-full bg-white/10 overflow-hidden"><div className="h-full grad" style={{ width: `${(mine.length / Math.max(items.length, 1)) * 100}%` }} /></div><span className="text-xs font-semibold tabular-nums" aria-label="Progresso da coleção">{mine.length}/{items.length} itens</span></div>
-        </div>
-        <div className="flex flex-col gap-2 sm:w-64 shrink-0">
-          {!complete && <button disabled={!!busy} onClick={claimAll} className="grad rounded-xl px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">{busy === "claim" ? "Pegando..." : "Pegar o conjunto (Beta)"}</button>}
-          {mine.length > 0 && <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>}
-          {c.bonus && <p className="text-[11px] text-muted leading-snug">Bônus do conjunto completo (tema + moldura + entrada): {SEASON_LOOK[c.key]?.bonus ?? "um extra no tema"}{shop.bonus === c.bonus ? <b className="text-emerald-300"> · ativo agora</b> : ""}.</p>}
+          <div className="flex items-center gap-2 flex-wrap"><h3 className="font-extrabold text-lg leading-tight">{c.nome}</h3>
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">Já é seu</span>
+            {wornAll && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-white text-black"><span className="size-1.5 rounded-full bg-emerald-500" />Ativo</span>}
+          </div>
+          <p className="text-xs text-white/60 mt-0.5">Coleção completa · {mine.length}/{items.length} itens{c.bonus && shop.bonus === c.bonus ? " · bônus ativo" : ""}</p>
           {msg && <p className="text-xs text-emerald-300" role="status">{msg}</p>}
+        </div>
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          <button onClick={seeSet} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center gap-1.5"><Play size={12} /> Ver prévia do conjunto</button>
+          <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>
+          <button onClick={() => setExpanded(true)} aria-label={`Ver os itens de ${c.nome}`} className="rounded-xl px-3 py-2 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10">Ver itens</button>
+        </div>
+      </div>
+    </section>
+  );
+  return (
+    <section style={{ background: st?.bg ?? `radial-gradient(120% 140% at 20% 0%, ${tint}, transparent 70%), linear-gradient(135deg, var(--color-surface-2), var(--color-surface))` }} className="relative rounded-3xl border border-line overflow-hidden" aria-label={`Coleção ${c.nome}`}>
+      <SeasonDeco k={c.key} />
+      <div className="relative p-5 sm:p-7 space-y-5">
+        <div className="max-w-xl">
+          <div className="flex items-center gap-2 flex-wrap">
+            {st && <span className="text-[11px] font-extrabold uppercase tracking-[0.18em]" style={{ color: st.ring }}>{st.kicker}</span>}
+            <BetaTag />{c.sazonal && c.daysLeft !== null && <span className="rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30">Edição Limitada · {c.daysLeft} dia{c.daysLeft === 1 ? "" : "s"}</span>}
+          </div>
+          <h3 className={`${hero ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"} font-black tracking-tight mt-1.5`}>{hero && st ? st.headline : c.nome}</h3>
+          <p className="text-sm text-white/75 mt-1.5">{st?.pitch ?? c.descricao}</p>
+          {c.sazonal && c.daysLeft !== null && <p className="mt-2 text-xs font-semibold text-amber-200">{c.daysLeft === 0 ? "Último dia para pegar." : `Só ${c.daysLeft} dia${c.daysLeft === 1 ? "" : "s"} para pegar: depois sai da Loja. Quem pegou, fica.`}</p>}
+        </div>
+        <Showcase items={items} me={me} />
+        <div className="flex flex-col lg:flex-row gap-4 lg:items-end justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3"><div className="h-2 w-44 rounded-full bg-white/10 overflow-hidden"><div className="h-full grad" style={{ width: `${(mine.length / Math.max(items.length, 1)) * 100}%` }} /></div><span className="text-xs font-semibold tabular-nums" aria-label="Progresso da coleção">{mine.length}/{items.length} itens</span></div>
+            {c.bonus && <p className="text-[11px] text-white/65 leading-snug max-w-md">Bônus do conjunto completo (tema + moldura + entrada): {SEASON_LOOK[c.key]?.bonus ?? "um extra no tema"}{shop.bonus === c.bonus ? <b className="text-emerald-300"> · ativo agora</b> : ""}.</p>}
+            {msg && <p className="text-xs text-emerald-300" role="status">{msg}</p>}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+            <button onClick={seeSet} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center justify-center gap-1.5"><Play size={14} /> Ver prévia do conjunto</button>
+            {!complete && <button disabled={!!busy} onClick={claimAll} className="grad rounded-xl px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">{busy === "claim" ? "Pegando..." : "Pegar o conjunto (Beta)"}</button>}
+            {mine.length > 0 && <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>}
+            {complete && <button onClick={() => setExpanded(false)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/10">Recolher</button>}
+          </div>
         </div>
       </div>
     </section>
@@ -148,6 +189,7 @@ function Prefs() {
 export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () => void }) {
   const ctx = useShop(), shop = ctx?.shop;
   const [tab, setTab] = useState<Tab>("vitrine");
+  const [pv, setPv] = useState<PreviewReq | null>(null);
   const [type, setType] = useState<ItemType | "all">("all"), [rar, setRar] = useState<Rarity | "all">("all"), [colF, setColF] = useState("all");
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
@@ -155,11 +197,13 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
   const filtered = useMemo(() => (shop?.items ?? []).filter((i) => (type === "all" || i.tipo === type) && (rar === "all" || i.raridade === rar) && (colF === "all" || i.collectionId === colF)), [shop, type, rar, colF]);
   const owned = useMemo(() => (shop?.items ?? []).filter((i) => shop!.owned.includes(i.id)), [shop]);
   const featured = shop?.collections.filter((c) => c.visible && c.sazonal) ?? [];
+  const permanent = shop?.collections.filter((c) => c.visible && !c.sazonal) ?? [];
+  const ordered = [...(shop?.collections ?? [])].sort((a, b) => Number(b.sazonal) - Number(a.sazonal));            // seasons first
   const itemsOf = (c: CollectionDTO) => (shop?.items ?? []).filter((i) => i.collectionId === c.id);
   const chip = (on: boolean) => `rounded-full px-3 py-1.5 text-xs font-medium border transition ${on ? "border-accent bg-accent/15 text-ink" : "border-line text-muted hover:text-ink"}`;
 
   return (
-    <LazyMotion features={domAnimation}>
+    <LazyMotion features={domAnimation}><OpenPreview.Provider value={setPv}>
       <m.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} role="dialog" aria-label="Loja" className="fixed inset-0 z-[60] bg-bg flex flex-col">
         <div className="titlebar-drag hidden electron-mac:block" />
         <header className="shrink-0 border-b border-line px-3 sm:px-6 py-3 flex items-center gap-3">
@@ -176,7 +220,9 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
           {ctx?.error && <p className="text-center text-accent py-20" role="alert">{ctx.error}</p>}
           {shop && tab === "vitrine" && (
             <div className="space-y-5">
-              {featured.length ? featured.map((c) => <Collection key={c.id} c={c} items={itemsOf(c)} hero />) : <p className="text-muted text-sm">Nenhuma coleção de temporada agora. Volte em breve.</p>}
+              {featured.length ? featured.map((c) => <Collection key={c.id} c={c} items={itemsOf(c)} me={me} hero />) : <p className="text-muted text-sm">Nenhuma coleção de temporada agora. Volte em breve.</p>}
+              {permanent.length > 0 && <h3 className="text-[11px] uppercase tracking-widest text-muted pt-2">Coleções sempre disponíveis</h3>}
+              {permanent.map((c) => <Collection key={c.id} c={c} items={itemsOf(c)} me={me} />)}
               <h3 className="text-[11px] uppercase tracking-widest text-muted pt-2">Itens em destaque</h3>
               <VirtualGrid items={shop.items.filter((i) => (featured.length ? featured.some((c) => c.id === i.collectionId) : true))} me={me} scroller={scroller} />
             </div>
@@ -189,7 +235,7 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
               <VirtualGrid items={filtered} me={me} scroller={scroller} />
             </div>
           )}
-          {shop && tab === "colecoes" && <div className="space-y-4">{shop.collections.length ? shop.collections.map((c) => <Collection key={c.id} c={c} items={itemsOf(c)} />) : <p className="text-muted text-sm">Sem coleções por enquanto.</p>}</div>}
+          {shop && tab === "colecoes" && <div className="space-y-4">{ordered.length ? ordered.map((c) => <Collection key={c.id} c={c} items={itemsOf(c)} me={me} />) : <p className="text-muted text-sm">Sem coleções por enquanto.</p>}</div>}
           {shop && tab === "inventario" && (
             <div className="space-y-4">
               <p className="text-sm text-muted">{owned.length} item{owned.length === 1 ? "" : "s"}. Os que você pegou continuam seus mesmo depois que a temporada acaba.</p>
@@ -199,6 +245,7 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
           {tab === "prefs" && <Prefs />}
         </div></div>
       </m.div>
-    </LazyMotion>
+      {pv && <PreviewModal req={pv} me={me} onClose={() => setPv(null)} />}
+    </OpenPreview.Provider></LazyMotion>
   );
 }

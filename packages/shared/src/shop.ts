@@ -26,8 +26,12 @@ export interface CollectionDTO {
   /** in season right now (and active): shown on the storefront */ visible: boolean;
   /** days until the season ends, for "Edição Limitada" */ daysLeft: number | null; bonus: string | null; itemIds: string[];
 }
-export interface PrefsDTO { effectsOff: boolean; soundsOff: boolean; seasonalAuto: boolean; hidePolitical: boolean; lite: "auto" | "on" | "off"; }
-export const DEFAULT_PREFS: PrefsDTO = { effectsOff: false, soundsOff: false, seasonalAuto: true, hidePolitical: false, lite: "auto" };
+/** A folder of servers in the side rail (the person's own organisation; only they see it). */
+export interface ServerGroup { id: string; name: string; color: string; serverIds: string[]; open: boolean; }
+export const GROUP_COLORS = ["#ff3b5c", "#ff8a3d", "#ffd166", "#3ddc84", "#19c2ff", "#5b8cff", "#a06bff", "#ff8fcf"] as const;
+export const GROUP_NAME_MAX = 24, GROUPS_MAX = 30;
+export interface PrefsDTO { effectsOff: boolean; soundsOff: boolean; seasonalAuto: boolean; hidePolitical: boolean; lite: "auto" | "on" | "off"; serverGroups: ServerGroup[]; }
+export const DEFAULT_PREFS: PrefsDTO = { effectsOff: false, soundsOff: false, seasonalAuto: true, hidePolitical: false, lite: "auto", serverGroups: [] };
 export interface ShopDTO {
   items: ShopItemDTO[]; collections: CollectionDTO[]; owned: string[];
   equipped: Partial<Record<Slot, string>>; /** item ids */ bonus: string | null; prefs: PrefsDTO; now: string; betaTester: boolean;
@@ -40,6 +44,10 @@ export const equipSetSchema = z.object({ collectionId: z.string().max(40) });
 export const prefsSchema = z.object({
   effectsOff: z.boolean().optional(), soundsOff: z.boolean().optional(), seasonalAuto: z.boolean().optional(), hidePolitical: z.boolean().optional(),
   lite: z.enum(["auto", "on", "off"]).optional(),
+  serverGroups: z.array(z.object({
+    id: z.string().min(1).max(40), name: z.string().trim().min(1).max(GROUP_NAME_MAX), color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    serverIds: z.array(z.string().min(1).max(40)).max(200), open: z.boolean(),
+  })).max(GROUPS_MAX).optional(),
 });
 export const serverSettingsSchema = z.object({ blockedCategories: z.array(z.enum(BLOCKABLE_CATEGORIES)).max(BLOCKABLE_CATEGORIES.length) });
 

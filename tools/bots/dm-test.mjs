@@ -67,7 +67,8 @@ await click('nav button[title="Servidor de Teste"]'); await sleep(800);
 await send(sb, a.user.id, `badge ${tag}`); await sleep(900);
 const apiUnread = (await http('/dms', 'GET', undefined, a.token)).d.find((c) => c.peer.id === b.user.id)?.unread;
 ok("fora das DMs o contador do botão bate com o da API", await ev(`document.querySelector('button[title="Mensagens diretas"]').innerText.trim()`) === String(apiUnread) && apiUnread >= 1, `api=${apiUnread} tela=${await ev(`document.querySelector('button[title="Mensagens diretas"]').innerText.trim()`)}`);
-await click('button[title="Mensagens diretas"]'); await sleep(500); await click("aside button", "teste2"); await sleep(1200);
+await click('button[title="Mensagens diretas"]'); await sleep(500); await click("aside button", "teste2");
+for (let i = 0; i < 32 && (await ev(`document.querySelector('button[title="Mensagens diretas"]').innerText.trim()`)) !== ""; i++) await sleep(250);          // the read mark goes through the database: poll
 ok("abrir a conversa zera o contador", await ev(`document.querySelector('button[title="Mensagens diretas"]').innerText.trim()===''`));
 
 // ---- camera confirmation ----
