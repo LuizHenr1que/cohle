@@ -145,15 +145,28 @@ const SHOTS = {
   "membros": ["Configurações do servidor com a lista de membros", "Configurações do servidor: membros, canais, convite e a lista de banidos (com botão de desbanir)."],
   "login": ["Tela de entrada do Cohle", "A porta de entrada. Login social (Google e GitHub) está na fila de construção."],
 };
-function setupGallery() {
-  const img = $("#shotImg"), cap = $("#shotCap"), main = $("#shotMain"), stage = $("#shotStage");
+const LOJA_SHOTS = {
+  "vitrine": ["Vitrine da Loja do Cohle com as coleções de Natal e Halloween e o selo Preview Beta", "A vitrine: coleções de temporada com contagem regressiva, tudo com o selo Preview Beta (grátis durante o beta)."],
+  "auras": ["Coleção de Auras da Loja com oito auras animadas: fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon", "As auras giram, queimam e brilham em volta do seu avatar. Passe o mouse e veja. Fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon."],
+  "colecoes": ["Banners das coleções Hacker, Gamer, Barbearia e Rainha com a arte de cada item", "Cada coleção mostra tudo o que vem nela: tema, moldura, nome, emblema, entrada e reações. Clicou, viu, decidiu."],
+  "previa": ["Prévia grande de um conjunto da Loja no avatar da própria pessoa", "A prévia mostra o conjunto no seu próprio avatar, com a entrada tocando ao vivo. Gostou? Pega. Não gostou? Sai."],
+  "natal": ["Cohle com o tema de Natal: neve, luzinhas, árvore e contagem para o Natal", "Tema de Natal: neve, luzinhas e uma árvore no canto. Clique nela e o Papai Noel passa no trenó."],
+  "halloween": ["Cohle com o tema de Halloween: luzes laranja e roxas, abóbora no canto e contagem", "Tema de Halloween: luzes laranja e roxas e uma abóbora no canto. Clique nela e a bruxa passa de vassoura."],
+  "hacker": ["Cohle com o tema Hacker: verde de terminal, luzes verdes e terminal no canto", "Tema Hacker: verde de terminal sobre preto. Clique no terminal para ver ACCESS GRANTED."],
+  "grupos": ["Barra lateral do Cohle com servidores organizados em grupos que se recolhem", "Muitos servidores? Agrupe. Cada grupo tem nome e cor, recolhe num ícone só e vale em qualquer aparelho."],
+};
+const APP_GALLERY = { img: "#shotImg", cap: "#shotCap", main: "#shotMain", stage: "#shotStage", tabs: "#app-real .shot-tabs", shots: SHOTS, first: "voz", prefix: "" };
+const LOJA_GALLERY = { img: "#lojaImg", cap: "#lojaCap", main: "#lojaMain", stage: "#lojaStage", tabs: "#loja .shot-tabs", shots: LOJA_SHOTS, first: "vitrine", prefix: "loja-" };
+function setupGallery(cfg) {
+  const img = $(cfg.img), cap = $(cfg.cap), main = $(cfg.main), stage = $(cfg.stage), tabs = `${cfg.tabs} button`, shots = cfg.shots;
+  if (!img || !stage) return;
   const set = (k) => {
-    $$(".shot-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.shot === k));
+    $$(tabs).forEach((b) => b.classList.toggle("on", b.dataset.shot === k));
     img.classList.add("swap");
-    setTimeout(() => { img.src = `shots/${k}.jpg`; img.alt = SHOTS[k][0]; cap.textContent = SHOTS[k][1]; img.onload = () => img.classList.remove("swap"); }, 160);
+    setTimeout(() => { img.src = `shots/${cfg.prefix}${k}.jpg`; img.alt = shots[k][0]; cap.textContent = shots[k][1]; img.onload = () => img.classList.remove("swap"); }, 160);
   };
-  cap.textContent = SHOTS.voz[1];
-  $$(".shot-tabs button").forEach((b) => b.addEventListener("click", () => set(b.dataset.shot)));
+  cap.textContent = shots[cfg.first][1];
+  $$(tabs).forEach((b) => b.addEventListener("click", () => set(b.dataset.shot)));
   if (reduceMotion) return;
   stage.addEventListener("pointermove", (e) => {
     if (e.pointerType === "touch") return;
@@ -162,7 +175,7 @@ function setupGallery() {
   });
   stage.addEventListener("pointerleave", () => { main.style.setProperty("--sy", "0deg"); main.style.setProperty("--sx", "0deg"); });
   // preload the other screens once the section is near the viewport
-  new IntersectionObserver(([en], o) => { if (en.isIntersecting) { Object.keys(SHOTS).forEach((k) => (new Image().src = `shots/${k}.jpg`)); o.disconnect(); } }, { rootMargin: "400px" }).observe(stage);
+  new IntersectionObserver(([en], o) => { if (en.isIntersecting) { Object.keys(shots).forEach((k) => (new Image().src = `shots/${cfg.prefix}${k}.jpg`)); o.disconnect(); } }, { rootMargin: "400px" }).observe(stage);
 }
 
 /* ---------- floating dots background ---------- */
@@ -375,5 +388,5 @@ function setupDemo() {
 
 /* ---------- boot ---------- */
 document.addEventListener("DOMContentLoaded", () => {
-  setupPage(); showLatestRelease(); setupDownloads(); setupTilt(); setupDots(); setupDemo(); setupGallery();
+  setupPage(); showLatestRelease(); setupDownloads(); setupTilt(); setupDots(); setupDemo(); setupGallery(APP_GALLERY); setupGallery(LOJA_GALLERY);
 });

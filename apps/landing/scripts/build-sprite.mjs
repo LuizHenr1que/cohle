@@ -10,7 +10,7 @@ const NAMES = ["hash","volume-2","volume-x","mic","mic-off","headphones","headph
   "phone-off","plus","link-2","zap","crown","send","maximize-2","minimize-2","x","user-plus","sliders-horizontal","screen-share","settings",
   "lock","ban","user-x","phone-missed","shield-alert","sparkles","download","laptop","monitor","message-square","rocket","smartphone",
   "globe","heart","check","chevron-down","arrow-right","play","users","gamepad-2","graduation-cap","palette","flame","gauge","bell",
-  "image","smile","bot","key-round","hourglass","hammer","coffee","party-popper","feather","sun","moon","cpu","wifi","at-sign","file-up","layers","flask-conical","eye","eye-off"];
+  "image","smile","bot","key-round","hourglass","hammer","coffee","party-popper","feather","sun","moon","cpu","wifi","at-sign","file-up","layers","flask-conical","eye","eye-off","store","folder-plus","gift","snowflake","ghost","terminal","scissors","trophy","wand-sparkles"];
 
 const attr = (o) => Object.entries(o).filter(([k]) => k !== "key").map(([k, v]) => `${k}="${v}"`).join(" ");
 const out = [];

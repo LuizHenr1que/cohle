@@ -11,6 +11,10 @@ export const COLLECTIONS: CatalogCollection[] = [
     key: "natal", nome: "Natal", categoria: "natal", sazonal: true, inicio: "2026-10-01T00:00:00-03:00", fim: "2027-01-07T00:00:00-03:00", bonus: "natal.sleigh",
     descricao: "Neve, luzinhas e o Papai Noel: clique na árvore e o trenó passa. Equipe tema + moldura + entrada do conjunto para o trenó deixar um rastro de luzes.",
   },
+  {
+    key: "anonovo", nome: "Ano Novo", categoria: "anonovo", sazonal: true, inicio: "2026-12-20T00:00:00-03:00", fim: "2027-01-10T00:00:00-03:00",
+    descricao: "Céu escuro, dourado e uma garrafa de champanhe no canto: clique nela e os fogos da virada estouram. Aro dourado, confete, entrada Feliz 2027 e muito brilho.",
+  },
   { key: "auras", nome: "Auras", categoria: "auras", sazonal: false, descricao: "Energia girando em volta do seu avatar: fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon." },
   { key: "hacker", nome: "Hacker", categoria: "hacker", sazonal: false, descricao: "Terminal verde, código em chuva e a entrada ACCESS GRANTED. Para quem vive no teclado." },
   { key: "gamer", nome: "Gamer", categoria: "gamer", sazonal: false, descricao: "Arena neon, controle, pixel art e a entrada GAME ON. Aperte start." },
@@ -97,6 +101,16 @@ export const ITEMS: CatalogItem[] = [
   { key: "queen.name.rose", tipo: "name_effect", nome: "Nome rosé", raridade: "raro", categoria: "rainha", collection: "rainha", descricao: "Degradê rosa e lilás.", meta: {style: "rose"} },
   { key: "queen.name.diamond", tipo: "name_effect", nome: "Nome diamante", raridade: "epico", categoria: "rainha", collection: "rainha", descricao: "Brilho de diamante, do branco ao azul gelo.", meta: {style: "diamond"} },
   { key: "queen.reactions", tipo: "reaction", nome: "Reações da Rainha", raridade: "raro", categoria: "rainha", collection: "rainha", descricao: "Coroa, flor e diamante para a reação gigante.", meta: {icons: ["crown", "flower", "diamond"]} },
+
+  // ---- Ano Novo (seasonal; nothing happens on its own: the champagne in the corner starts the fireworks when clicked) ----
+  { key: "anonovo.theme", tipo: "theme", nome: "Virada 2027", raridade: "epico", categoria: "anonovo", collection: "anonovo", descricao: "Céu escuro e dourado, luzes douradas nas bordas, contagem para a virada e uma garrafa no canto: clique e os fogos estouram.", meta: {theme: "anonovo", lights: true, corner: "newyear", "countdown": true} },
+  { key: "anonovo.frame.gold", tipo: "frame", nome: "Aro dourado", raridade: "raro", categoria: "anonovo", collection: "anonovo", descricao: "Aro dourado com faíscas girando.", meta: {style: "nygold"} },
+  { key: "anonovo.frame.confetti", tipo: "frame", nome: "Confete", raridade: "comum", categoria: "anonovo", collection: "anonovo", descricao: "Confete colorido em volta do avatar.", meta: {style: "nyconfetti"} },
+  { key: "anonovo.badge.2027", tipo: "badge", nome: "Virada 2027", raridade: "raro", categoria: "anonovo", collection: "anonovo", descricao: "Estava lá na virada.", meta: {icon: "party"} },
+  { key: "anonovo.entrance.champagne", tipo: "entrance", nome: "Feliz 2027!", raridade: "epico", categoria: "anonovo", collection: "anonovo", descricao: "Ao entrar na sala: Feliz 2027! com fogos, champanhe e relógios caindo.", meta: {fx: "champagne", sound: "pop"} },
+  { key: "anonovo.name.gold", tipo: "name_effect", nome: "Nome de ouro", raridade: "raro", categoria: "anonovo", collection: "anonovo", descricao: "Dourado brilhante com reflexo.", meta: {style: "nygold"} },
+  { key: "anonovo.name.fireworks", tipo: "name_effect", nome: "Nome de fogos", raridade: "epico", categoria: "anonovo", collection: "anonovo", descricao: "Cores de fogos de artifício.", meta: {style: "nyfireworks"} },
+  { key: "anonovo.reactions", tipo: "reaction", nome: "Reações de Ano Novo", raridade: "raro", categoria: "anonovo", collection: "anonovo", descricao: "Fogos, champanhe e relógio para a reação gigante.", meta: {icons: ["firework", "champagne", "clock"]} },
 ];
 
 /** Reaction icons everybody can send as a "giant reaction"; packs add more. */

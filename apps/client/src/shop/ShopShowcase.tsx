@@ -19,6 +19,7 @@ const first = (items: ShopItemDTO[], tipo: string) => items.find((i) => i.tipo =
 /** Colours, art and words of each season: what makes a collection look like a product. */
 export const SEASON_STYLE: Record<string, { bg: string; ring: string; kicker: string; headline: string; pitch: string }> = {
   natal: { bg: "radial-gradient(120% 140% at 15% 0%, rgba(230,57,70,.45), transparent 62%), radial-gradient(90% 120% at 100% 100%, rgba(61,220,132,.22), transparent 60%), linear-gradient(135deg,#0d2038,#06101c)", ring: "#e63946", kicker: "Edição de Natal", headline: "O Natal chegou no Cohle", pitch: "Neve caindo, luzinhas nas bordas e uma árvore no canto: clique nela e o Papai Noel passa no trenó." },
+  anonovo: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(255,209,102,.38), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(255,143,207,.26), transparent 60%), linear-gradient(135deg,#1a1626,#07060d)", ring: "#ffd166", kicker: "Edição de Ano Novo", headline: "Virada com estilo", pitch: "Céu escuro, dourado e uma garrafa de champanhe no canto: clique nela e os fogos da virada estouram." },
   auras: { bg: "radial-gradient(110% 130% at 10% 0%, rgba(255,122,26,.38), transparent 58%), radial-gradient(100% 120% at 100% 20%, rgba(90,168,255,.34), transparent 60%), radial-gradient(90% 120% at 60% 110%, rgba(160,107,255,.32), transparent 60%), linear-gradient(135deg,#0d1020,#070812)", ring: "#8fb8ff", kicker: "Coleção de Auras", headline: "Energia em volta de você", pitch: "Fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon girando ao redor do seu avatar. Passe o mouse e veja." },
   hacker: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(61,255,122,.3), transparent 60%), linear-gradient(135deg,#06150b,#030a05)", ring: "#3dff7a", kicker: "Coleção Hacker", headline: "Modo terminal", pitch: "Verde fosforescente, código em chuva e a entrada ACCESS GRANTED. Para quem vive no teclado." },
   gamer: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(181,123,255,.42), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(25,224,255,.26), transparent 60%), linear-gradient(135deg,#150d2e,#0a0716)", ring: "#b57bff", kicker: "Coleção Gamer", headline: "Aperte start", pitch: "Arena neon, controle girando, borda pixel e a entrada GAME ON!" },
@@ -34,8 +35,8 @@ export function SeasonDeco({ k }: { k: string }) {
       {[[190, 100, 70, "#ff7a1a"], [235, 70, 48, "#8fdcff"], [250, 140, 40, "#a06bff"], [150, 60, 28, "#ffd84a"]].map(([x, y, r, c], i) => <g key={i}><circle cx={x as number} cy={y as number} r={r as number} fill="none" stroke={c as string} strokeWidth="5" opacity=".55" /><circle cx={x as number} cy={y as number} r={(r as number) - 12} fill="none" stroke={c as string} strokeWidth="1.5" strokeDasharray="3 7" opacity=".9" /></g>)}
     </svg>
   );
-  if (k === "hacker" || k === "gamer" || k === "barbearia" || k === "rainha") return (
-    <div className="absolute right-8 top-4 pointer-events-none hidden sm:block opacity-95"><CornerArt k={k === "hacker" ? "terminal" : k === "gamer" ? "gamepad" : k === "barbearia" ? "pole" : "crown"} size={128} /></div>
+  if (k === "hacker" || k === "gamer" || k === "barbearia" || k === "rainha" || k === "anonovo") return (
+    <div className="absolute right-8 top-4 pointer-events-none hidden sm:block opacity-95"><CornerArt k={k === "hacker" ? "terminal" : k === "gamer" ? "gamepad" : k === "barbearia" ? "pole" : k === "anonovo" ? "newyear" : "crown"} size={128} /></div>
   );
   if (k === "halloween") return (
     <svg className="absolute right-0 top-0 h-[185px] w-[46%] opacity-90 pointer-events-none hidden sm:block [mask-image:linear-gradient(to_bottom,black_55%,transparent)]" viewBox="0 0 300 200" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">

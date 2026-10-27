@@ -8,6 +8,8 @@ Vale igual no app e na web (mesmo cliente, mesmo servidor). **Tudo é grátis du
 | **Natal** | 01/10/2026 a 07/01/2027 | noite estrelada, neve, luzinhas, árvore, contagem para o Natal; **clique na árvore e o Papai Noel passa no trenó** (com o ho ho ho real) | trenó com rastro de luzes |
 | **Halloween** | 10/10/2026 a 03/11/2026 | noite roxa, luzes laranja e roxas, contagem para o Halloween; **clique na abóbora e a bruxa de vassoura passa** (com o buuu real) | bruxa com rastro de faíscas |
 
+| **Ano Novo** | 20/12/2026 a 10/01/2027 | céu escuro e dourado, luzes douradas, contagem para a virada; **clique na garrafa de champanhe do canto e os fogos estouram** (com som) | – |
+
 Regra: **quem pegou, pegou.** Durante a janela qualquer pessoa pega os itens; quando a temporada acaba a coleção some da vitrine e ninguém novo consegue pegar (403), mas **quem já pegou continua com tudo e pode equipar**. Isso deixa pronto o caminho para limitar quantidade, lançar novos temas de Natal etc. como produtos únicos sazonais.
 
 ## Coleções permanentes (sem temporada)
@@ -55,3 +57,6 @@ Categoria `politica`: a pessoa pode ocultar nas preferências e o dono do servid
 
 ## Grupos de servidores (barra lateral)
 Quem tem muitos servidores organiza em **grupos**: botão "Novo grupo" (ou clique direito num servidor > "Novo grupo com este servidor"), nome, cor e servidores. O grupo recolhido vira um só ícone (com a contagem e uma marca se o servidor aberto está dentro). Mover: menu do servidor ("Mover para" / "Tirar do grupo") ou arrastar para o grupo. Editar, recolher e "Desfazer grupo" (os servidores voltam soltos) no menu do grupo. Ficam em `UserPrefs.serverGroups` (até 30 grupos, nome de até 24 caracteres), então valem em qualquer aparelho. Teste: `tools/bots/server-groups-ui-test.mjs`.
+
+## Ano Novo (Etapa 2)
+Coleção sazonal de 8 itens: tema **Virada**, molduras Aro dourado e Confete, emblema Virada, entrada **Feliz 20XX!** (champanhe, fogos e relógios caindo), nomes Ouro e Fogos e reações (fogos, champanhe, relógio). O ano mostrado na contagem e nos textos é sempre o da próxima virada. **Os fogos não estouram à meia-noite sozinhos**: seguem a regra "nada acontece sozinho" e só saem quando a pessoa clica na garrafa. A coleção só aparece na janela; para ver antes no banco de desenvolvimento, ajuste `inicio`/`fim` em `Collection` (o `shop-test` e o `shop-ui-test` fazem isso e restauram no fim).

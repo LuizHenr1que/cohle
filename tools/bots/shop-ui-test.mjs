@@ -1,6 +1,11 @@
 // The Loja in the real client. Chrome (default, headless, CDP 9361) or the desktop app: ATTACH=9341. Dev API (EMAIL_DEV=1, log in SERVER_LOG) + vite :5173.
 import { spawn } from "node:child_process"; import { mkdtempSync, writeFileSync, readFileSync } from "node:fs"; import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { io } from "../bots/node_modules/socket.io-client/build/esm/index.js";
+const req = createRequire(import.meta.url);
+const { PrismaClient } = req("../../apps/server/node_modules/@prisma/client");
+const dbEnv = Object.fromEntries(readFileSync(new URL("../../apps/server/.env", import.meta.url), "utf8").split("\n").map((l) => l.match(/^\s*([A-Z_]+)\s*=\s*"?(.*?)"?\s*$/)).filter(Boolean).map((m) => [m[1], m[2]]));
+const prisma = new PrismaClient({ datasources: { db: { url: dbEnv.DATABASE_URL } } });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const API = "http://localhost:3001", OUT = process.env.SHOTS ?? tmpdir(), LOG = process.env.SERVER_LOG, ATTACH = process.env.ATTACH, TAG = ATTACH ? "desktop" : "web";
 let pass = 0, fail = 0; const ok = (l, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  [${TAG}] ${l}${x ? "  — " + x : ""}`); };
@@ -8,7 +13,10 @@ const http = async (p, b, tok, m) => { const r = await fetch(API + p, { method: 
 const last = (re) => [...readFileSync(LOG, "utf8").matchAll(re)].at(-1)?.[1];
 const run = Date.now().toString(36).slice(-6);
 const mk = async (name) => { const email = `${name}.${run}@cohle.dev`; const r = await http("/auth/register", { email, username: `${name}_${run}`, password: "senhaSegura123" }); if (r.d.token) return r.d; await sleep(500); return (await http("/auth/verify", { email, code: last(/Seu código do Cohle: (\d{6})/g) })).d; };
-const A = await mk("ana"), B = await mk("bia"), H = await mk("hel"), X = await mk("hax");
+// Ano Novo starts on 20 Dec: open its window in the dev database for this run (restored at the end)
+const nyOrig = await prisma.collection.findUnique({ where: { key: "anonovo" } });
+await prisma.collection.update({ where: { key: "anonovo" }, data: { inicio: new Date(Date.now() - 86_400_000), fim: new Date(Date.now() + 10 * 86_400_000) } }); await sleep(600);
+const A = await mk("ana"), B = await mk("bia"), H = await mk("hel"), X = await mk("hax"), N = await mk("nye");
 const owner = (await http("/auth/login", { email: "teste1@cohle.dev", password: "teste12345" })).d;
 const srv = (await http("/servers", { name: "Loja UI " + run }, owner.token)).d, vch = srv.channels.find((c) => c.type === "VOICE").id;
 await http(`/servers/join/${srv.inviteCode}`, {}, A.token); await http(`/servers/join/${srv.inviteCode}`, {}, B.token);
@@ -22,6 +30,8 @@ const shH = (await http("/shop", null, H.token)).d; for (const it of shH.items.f
 await http("/shop/equipped/set", { collectionId: shH.collections.find((c) => c.key === "halloween").id }, H.token);
 const shX = (await http("/shop", null, X.token)).d; for (const it of shX.items.filter((i) => i.key.startsWith("hacker."))) await http(`/shop/items/${it.id}/claim`, {}, X.token);
 await http("/shop/equipped/set", { collectionId: shX.collections.find((c) => c.key === "hacker").id }, X.token);
+const shN = (await http("/shop", null, N.token)).d; for (const it of shN.items.filter((i) => i.key.startsWith("anonovo."))) await http(`/shop/items/${it.id}/claim`, {}, N.token);
+await http("/shop/equipped/set", { collectionId: shN.collections.find((c) => c.key === "anonovo").id }, N.token);
 let t; if (ATTACH) t = (await (await fetch(`http://localhost:${ATTACH}/json`)).json()).find((x) => x.type === "page" && x.url.startsWith("http://localhost:5173"));
 const chrome = ATTACH ? null : spawn("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", ["--headless=new", "--remote-debugging-port=9361", `--user-data-dir=${mkdtempSync(tmpdir() + "/su-")}`, "--window-size=1280,860", "--no-first-run", "about:blank"], { stdio: "ignore" });
 for (let i = 0; i < 40 && !t; i++) { await sleep(300); try { t = (await (await fetch("http://localhost:9361/json")).json()).find((x) => x.type === "page"); } catch {} }
@@ -41,7 +51,7 @@ const effects = () => ev(`({ lights: document.querySelectorAll('.fx-lights').len
 try {
   await cmd("Runtime.enable"); await cmd("Page.enable");
   // counts every sound the page starts (sample elements and synthesized oscillators/noise): the rule is that none starts without a click
-  await cmd("Page.addScriptToEvaluateOnNewDocument", { source: `window.__snd=0;const pl=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__snd++;return pl.apply(this,arguments)};for(const k of ['createOscillator','createBufferSource']){const o=AudioContext.prototype[k];AudioContext.prototype[k]=function(){window.__snd++;return o.apply(this,arguments)}}0` });
+  await cmd("Page.addScriptToEvaluateOnNewDocument", { source: `window.__snd=0;window.__stk=[];const pl=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__snd++;window.__stk.push('audio '+this.src.split('/').pop()+' '+new Error().stack.split('\\n').slice(2,5).join(' | '));return pl.apply(this,arguments)};for(const k of ['createOscillator','createBufferSource']){const o=AudioContext.prototype[k];AudioContext.prototype[k]=function(){window.__snd++;window.__stk.push(k+' '+new Error().stack.split('\\n').slice(2,6).join(' | '));return o.apply(this,arguments)}}0` });
   if (ATTACH) { await cmd("Page.bringToFront"); await cmd("Emulation.setFocusEmulationEnabled", { enabled: true }); }
   await cmd("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }).catch(() => {});
   await cmd("Page.navigate", { url: "http://localhost:5173/" }); await sleep(1500);
@@ -87,7 +97,7 @@ try {
 
   // the rule (CLAUDE.md): nothing crosses the screen or makes noise on its own; the corner icon does it when clicked
   await sleep(24000);
-  ok("sem clique, nada cruza a tela e nenhum som toca (o trenó antigo vinha sozinho aos 20 s)", !(await ev(`!!document.querySelector('.fx-cross')`)) && (await ev(`window.__snd`)) === 0, `sons=${await ev(`window.__snd`)}`);
+  ok("sem clique, nada cruza a tela e nenhum som toca (o trenó antigo vinha sozinho aos 20 s)", !(await ev(`!!document.querySelector('.fx-cross')`)) && (await ev(`window.__snd`)) === 0, `sons=${await ev(`window.__snd`)} ${(await ev(`window.__stk.slice(0,2).join(' ## ')`) ?? '').slice(0, 600)}`);
   ok("a árvore do canto é um botão clicável", !!(await ev(`!!document.querySelector('button.fx-tree[aria-label*="Papai Noel"]')`)));
   await ev(`document.querySelector('button.fx-tree').click()`);
   ok("clicou na árvore: o Papai Noel passa no trenó (barba, gorro e rena) e toca o som", await waitFor(`!!document.querySelector('.fx-cross svg path[fill="#fff"]') && !!document.querySelector('.fx-cross svg circle[fill="#f2d3b3"]')`, 6000) && (await ev(`window.__snd`)) > 0);
@@ -97,7 +107,7 @@ try {
   // ---- the Loja as a sales window: banners, big preview, click-see-leave ----
   await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500); await tab("Coleções");
   const banners = await ev(`[...document.querySelectorAll('section[aria-label^="Coleção "]')].map(x=>x.getAttribute('aria-label').replace('Coleção ',''))`);
-  ok("Coleções: banners de Natal, Halloween, Auras, Hacker, Gamer, Barbearia e Rainha", ["Natal", "Halloween", "Auras", "Hacker", "Gamer", "Barbearia", "Rainha"].every((n) => banners.includes(n)), banners.join(","));
+  ok("Coleções: banners de Natal, Halloween, Ano Novo, Auras, Hacker, Gamer, Barbearia e Rainha", ["Natal", "Halloween", "Ano Novo", "Auras", "Hacker", "Gamer", "Barbearia", "Rainha"].every((n) => banners.includes(n)), banners.join(","));
   ok("coleção completa vira faixa: 'Já é seu', 'Ativo' (equipada) e 8/8", await ev(`(()=>{const t=document.querySelector('[aria-label="Coleção Natal"]').innerText;return /Já é seu/i.test(t)&&/Ativo/i.test(t)&&/8\\/8 itens/.test(t)&&!/Neve caindo/.test(t)})()`));
   ok("banner de temporada que ainda não é seu vende: texto, edição limitada com dias e 'quem pegou, fica'", await ev(`(()=>{const t=document.querySelector('[aria-label="Coleção Halloween"]').innerText;return /Lua cheia/.test(t)&&/Edição Limitada · \\d+ dias?/.test(t)&&/Quem pegou, fica/.test(t)})()`));
   ok("banner mostra a arte real dos itens (moldura, nome, emblema, entrada, reações)", await ev(`(()=>{const sh=document.querySelector('[aria-label="Coleção Halloween"] [aria-label="O que vem no conjunto"]');return !!sh&&/moldura/i.test(sh.innerText)&&/emblema/i.test(sh.innerText)&&/entrada/i.test(sh.innerText)&&/rea[cç][oõ]es/i.test(sh.innerText)})()`));
@@ -163,6 +173,8 @@ try {
 
   // ---- take the theme off: the old theme comes back ----
   await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500);
+  await tab("Itens"); await ev(`[...document.querySelectorAll('[role=group][aria-label="Coleção"] button')].find(b=>b.innerText.trim()==='Natal')?.click()`); await sleep(800);          // the grid is virtualized: filter to the collection so the card is on screen
+  ok("o card do tema equipado mostra 'Ativo'", await waitFor(`/Ativo/.test(document.querySelector('[data-item="natal.theme"]')?.innerText||'')`, 6000));
   await ev(`[...document.querySelectorAll('[data-item="natal.theme"] button')].find(b=>/Equipado/.test(b.innerText))?.click()`); await sleep(1500);
   ok("tirar o tema devolve o tema anterior", await waitFor(`document.documentElement.dataset.theme!=='natal'`));
 
@@ -177,7 +189,7 @@ try {
   ok("Halloween: luzes laranja e roxas, abóbora no canto e contagem para o Halloween (sem neve)", await waitFor(`document.querySelectorAll('.fx-lights.hw').length===4 && !!document.querySelector('.fx-corner') && /para o Halloween|Halloween é amanhã|Hoje é Halloween|Feliz Halloween/.test(document.body.innerText) && !document.querySelector('[id^="fx-snow-"] canvas')`, 15000));
   await shot(`shop-6-halloween-${TAG}`);
   await ev(`window.__snd=0`); await sleep(22000);
-  ok("Halloween: sem clique, nada cruza a tela e nenhum som toca", !(await ev(`!!document.querySelector('.fx-cross')`)) && (await ev(`window.__snd`)) === 0, `sons=${await ev(`window.__snd`)}`);
+  ok("Halloween: sem clique, nada cruza a tela e nenhum som toca", !(await ev(`!!document.querySelector('.fx-cross')`)) && (await ev(`window.__snd`)) === 0, `sons=${await ev(`window.__snd`)} ${(await ev(`window.__stk.slice(0,2).join(' ## ')`) ?? '').slice(0, 600)}`);
   await ev(`document.querySelector('button[aria-label*="bruxa"]').click()`);
   ok("Halloween: clicou na abóbora, a bruxa de vassoura passa e toca o som", await waitFor(`!!document.querySelector('.fx-cross svg circle[fill="#8bd17c"]')`, 6000) && (await ev(`window.__snd`)) > 0);
   await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500);
@@ -191,11 +203,22 @@ try {
   // ---- a theme without a season (Hacker): nothing on its own, the terminal icon in the corner does the animation + sound ----
   await ev(`localStorage.setItem('token',${JSON.stringify(X.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(X.user))});localStorage.setItem('cohle:tour:${X.user.id}','done');location.reload()`); await sleep(4500);
   ok("Hacker: tema verde de terminal aplicado, com luzes verdes e o terminal no canto", await waitFor(`document.documentElement.dataset.theme==='hacker' && document.querySelectorAll('.fx-lights').length===4 && !!document.querySelector('button.fx-corner')`, 12000));
-  await ev(`window.__snd=0`); await sleep(8000);
-  ok("Hacker: sem clique, nada aparece nem toca", !(await ev(`!!document.querySelector('.fx-ent-text')`)) && (await ev(`window.__snd`)) === 0);
+  await ev(`window.__snd=0;window.__stk.length=0`); await sleep(8000);
+  ok("Hacker: sem clique, nada aparece nem toca", !(await ev(`!!document.querySelector('.fx-ent-text')`)) && (await ev(`window.__snd`)) === 0, `sons=${await ev(`window.__snd`)} ${(await ev(`window.__stk.slice(0,2).join(' ## ')`) ?? '').slice(0, 600)}`);
   await ev(`document.querySelector('button.fx-corner').click()`);
   ok("Hacker: clicou no terminal, sai a animação com som", await waitFor(`/sudo hack/.test(document.querySelector('.fx-ent-text')?.innerText||'')`, 5000) && (await ev(`window.__snd`)) > 0);
   await shot(`shop-8-hacker-${TAG}`);
+  await ev(`localStorage.setItem('token',${JSON.stringify(A.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(A.user))});location.reload()`); await sleep(4000);
+
+  // ---- Ano Novo: gold theme, the bottle in the corner; fireworks only when it is clicked ----
+  await ev(`localStorage.setItem('token',${JSON.stringify(N.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(N.user))});localStorage.setItem('cohle:tour:${N.user.id}','done');location.reload()`); await sleep(4500);
+  ok("Ano Novo: tema dourado, luzes douradas, garrafa no canto e contagem para a virada", await waitFor(`document.documentElement.dataset.theme==='anonovo' && document.querySelectorAll('.fx-lights').length===4 && !!document.querySelector('button.fx-corner') && /para 20\\d\\d|20\\d\\d começa amanhã|Feliz 20\\d\\d/.test(document.body.innerText)`, 14000));
+  await ev(`window.__snd=0;window.__stk.length=0`); await sleep(9000);
+  ok("Ano Novo: sem clique, nenhum fogo aparece e nenhum som toca", !(await ev(`!!document.querySelector('[data-fireworks]')`)) && (await ev(`window.__snd`)) === 0);
+  await ev(`document.querySelector('button.fx-corner').click()`);
+  ok("Ano Novo: clicou na garrafa, os fogos estouram, aparece 'Feliz Ano Novo!' e toca o som", await waitFor(`!!document.querySelector('[data-fireworks]') && /Feliz Ano Novo/.test(document.querySelector('.fx-ent-text')?.innerText||'')`, 5000) && (await ev(`window.__snd`)) > 0);
+  await shot(`shop-9-fogos-${TAG}`);
+  ok("os fogos somem sozinhos depois de estourar", await waitFor(`!document.querySelector('[data-fireworks]')`, 8000));
   await ev(`localStorage.setItem('token',${JSON.stringify(A.token)});localStorage.setItem('me',${JSON.stringify(JSON.stringify(A.user))});location.reload()`); await sleep(4000);
 
   // ---- phone size ----
@@ -204,5 +227,5 @@ try {
     ok("celular: a Loja não rola para o lado", await noSide()); await shot(`shop-5-celular-${TAG}`);
   }
   ok("sem erros de JavaScript", errors.length === 0, errors.slice(0, 2).join(" | ").slice(0, 240));
-} finally { ws.close(); chrome?.kill(); }
+} finally { ws.close(); chrome?.kill(); await prisma.collection.update({ where: { key: "anonovo" }, data: { inicio: nyOrig.inicio, fim: nyOrig.fim } }).catch(() => {}); await prisma.$disconnect(); }
 console.log(`\n${pass} passaram, ${fail} falharam`); process.exit(fail ? 1 : 0);

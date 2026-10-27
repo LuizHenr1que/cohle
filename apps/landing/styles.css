@@ -352,3 +352,12 @@ h1, h2, h3 { margin: 0; letter-spacing: -.025em; line-height: 1.1; }
   .float, .glow, .shot-glow, .phone, .chip, .demo-hint, .marquee-track, .av.speak, .meter i, .m-code u, .m-cur, .m-game i { animation: none !important; }
   .js .reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* ---------- Loja ---------- */
+.loja-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 46px; }
+.loja-foot { display: grid; justify-items: center; gap: 18px; margin-top: 34px; text-align: center; }
+.loja-badges { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.loja-note { margin: 0; max-width: 640px; color: var(--muted); }
+.loja-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin: 0; }
+@media (max-width: 1020px) { .loja-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .loja-grid { grid-template-columns: 1fr; margin-top: 32px; } }

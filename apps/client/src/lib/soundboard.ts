@@ -90,11 +90,17 @@ export function playSound(id: string) {
 }
 
 // ---- sounds of shop effects (same rule: synthesized, nothing downloaded) ----
-export type FxSound = "hohoho" | "whoosh" | "sleigh" | "boo" | "witch" | "glitch" | "gameon" | "snip" | "tada";
+export type FxSound = "hohoho" | "whoosh" | "sleigh" | "boo" | "witch" | "glitch" | "gameon" | "snip" | "tada" | "pop" | "fireworks";
 // Real recordings (CC0, see public/sfx/CREDITS.txt), ~30 KB in total, fetched only the first time they play. If one cannot load or play, the synthesized version below takes over.
 const SAMPLES: Partial<Record<FxSound, { file: string; vol: number }>> = { hohoho: { file: "sfx/santa-hohoho.mp3", vol: 0.9 }, boo: { file: "sfx/ghost-boo.mp3", vol: 0.85 } };
 const sampleCache = new Map<string, HTMLAudioElement>();
-export function playFx(id: FxSound) {
+// Rule (CLAUDE.md): no theme makes noise on its own. A Loja sound only plays right after a click/tap/key of the person, or when it is an effect another
+// person sent on purpose into the call we are in (`others`). Anything else (a stray timer, a bug) is refused here, so it cannot happen by construction.
+let lastGesture = 0;
+if (typeof window !== "undefined") for (const e of ["pointerdown", "click", "keydown", "touchstart"]) window.addEventListener(e, () => { lastGesture = Date.now(); }, { capture: true, passive: true });
+export const GESTURE_WINDOW_MS = 4000;
+export function playFx(id: FxSound, opts?: { others?: boolean }) {
+  if (!opts?.others && Date.now() - lastGesture > GESTURE_WINDOW_MS) return;
   const sm = SAMPLES[id];
   if (sm) {
     try {
@@ -126,6 +132,11 @@ function synthFx(id: FxSound) {
   } else if (id === "tada") {                                        // a royal fanfare: bright chord with a sparkle
     [523, 659, 784].forEach((f) => tone(c, { type: "triangle", f0: f, t: 0, d: 0.5, v: 0.08 })); [1047, 1319, 1568].forEach((f, i) => tone(c, { f0: f, t: 0.18 + i * 0.07, d: 0.5, v: 0.06 }));
     [3136, 3520, 4186, 3729].forEach((f, i) => tone(c, { f0: f, t: 0.4 + i * 0.06, d: 0.25, v: 0.03 }));
+  } else if (id === "pop") {                                         // a champagne cork: a sharp pop, then fizz
+    noise(c, { t: 0, d: 0.08, v: 0.4, kind: "lowpass", freq: 1800 }); tone(c, { type: "sine", f0: 520, f1: 90, t: 0, d: 0.14, v: 0.25 });
+    noise(c, { t: 0.1, d: 1.1, v: 0.1, kind: "highpass", freq: 4500 }); [1568, 2093, 2637].forEach((f, i) => tone(c, { f0: f, t: 0.35 + i * 0.09, d: 0.3, v: 0.04 }));
+  } else if (id === "fireworks") {                                   // three launches: whistle up, boom, crackle
+    [0, 0.55, 1.05].forEach((t, i) => { tone(c, { type: "sine", f0: 500 + i * 120, f1: 1700 + i * 200, t, d: 0.35, v: 0.05 }); tone(c, { type: "sine", f0: 110, f1: 38, t: t + 0.36, d: 0.5, v: 0.34 }); noise(c, { t: t + 0.36, d: 0.7, v: 0.22, kind: "lowpass", freq: 900 }); noise(c, { t: t + 0.42, d: 0.9, v: 0.1, kind: "highpass", freq: 5200 }); });
   } else if (id === "witch") {                                        // a short cackle: quick rising squeaks
     [0, 0.13, 0.26, 0.39].forEach((t, i) => tone(c, { type: "sawtooth", f0: 520 + i * 40, f1: 900 + i * 60, t, d: 0.1, v: 0.05 }));
   } else if (id === "sleigh") {                                       // bells

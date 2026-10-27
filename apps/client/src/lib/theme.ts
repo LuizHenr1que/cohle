@@ -1,7 +1,7 @@
 // Color themes. The CSS (index.css) defines the tokens per [data-theme]; here are the names and the swatches for the picker.
-export type ThemeId = "cohle" | "ocean" | "forest" | "violet" | "sunset" | "custom" | "natal" | "halloween" | "hacker" | "gamer" | "barbearia" | "rainha";
+export type ThemeId = "cohle" | "ocean" | "forest" | "violet" | "sunset" | "custom" | "natal" | "halloween" | "hacker" | "gamer" | "barbearia" | "rainha" | "anonovo";
 /** Themes that come from the shop (not in the picker: you wear them by owning and equipping the item). */
-export const SHOP_THEMES: ThemeId[] = ["natal", "halloween", "hacker", "gamer", "barbearia", "rainha"];
+export const SHOP_THEMES: ThemeId[] = ["natal", "halloween", "hacker", "gamer", "barbearia", "rainha", "anonovo"];
 export const THEMES: { id: ThemeId; name: string; hint: string; a: string; b: string; bg: string }[] = [
   { id: "cohle", name: "Cohle", hint: "Vermelho, o clássico", a: "#ff3b5c", b: "#ff8a5b", bg: "#140a0e" },
   { id: "ocean", name: "Oceano", hint: "Azul profundo", a: "#3b8cff", b: "#35c8ff", bg: "#0a121c" },

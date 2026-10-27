@@ -120,6 +120,22 @@ export const FrameArt = memo(function FrameArt({ frame }: { frame: string }) {
       </svg>
     );
   }
+  if (kind === "nygold") {
+    return (
+      <svg className="fx-art" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#e0b050" strokeWidth="3.2" /><circle cx="50" cy="50" r="46" fill="none" stroke="#fff7c2" strokeWidth="1" strokeDasharray="1.5 6" />
+        <g className="spin">{Array.from({ length: 8 }, (_, i) => <path key={i} transform={`rotate(${i * 45} 50 50) translate(50 4)`} d="M0 -3.4 L1 -1 L3.4 0 L1 1 L0 3.4 L-1 1 L-3.4 0 L-1 -1 Z" fill={i % 2 ? "#fff7c2" : "#ffd166"} />)}</g>
+      </svg>
+    );
+  }
+  if (kind === "nyconfetti") {
+    const cs = ["#ff4f6d", "#ffd166", "#19c2ff", "#3ddc84", "#b57bff", "#ff8fcf"];
+    return (
+      <svg className="fx-art" viewBox="0 0 100 100" aria-hidden="true">
+        <g className="spin">{Array.from({ length: 18 }, (_, i) => <rect key={i} transform={`rotate(${i * 20} 50 50) translate(50 ${3 + (i % 3) * 2}) rotate(${(i % 4) * 30})`} x="-2" y="-1" width={i % 2 ? 4 : 2.6} height={i % 2 ? 1.8 : 3.6} rx=".6" fill={cs[i % 6]} />)}</g>
+      </svg>
+    );
+  }
   return null;
 });
 

@@ -25,5 +25,11 @@ function CornerSvg({ k, size }: { k: string; size: number }) {
     <svg {...common}><path d="M8 44 L6 18 L21 30 L32 12 L43 30 L58 18 L56 44 Z" fill="#ffd166" stroke="#b8860b" strokeWidth="2.2" strokeLinejoin="round" /><rect x="8" y="42" width="48" height="9" rx="2.6" fill="#e0b050" stroke="#b8860b" strokeWidth="2" />
       {[[6, 16, "#ff8fcf"], [32, 10, "#9fe8ff"], [58, 16, "#ff8fcf"]].map(([x, y, c], i) => <circle key={i} className={i === 1 ? "tw-b" : "tw-a"} cx={x as number} cy={y as number} r="4" fill={c as string} stroke="#b8860b" strokeWidth="1.4" />)}<circle cx="32" cy="46.5" r="2.4" fill="#ff8fcf" /><circle cx="19" cy="46.5" r="2" fill="#9fe8ff" /><circle cx="45" cy="46.5" r="2" fill="#9fe8ff" /></svg>
   );
+  if (k === "newyear") return (
+    <svg {...common}><path d="M26 18 H38 V24 L43 32 V58 H21 V32 L26 24 Z" fill="#1f5b3a" stroke="#0f3a24" strokeWidth="2.2" strokeLinejoin="round" /><rect x="21" y="38" width="22" height="14" fill="#fff3c9" stroke="#e0b050" strokeWidth="1.6" /><path d="M27 45 h10" stroke="#b8860b" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="25" y="14" width="14" height="6" rx="2" fill="#ffd166" stroke="#b8860b" strokeWidth="1.6" />
+      <g className="tw-a">{[[46, 8, "#ffd166"], [54, 16, "#ff4f6d"], [50, 4, "#19c2ff"], [58, 8, "#3ddc84"], [44, 14, "#ff8fcf"]].map(([x, y, c], i) => <circle key={i} cx={x as number} cy={y as number} r="2.2" fill={c as string} />)}</g>
+      <g className="tw-b" stroke="#ffd166" strokeWidth="1.8" strokeLinecap="round"><path d="M12 12 l4 4 M20 6 v5 M8 22 h5" /></g></svg>
+  );
   return null;
 }

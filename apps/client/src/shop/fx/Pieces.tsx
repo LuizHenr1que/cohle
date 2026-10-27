@@ -44,7 +44,7 @@ export const PumpkinCorner = ({ onTap }: { onTap?: () => void }) => (
 );
 
 /** "Faltam N dias para o Natal". Recomputed every 10 minutes, only while the tab is visible. */
-export function Countdown({ month = 11, day: dayOfMonth = 25, soon = "Faltam {n} dias para o Natal", tomorrow = "O Natal é amanhã!", today = "Hoje é Natal!", after = "Feliz Natal e boas festas!", tag = "xmas" }: { month?: number; day?: number; soon?: string; tomorrow?: string; today?: string; after?: string; tag?: string }) {
+export function Countdown({ month = 11, day: dayOfMonth = 25, soon = "Faltam {n} dias para o Natal", tomorrow = "O Natal é amanhã!", today = "Hoje é Natal!", after = "Feliz Natal e boas festas!", tag = "xmas", nextYear = false }: { month?: number; day?: number; soon?: string; tomorrow?: string; today?: string; after?: string; tag?: string; nextYear?: boolean }) {
   const vis = useVisible();
   const [now, setNow] = useState(() => new Date());
   const day = () => `cohle:${tag}-hide:${new Date().toDateString()}`;
@@ -52,8 +52,9 @@ export function Countdown({ month = 11, day: dayOfMonth = 25, soon = "Faltam {n}
   useEffect(() => { if (!vis) return; setNow(new Date()); const t = setInterval(() => setNow(new Date()), 10 * 60_000); return () => clearInterval(t); }, [vis]);
   if (hidden) return null;
   const y = now.getFullYear(), start = new Date(now.getFullYear(), now.getMonth(), now.getDate()), xmas = new Date(y, month, dayOfMonth);
+  if (nextYear && xmas < start) xmas.setFullYear(y + 1);                      // Dec 20 .. Jan 10: the next 1 January
   const d = Math.round((xmas.getTime() - start.getTime()) / 86_400_000);
-  const text = d > 1 ? soon.replace("{n}", String(d)) : d === 1 ? tomorrow : d === 0 ? today : after;
+  const yy = String(xmas.getFullYear()), text = (d > 1 ? soon.replace("{n}", String(d)) : d === 1 ? tomorrow : d === 0 ? today : after).replace("{y}", yy);
   return (
     <div role="status" className="fixed top-3 left-1/2 -translate-x-1/2 z-[45] flex items-center gap-2 rounded-full border border-line bg-surface/90 pl-4 pr-1.5 py-1 text-xs font-semibold shadow-[0_6px_24px_rgba(0,0,0,0.4)]">
       <span className="text-accent2">{text}</span>
@@ -116,5 +117,23 @@ export function Witch({ run, trail }: { run: number; trail: boolean }) {
       <path d="M78 15 C80 14 92 14 94 15 C92 10 88 4 86 -2 C84 4 80 10 78 15 Z" fill="#1b1128" transform="translate(0 2)" /><path d="M74 17 H98 C96 20 76 20 74 17 Z" fill="#1b1128" /><rect x="80.4" y="12" width="11" height="2.6" fill="#ff7a1a" />
       <path d="M92 20 C100 22 104 26 102 32" stroke="#e0a64a" strokeWidth="2.4" fill="none" strokeLinecap="round" />
     </Crosser>
+  );
+}
+
+/** Fireworks, started only by a click on the bottle: bursts of particles flying out (transform + opacity), gone after ~3 s. */
+export function Fireworks() {
+  const bursts = useRef(Array.from({ length: 7 }, (_, b) => ({
+    x: 12 + Math.random() * 76, y: 14 + Math.random() * 38, d: b * 0.28 + Math.random() * 0.15, c: ["#ffd166", "#ff4f6d", "#19c2ff", "#3ddc84", "#b57bff", "#ff8fcf", "#ffffff"][b % 7],
+    ps: Array.from({ length: 14 }, (_, i) => { const a = (i / 14) * Math.PI * 2, r = 70 + Math.random() * 60; return { bx: Math.cos(a) * r, by: Math.sin(a) * r + 14 }; }),
+  }))).current;
+  return (
+    <div className="fixed inset-0 z-[69] pointer-events-none overflow-hidden" aria-hidden="true" data-fireworks>
+      {bursts.map((b, i) => (
+        <div key={i} className="absolute" style={{ left: `${b.x}%`, top: `${b.y}%` }}>
+          <span className="absolute -translate-x-1/2 -translate-y-1/2 size-10 rounded-full" style={{ background: `radial-gradient(circle, ${b.c}, transparent 70%)`, animation: `fx-flash .7s ease-out ${b.d}s both` }} />
+          {b.ps.map((p, j) => <span key={j} className="absolute size-1.5 rounded-full" style={{ background: b.c, ["--bx" as any]: `${p.bx}px`, ["--by" as any]: `${p.by}px`, animation: `fx-burst 1.2s ease-out ${b.d}s both` }} />)}
+        </div>
+      ))}
+    </div>
   );
 }

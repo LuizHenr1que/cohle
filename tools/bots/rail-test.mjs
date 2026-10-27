@@ -16,7 +16,8 @@ ok("começa recolhida (só ícones, 72 px)", Math.round(w0) === 72 && !/Criar se
 await ev(`document.querySelector('button[title^="Expandir a barra lateral"]').click()`); await sleep(400);
 const txt = await nav(), w1 = await ev(`document.querySelector('nav').getBoundingClientRect().width`);
 ok("expandir mostra nomes dos servidores e rótulos dos botões", ["Servidor de Teste", "Mensagens diretas", "Criar servidor", "Entrar com convite", "Modo leve", "Animação de fundo", "Sair da conta"].every((x) => txt.includes(x)), `${Math.round(w1)}px · ${txt.slice(0, 150)}`);
-const shot = await cmd("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: 520, height: 700, scale: 1 } }); writeFileSync("/tmp/rail.png", Buffer.from(shot.data, "base64"));
+await cmd("Page.bringToFront"); await cmd("Emulation.setFocusEmulationEnabled", { enabled: true });          // a hidden window never paints: without this the capture waits forever
+const shot = await Promise.race([cmd("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: 520, height: 700, scale: 1 } }), sleep(8000).then(() => null)]); if (shot) writeFileSync("/tmp/rail.png", Buffer.from(shot.data, "base64"));
 await boot();
 ok("a escolha é lembrada ao reabrir", /Criar servidor/.test(await nav()));
 await ev(`[...document.querySelectorAll('nav button')].find(b=>b.innerText.includes('Servidor de Teste'))?.click()`); await sleep(500);

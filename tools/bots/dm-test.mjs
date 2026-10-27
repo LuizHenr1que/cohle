@@ -35,7 +35,7 @@ if (u.d.needsVerification) {                                                    
 if (u.d.token) { ok("estranho (sem servidor em comum) não recebe mensagem", !(await send(sa, u.d.user.id, "spam")).ok); }
 else ok("conta de estranho criada para o teste", false, JSON.stringify(u.d));
 // paging
-for (let i = 0; i < 55; i++) await send(sa, b.user.id, `m${i} ${tag}`);
+let lastOk = -1; for (let i = 0; i < 55; i++) { const rr = await send(sa, b.user.id, `m${i} ${tag}`); if (rr.ok) lastOk = i; }          // the server limits the pace (8 per 10 s): some are refused, so check the LAST ACCEPTED one
 const p1 = (await http(`/dms/${b.user.id}/messages`, "GET", undefined, a.token)).d;
 const p2 = (await http(`/dms/${b.user.id}/messages?before=${p1.messages[0].id}`, "GET", undefined, a.token)).d;
 // since Versão 11 only the last 15 messages of a conversation are kept (KEEP_MESSAGES): one full page, nothing older to page into
@@ -51,7 +51,8 @@ const click = (sel, txt) => ev(`(()=>{const e=[...document.querySelectorAll(${JS
 await click('button[title="Mensagens diretas"]'); await sleep(1200);
 ok("abre a área de mensagens diretas com a conversa existente", await ev(`document.body.innerText.includes('Mensagens diretas') && document.body.innerText.includes('teste2')`));
 await click("aside button", "teste2"); await sleep(1500);
-ok("histórico aparece no chat (mais recentes)", await ev(`document.body.innerText.includes(${JSON.stringify("m54 " + tag)})`));
+for (let i = 0; i < 40 && !(await ev(`document.body.innerText.includes(${JSON.stringify(`m${lastOk} ${tag}`)})`)); i++) await sleep(250);          // the history comes from the database: poll
+{ const has = await ev(`document.body.innerText.includes(${JSON.stringify(`m${lastOk} ${tag}`)})`); ok("histórico aparece no chat (mais recentes)", has, has ? "" : `tag=${tag} | ids na tela: ${(await ev(`document.body.innerText.match(/m\\d+ \\w+/g)?.slice(-6).join(", ")`)) ?? "nenhuma"}`); }
 // send from the UI
 await ev(`(()=>{const t=document.querySelector('textarea');const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;set.call(t,${JSON.stringify("da interface " + tag)});t.dispatchEvent(new Event('input',{bubbles:true}))})()`);
 got = null; await ev(`document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);

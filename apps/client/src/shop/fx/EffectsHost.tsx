@@ -5,13 +5,13 @@ import { CLICK_FX, ENTRANCE_OF, THEME_SCENE, type EntranceLook } from "../regist
 import { GiantArt } from "../GiantIcons";
 import { isMobile, useEffectsOn, usePrefs } from "../prefs";
 import { playFx, soundboardOn } from "../../lib/soundboard";
-import { Countdown, Lights, PumpkinCorner, Sleigh, Tree, Witch, useVisible } from "./Pieces";
+import { Countdown, Fireworks, Lights, PumpkinCorner, Sleigh, Tree, Witch, useVisible } from "./Pieces";
 import { CornerArt } from "../art";
 import type { Socket } from "socket.io-client";
 
 const Snow = lazy(() => import("./Snow"));
 
-type Ov = { id: number; kind: "entrance"; look: EntranceLook; who: string } | { id: number; kind: "giant"; icon: string };
+type Ov = { id: number; kind: "entrance"; look: EntranceLook; who: string } | { id: number; kind: "giant"; icon: string } | { id: number; kind: "fireworks" };
 let seq = 0;
 
 function Entrance({ look, who }: { look: EntranceLook; who: string }) {
@@ -57,7 +57,7 @@ export default function EffectsHost({ keys, bonus, season, socket, voiceId, name
     const t = setInterval(() => {
       const s = latest.current.socket(); if (!s) return; clearInterval(t);
       const add = (o: Ov, ms: number) => { setOvs((l) => [...l.slice(-5), o]); setTimeout(() => setOvs((l) => l.filter((x) => x.id !== o.id)), ms); };
-      const sound = (id: EntranceLook["sound"] | "whoosh") => { const p = latest.current.prefs; if (!p.soundsOff && soundboardOn()) playFx(id); };
+      const sound = (id: EntranceLook["sound"] | "whoosh") => { const p = latest.current.prefs; if (!p.soundsOff && soundboardOn()) playFx(id, { others: true }); };          // another person's effect in my call: sent on purpose
       const entrance = (e: { userId: string; channelId: string; key: string }) => {
         const L = latest.current, meta = ENTRANCE_OF[e.key];
         if (!L.on || !meta || e.channelId !== L.voiceId || document.hidden) return;                // only in the call I am in, only if effects are on and I am looking
@@ -94,14 +94,20 @@ export default function EffectsHost({ keys, bonus, season, socket, voiceId, name
   // Clicks on the corner icons: the only thing that makes a theme move or make noise (rule in CLAUDE.md). A short pause between clicks keeps spamming from stacking effects.
   const sfx = (...ids: ("sleigh" | "witch" | "hohoho" | "boo")[]) => { const p = latest.current.prefs; if (!p.soundsOff && soundboardOn()) ids.forEach((i) => playFx(i)); };
   const tap = (fn: () => void) => () => { const now = Date.now(); if (now - lastTap.current < 1500 || !latest.current.on) return; lastTap.current = now; fn(); };
-  const burst = (k: string) => () => { const look = CLICK_FX[k]; if (!look) return; setOvs((l) => [...l.slice(-5), { id: ++seq, kind: "entrance", look, who: "" }]); const id = seq; setTimeout(() => setOvs((l) => l.filter((x) => x.id !== id)), 2800); const p = latest.current.prefs; if (!p.soundsOff && soundboardOn()) playFx(look.sound); };
+  const burst = (k: string) => () => {
+    const look = CLICK_FX[k]; if (!look) return;
+    const entId = ++seq, fwId = k === "newyear" ? ++seq : 0;                  // ids first: a state updater may run later, so it must not allocate them
+    setOvs((l) => [...l.slice(-5), { id: entId, kind: "entrance" as const, look, who: "" }, ...(fwId ? [{ id: fwId, kind: "fireworks" as const }] : [])]);
+    setTimeout(() => setOvs((l) => l.filter((x) => x.id !== entId && x.id !== fwId)), k === "newyear" ? 3600 : 2800);
+    const p = latest.current.prefs; if (!p.soundsOff && soundboardOn()) playFx(look.sound);
+  };
   return (
     <>
       {snow > 0 && <Suspense fallback={null}><Snow count={snow} /></Suspense>}
       {scene && vis && <><Lights /><Tree onTap={tap(() => { setRuns((r) => ({ ...r, sleigh: r.sleigh + 1 })); sfx("hohoho", "sleigh"); })} /><Countdown /><Sleigh run={runs.sleigh} trail={bonus === "natal.sleigh"} /></>}
-      {other && vis && <><Lights colors={other.lights} /><CornerArt k={other.corner} className="fx-corner fixed right-3 bottom-3 z-[5] opacity-90 block" size={104} onTap={tap(burst(other.corner))} /></>}
+      {other && vis && <><Lights colors={other.lights} /><CornerArt k={other.corner} className="fx-corner fixed right-3 bottom-3 z-[5] opacity-90 block" size={104} onTap={tap(burst(other.corner))} />{keys.theme === "anonovo.theme" && <Countdown month={0} day={1} nextYear tag="newyear" soon="Faltam {n} dias para {y}" tomorrow="{y} começa amanhã!" today="Feliz {y}!" after="Feliz {y}!" />}</>}
       {spooky && vis && <><Lights halloween /><PumpkinCorner onTap={tap(() => { setRuns((r) => ({ ...r, witch: r.witch + 1 })); sfx("boo", "witch"); })} /><Countdown month={9} day={31} tag="halloween" soon="Faltam {n} dias para o Halloween" tomorrow="O Halloween é amanhã!" today="Hoje é Halloween!" after="Feliz Halloween!" /><Witch run={runs.witch} trail={bonus === "halloween.witch"} /></>}
-      {ovs.map((o) => (o.kind === "entrance" ? <Entrance key={o.id} look={o.look} who={o.who} /> : <Giant key={o.id} icon={o.icon} onDone={() => setOvs((l) => l.filter((x) => x.id !== o.id))} />))}
+      {ovs.map((o) => (o.kind === "fireworks" ? <Fireworks key={o.id} /> : o.kind === "entrance" ? <Entrance key={o.id} look={o.look} who={o.who} /> : <Giant key={o.id} icon={o.icon} onDone={() => setOvs((l) => l.filter((x) => x.id !== o.id))} />))}
     </>
   );
 }

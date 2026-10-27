@@ -112,6 +112,22 @@ ok("equipar o conjunto Hacker entrega tema, moldura, nome e emblema", r.s === 20
 ok("aura equipada como moldura", (await equip(P, "frame", item(sp, "aura.fire").id)).s === 200 && (await http("/me", null, P.token)).d.fx?.frame === "aura.fire");
 ok("não dá para equipar uma aura que não é sua (403)", (await equip(P, "frame", item(sp, "aura.gold").id)).s === 403);
 ok("coleção permanente continua pegável a qualquer hora", (await claim(P, sp, "gamer.frame.pad")).s === 200);
+// ---- Ano Novo: a season that has not started yet (20 Dec): invisible and impossible to claim; open the window and it works like the others ----
+const nyCol = await prisma.collection.findUnique({ where: { key: "anonovo" } });
+const nySet = async (data) => { await prisma.collection.update({ where: { key: "anonovo" }, data }); await sleep(450); };
+const NYK = ["anonovo.theme", "anonovo.frame.gold", "anonovo.frame.confetti", "anonovo.badge.2027", "anonovo.entrance.champagne", "anonovo.name.gold", "anonovo.name.fireworks", "anonovo.reactions"];
+const Y = await mk("ano"); let sy = await shop(Y);
+await nySet({ inicio: new Date(Date.now() + 30 * 86_400_000), fim: new Date(Date.now() + 50 * 86_400_000) }); sy = await shop(Y);
+ok("Ano Novo antes da janela: fora da vitrine e sem itens", !sy.collections.some((c) => c.key === "anonovo") && !sy.items.some((i) => i.key.startsWith("anonovo.")));
+await nySet({ inicio: new Date(Date.now() - 86_400_000), fim: new Date(Date.now() + 10 * 86_400_000) }); sy = await shop(Y);
+const nc = sy.collections.find((c) => c.key === "anonovo");
+ok("Ano Novo dentro da janela: sazonal, 8 itens e dias restantes", !!nc && nc.visible && nc.sazonal && nc.daysLeft > 0 && NYK.every((k) => item(sy, k)), JSON.stringify(nc));
+for (const k of NYK) await claim(Y, sy, k);
+r = await http("/shop/equipped/set", { collectionId: nc.id }, Y.token); const yfx = (await http("/me", null, Y.token)).d.fx ?? {};
+ok("equipar o conjunto de Ano Novo entrega moldura, nome e emblema", r.s === 200 && yfx.frame?.startsWith("anonovo.frame.") && yfx.nameEffect?.startsWith("anonovo.name.") && yfx.badge === "anonovo.badge.2027", JSON.stringify(yfx));
+await nySet({ fim: new Date(Date.now() - 3600_000) });
+ok("fim da temporada: quem pegou fica, quem não pegou não consegue pegar", (await equip(Y, "theme", item(sy, "anonovo.theme").id)).s === 200 && (await http(`/shop/items/${item(sy, "anonovo.theme").id}/claim`, {}, (await mk("ano2")).token)).s === 403);
+await nySet({ ativo: nyCol.ativo, inicio: nyCol.inicio, fim: nyCol.fim });
 // ---- the real sounds: small files that exist ----
 for (const f of ["santa-hohoho.mp3", "ghost-boo.mp3"]) { const rr = await fetch(`http://localhost:5173/sfx/${f}`); const buf = Buffer.from(await rr.arrayBuffer()); ok(`som real ${f}: existe, é áudio e é leve (< 40 KB)`, rr.status === 200 && /audio|mpeg/.test(rr.headers.get("content-type") ?? "") && buf.length > 3000 && buf.length < 40_000, `${rr.status} ${buf.length} bytes`); }
 // ---- preferences ----

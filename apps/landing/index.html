@@ -30,7 +30,7 @@
         <img src="logo-mark.svg" alt="" width="34" height="34" /><span>Cohle</span>
       </a>
       <nav class="links" aria-label="Seções">
-        <a href="#demo">Demo</a><a href="#recursos">Recursos</a><a href="#app-real">Prints</a><a href="#futuro">Web e novidades</a><a href="#baixar">Baixar</a><a href="#faq">FAQ</a>
+        <a href="#demo">Demo</a><a href="#recursos">Recursos</a><a href="#loja">Loja</a><a href="#app-real">Prints</a><a href="#futuro">Web e novidades</a><a href="#baixar">Baixar</a><a href="#faq">FAQ</a>
       </nav>
       <div class="nav-cta">
         <a class="btn btn-ghost btn-sm" href="/app/" aria-label="Entrar no Cohle pelo navegador"><svg class="i"><use href="icons.svg#i-arrow-right"/></svg>Entrar</a>
@@ -205,6 +205,51 @@
     </section>
 
 
+    <!-- LOJA -->
+    <section class="section wrap" id="loja">
+      <header class="sec-head reveal">
+        <span class="eyebrow"><svg class="i"><use href="icons.svg#i-store"/></svg>Loja do Cohle · Preview Beta</span>
+        <h2>Deixe o seu Cohle com a sua cara.</h2>
+        <p>Molduras, auras que giram em volta do avatar, temas, entradas na chamada e reações gigantes. <b>Tudo grátis durante o beta</b>, direto no app e no navegador.</p>
+      </header>
+      <div class="gallery reveal">
+        <div class="shot-tabs" role="tablist" aria-label="Telas da Loja">
+          <button class="on" role="tab" data-shot="vitrine"><svg class="i"><use href="icons.svg#i-store"/></svg>Vitrine</button>
+          <button role="tab" data-shot="auras"><svg class="i"><use href="icons.svg#i-flame"/></svg>Auras</button>
+          <button role="tab" data-shot="colecoes"><svg class="i"><use href="icons.svg#i-layers"/></svg>Coleções</button>
+          <button role="tab" data-shot="previa"><svg class="i"><use href="icons.svg#i-eye"/></svg>Prévia</button>
+          <button role="tab" data-shot="natal"><svg class="i"><use href="icons.svg#i-snowflake"/></svg>Natal</button>
+          <button role="tab" data-shot="halloween"><svg class="i"><use href="icons.svg#i-ghost"/></svg>Halloween</button>
+          <button role="tab" data-shot="hacker"><svg class="i"><use href="icons.svg#i-terminal"/></svg>Hacker</button>
+          <button role="tab" data-shot="grupos"><svg class="i"><use href="icons.svg#i-folder-plus"/></svg>Grupos</button>
+        </div>
+        <div class="shot-stage" id="lojaStage">
+          <figure class="shot-main" id="lojaMain">
+            <div class="shot-glow" aria-hidden="true"></div>
+            <img id="lojaImg" src="shots/loja-vitrine.jpg" loading="lazy" width="1800" height="1125" alt="Vitrine da Loja do Cohle com as coleções de Natal e Halloween e o selo Preview Beta" />
+          </figure>
+          <p class="shot-cap" id="lojaCap"></p>
+        </div>
+      </div>
+      <div class="loja-grid reveal">
+        <article class="card"><div class="card-ic"><svg class="i"><use href="icons.svg#i-flame"/></svg></div><h3>Auras animadas</h3><p>Fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon girando em volta de você, na chamada e no perfil.</p></article>
+        <article class="card"><div class="card-ic"><svg class="i"><use href="icons.svg#i-snowflake"/></svg></div><h3>Coleções de temporada</h3><p>Natal, Halloween e Ano Novo com tema, moldura, emblema e entrada. Pegou na temporada, é seu para sempre.</p></article>
+        <article class="card"><div class="card-ic"><svg class="i"><use href="icons.svg#i-palette"/></svg></div><h3>Temas com personalidade</h3><p>Hacker, Gamer, Barbearia e Rainha: cores, luzes de borda e um ícone no canto para fazer a animação com som.</p></article>
+        <article class="card"><div class="card-ic"><svg class="i"><use href="icons.svg#i-party-popper"/></svg></div><h3>Entradas e reações gigantes</h3><p>Entre na sala com estilo e mande uma reação que atravessa a tela de todo mundo na chamada.</p></article>
+        <article class="card"><div class="card-ic"><svg class="i"><use href="icons.svg#i-eye"/></svg></div><h3>Veja antes de pegar</h3><p>Clique em qualquer item ou conjunto e veja no seu avatar, ao vivo. Clicou, viu, saiu.</p></article>
+        <article class="card"><div class="card-ic"><svg class="i"><use href="icons.svg#i-folder-plus"/></svg></div><h3>Servidores em grupos</h3><p>Muitos servidores? Crie grupos com nome e cor, recolha e arraste. A barra lateral para de crescer sem fim.</p></article>
+      </div>
+      <div class="loja-foot reveal">
+        <div class="loja-badges">
+          <span class="badge ok"><svg class="i"><use href="icons.svg#i-check"/></svg>Preview Beta: tudo grátis</span>
+          <span class="badge plan"><svg class="i"><use href="icons.svg#i-sliders-horizontal"/></svg>Nada toca nem se mexe sozinho</span>
+          <span class="badge plan"><svg class="i"><use href="icons.svg#i-zap"/></svg>Leve: desligue os efeitos ou use o Modo leve</span>
+        </div>
+        <p class="loja-note">Grátis durante o beta. No futuro alguns itens serão pagos, e a gente avisa com antecedência. O que você pegar durante o beta continua seu.</p>
+        <p class="loja-cta"><a class="btn btn-grad" href="/app/"><svg class="i"><use href="icons.svg#i-store"/></svg>Abrir a Loja no navegador</a><a class="btn btn-ghost" href="#baixar"><svg class="i"><use href="icons.svg#i-download"/></svg>Baixar o app</a></p>
+      </div>
+    </section>
+
     <!-- REAL SCREENSHOTS -->
     <section class="section wrap" id="app-real">
       <header class="sec-head reveal">
@@ -339,6 +384,8 @@
       </header>
       <div class="faq reveal">
         <details><summary>Quantas mensagens ficam guardadas?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Para o Cohle continuar grátis, guardamos só as <b>últimas 15 mensagens</b> de cada canal e de cada conversa direta. Ao enviar uma nova, a mais antiga (e os arquivos dela) é apagada. Cada mensagem tem até 500 caracteres, e os arquivos podem ter até 10 MB. Se precisar guardar algo, salve o arquivo no seu computador.</p></details>
+        <details><summary>A Loja é paga?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Por enquanto é <b>tudo grátis</b>: a Loja está em <b>Preview Beta</b>. No futuro alguns itens serão pagos, e avisamos com bastante antecedência. O que você pegou durante o beta continua seu. As coleções de temporada (Natal, Halloween, Ano Novo) saem da Loja quando a temporada acaba, mas quem pegou fica com elas.</p></details>
+        <details><summary>A Loja deixa o app pesado ou barulhento?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Não. Os efeitos são leves, ficam parados quando a janela está oculta e dá para desligar tudo (ou usar o Modo leve). E nada se mexe nem toca som sozinho: animações grandes e sons só aparecem quando você clica no ícone do tema, ou quando alguém da sua chamada manda uma entrada ou reação de propósito.</p></details>
         <details><summary>É grátis?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Hoje não cobramos nada. Qualquer mudança no futuro será avisada com bastante antecedência. A gente não é do tipo que aparece de surpresa na fatura.</p></details>
         <details><summary>Roda no meu computador?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>Roda em Macs com chip Apple e Intel, e em Windows 64 bits. Ele foi pensado para ficar aberto em segundo plano enquanto você joga, sem pesar.</p></details>
         <details><summary>E no navegador e no celular?<svg class="i"><use href="icons.svg#i-chevron-down"/></svg></summary><p>No navegador já dá: é só abrir <a href="/app/">cohle.verticeapp.com.br/app</a> e entrar com a sua conta. Chat, voz e compartilhamento de tela funcionam no Chrome, Edge e Firefox de computador. No celular o navegador abre o chat e a voz, mas compartilhar tela só funciona no computador. O app de celular ainda está sendo criado: tenha calma, coisa boa leva tempo.</p></details>

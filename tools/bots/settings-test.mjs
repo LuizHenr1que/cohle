@@ -1,21 +1,19 @@
+// Needs the dev API started with DEV_EMAILS=teste1@cohle.dev (the DEV badge is granted by e-mail) besides the usual OWNER_EMAILS/EMAIL_DEV.
 // Settings screen, profile cards, and the badge for already-signed-in users. Dev stack (EMAIL_DEV=1), Electron on CDP 9341.
 import { readFileSync, writeFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { io } from "../bots/node_modules/socket.io-client/build/esm/index.js";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const API = "http://localhost:3001";
 let pass = 0, fail = 0; const ok = (l, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${l}${x ? "  — " + x : ""}`); };
 const http = async (p, b, tok, m) => { const r = await fetch(API + p, { method: m ?? (b ? "POST" : "GET"), headers: { "Content-Type": "application/json", ...(tok ? { Authorization: "Bearer " + tok } : {}) }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, d: await r.json().catch(() => ({})) }; };
-const psql = (q) => execSync(`docker exec infra-postgres-1 psql -U auralis -d auralis -tAc ${JSON.stringify(q)}`).toString().trim();
-// 1) someone who was ALREADY signed in (badge column empty) gets the badge from /me
-const login = (await http("/auth/login", { email: "verticeappempresa@gmail.com", password: "senha-forte-1" })).d;
-psql(`UPDATE "User" SET badge=NULL WHERE email='verticeappempresa@gmail.com'`);
-ok("antes: o selo está vazio no banco", psql(`SELECT coalesce(badge,'vazio') FROM "User" WHERE email='verticeappempresa@gmail.com'`) === "vazio");
+// 1) the owner account (teste1 is in OWNER_EMAILS on the dev server) gets the DEV badge from /me, also when it was already signed in
+const login = (await http("/auth/login", { email: "teste1@cohle.dev", password: "teste12345" })).d;
 const me = (await http("/me", null, login.token)).d;
-ok("quem já estava logado recebe o selo ao abrir o app (/me)", me.badge === "DEV");
+ok("quem já estava logado recebe o selo ao abrir o app (/me)", me.badge === "DEV", `badge=${me.badge}`);
 // 2) account endpoints
 const acc = (await http("/me/account", null, login.token)).d;
-ok("/me/account devolve e-mail, data e confirmação", acc.email === "verticeappempresa@gmail.com" && acc.emailVerified === true && !!acc.createdAt);
-const a = (await http("/auth/login", { email: "teste1@cohle.dev", password: "teste12345" })).d;
+ok("/me/account devolve e-mail, data e confirmação", acc.email === "teste1@cohle.dev" && acc.emailVerified === true && !!acc.createdAt, JSON.stringify(acc).slice(0, 120));
+const a = (await http("/auth/login", { email: "teste2@cohle.dev", password: "teste12345" })).d;          // the other person who looks at the DEV account
 const bad = await http("/me/password", { current: "errada-123456", password: "nova-senha-123" }, a.token);
 ok("trocar senha com a atual errada é recusado", bad.s === 401);
 const tag = Date.now().toString(36), e = `cfg_${tag}@exemplo.dev`;
@@ -39,7 +37,7 @@ await ev(`sessionStorage.clear();localStorage.clear();localStorage.setItem('toke
 ok("o selo DEV aparece no cartão do usuário (canto inferior)", await ev(`!!document.querySelector('button[title="Configurações e perfil"] [aria-label="Desenvolvedor do Cohle"]')`));
 await ev(`document.querySelector('button[title="Configurações e perfil"]').click()`); await sleep(700);
 ok("clicar no nome/engrenagem abre as Configurações", /Minha conta/.test(await text()) && /Senha e segurança/.test(await text()) && /Aparência/.test(await text()) && /Áudio e sons/.test(await text()) && /Aplicativo/.test(await text()) && /Sobre/.test(await text()));
-ok("Minha conta mostra e-mail, selo e botão de editar", /verticeappempresa@gmail.com/.test(await text()) && /Editar foto e nome/.test(await text()) && await ev(`!!document.querySelector('[role=dialog][aria-label="Configurações"] [aria-label="Desenvolvedor do Cohle"]')`));
+ok("Minha conta mostra e-mail, selo e botão de editar", /teste1@cohle.dev/.test(await text()) && /Editar foto e nome/.test(await text()) && await ev(`!!document.querySelector('[role=dialog][aria-label="Configurações"] [aria-label="Desenvolvedor do Cohle"]')`));
 await shot("/tmp/settings-account.png");
 await click("Aparência"); await sleep(300);
 await ev(`document.querySelectorAll('[role=dialog] [role=switch]')[1].click()`); await sleep(400);
@@ -61,14 +59,21 @@ ok("Sobre mostra a versão e as novidades", /Versão \d+/.test(await text()) && 
 await ev(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))`); await sleep(400);
 ok("Esc fecha as configurações", await ev(`!document.querySelector('[role=dialog][aria-label="Configurações"]')`));
 
-// profile card from the chat
-await ev(`[...document.querySelectorAll('aside button')].find(b=>b.innerText.includes('geral'))?.click()`); await sleep(1500);
-await ev(`[...document.querySelectorAll('main button')].find(b=>b.innerText.trim()==='teste1')?.click()`); await sleep(1200);
-ok("clicar no nome de alguém no chat abre o perfil", await ev(`!!document.querySelector('[role=dialog][aria-label="Perfil"]')`) && /Membro do Cohle desde/.test(await text()) && /Servidores em comum|Seus servidores/.test(await text()));
+// profile card from the chat: each of the two accounts says something in #geral, so both names are on screen
+{ const srv = (await http("/servers", null, login.token)).d.find((x) => x.name === "Servidor de Teste"), ch = srv.channels.find((c) => c.type === "TEXT").id;
+  for (const [who, txt] of [[a, "oi do settings-test (teste2)"], [login, "oi do settings-test (teste1)"]]) { const sk = io(API, { auth: { token: who.token }, transports: ["websocket"] }); await new Promise((r) => sk.on("connect", r)); sk.emit("channel:join", ch); await sleep(500); sk.emit("message:send", { channelId: ch, content: txt }, () => {}); await sleep(900); sk.close(); } }
+await ev(`[...document.querySelectorAll('nav button')].find(b=>b.getAttribute('title')==='Servidor de Teste')?.click()`); await sleep(1200);          // since Versão 12 the app opens on the welcome screen: pick the server first
+await ev(`[...document.querySelectorAll('aside button')].find(b=>b.innerText.includes('geral'))?.click()`); await sleep(1800);
+for (let i = 0; i < 40 && !(await ev(`[...document.querySelectorAll('main button')].some(b=>b.innerText.trim()==='teste2')`)); i++) await sleep(250);          // wait for the history to be on screen
+await ev(`[...document.querySelectorAll('main button')].find(b=>b.innerText.trim()==='teste2')?.click()`);
+for (let i = 0; i < 32 && !/membro desde/i.test(await text()); i++) await sleep(250);          // the card loads the profile from the server
+{ const dlg = await ev(`!!document.querySelector('[role=dialog][aria-label="Perfil"]')`), tx = await text(); ok("clicar no nome de alguém no chat abre o perfil", dlg && /membro desde/i.test(tx) && /servidores em comum|seus servidores/i.test(tx), `dialogo=${dlg} membro=${/membro desde/i.test(tx)} comum=${/servidores em comum/i.test(tx)} cartao=${(await ev(`document.querySelector('[role=dialog][aria-label="Perfil"]')?.innerText ?? ''`)).slice(0, 200).replace(/\n/g, ' / ')} botoes=${await ev(`[...document.querySelectorAll('main button')].map(b=>b.innerText.trim()).filter(x=>/^teste\\d$/.test(x)).join(",")`)}`); }
 await shot("/tmp/profile-card.png");
 await ev(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))`); await sleep(400);
-await ev(`[...document.querySelectorAll('main button')].find(b=>b.innerText.trim()==='verticeapps')?.click()`); await sleep(1200);
-ok("no próprio perfil aparece «Editar perfil»", /Este é o seu perfil/.test(await text()) && /Editar perfil/.test(await text()));
+for (let i = 0; i < 40 && !(await ev(`[...document.querySelectorAll('main button')].some(b=>b.innerText.trim()==='teste1')`)); i++) await sleep(250);
+await ev(`[...document.querySelectorAll('main button')].find(b=>b.innerText.trim()==='teste1')?.click()`);
+for (let i = 0; i < 32 && !/este é o seu perfil/i.test(await text()); i++) await sleep(250);
+ok("no próprio perfil aparece «Editar perfil»", /este é o seu perfil/i.test(await text()) && /Editar perfil/.test(await text()));
 await click("Editar perfil"); await sleep(600);
 ok("«Editar perfil» abre a edição de foto e nome", await ev(`!!document.querySelector('input[type=file]')`));
 console.log(`\n${pass} passaram, ${fail} falharam`); process.exit(fail ? 1 : 0);
