@@ -65,15 +65,18 @@ try {
   // ---- teste2 looks at teste1 ----
   await open(b);
   await ev(`[...document.querySelectorAll('button')].find(x=>x.getAttribute('title')==='Servidor de Teste'||x.innerText.includes('Servidor de Teste'))?.click()`); await sleep(900);
-  await click("geral", "button, a, div[role=button]"); await sleep(1500);
-  ok("no chat aparece o nome de exibição, não o @", new RegExp(`Ana Teste[\\s\\S]*${msg}`).test(await text()));
+  await click("geral", "button, a, div[role=button]");
+  for (let i = 0; i < 60 && !(await text()).includes(msg); i++) await sleep(250);          // poll for the history: the time it takes depends on the database latency, not on a fixed wait
+  { const tt = await text(), good = new RegExp(`Ana Teste[\\s\\S]*${msg}`).test(tt); ok("no chat aparece o nome de exibição, não o @", good, good ? "" : tt.slice(0, 500).replace(/\n/g, " / ")); }
   await ev(`[...document.querySelectorAll('button.font-bold')].find(x=>x.innerText.includes('Ana Teste'))?.click()`); await waitText(/Amigos em comum|Membro desde/i);
   let tx = await text();
   ok("cartão: nome de exibição, @ e atividade (em chamada, com o lugar)", /Ana Teste/.test(tx) && /@teste1/.test(tx) && /Em chamada/.test(tx) && /Sala de voz · Servidor de Teste/.test(tx), (tx.match(/Em chamada[^\n]*/) ?? [""])[0]);
   ok("cartão: Sobre mim com a descrição e quebra de linha", /Sobre mim/i.test(tx) && /Gosto de jogar de noite\./.test(tx) && /Falo pouco/.test(tx));
   ok("cartão: Membro desde e Amigos desde", /Membro desde/i.test(tx) && /Amigos desde/i.test(tx));
   ok("cartão: servidores em comum", /Servidores em comum/i.test(tx) && /Servidor de Teste/.test(tx));
-  ok("cartão: amigos em comum (cris)", /Amigos em comum \(\d+\)/i.test(tx) && new RegExp(`cris_${run}`, "i").test(tx), (tx.match(/Amigos em comum[^\n]*\n[^\n]*/i) ?? ["sem a seção"])[0].replace(/\n/g, " | "));
+  // the card lists a few mutual friends and says "+N" for the rest (the dev schema has many bot friends)
+  ok("cartão: amigos em comum (cris)", /Amigos em comum \(\d+\)/i.test(tx) && (new RegExp(`cris_${run}`, "i").test(tx) || /\+\d+/.test(tx.match(/Amigos em comum[\s\S]{0,400}/i)?.[0] ?? "")),
+    (tx.match(/Amigos em comum[^\n]*\n[^\n]*/i) ?? ["sem a seção"])[0].replace(/\n/g, " | "));
   ok("cartão: a capa usa a cor escolhida", /#3b8cff|59,\s*140,\s*255/i.test((await ev(`document.querySelector('[role=dialog] div[style*="gradient"]')?.getAttribute('style')`)) ?? ""));
   await shot(`prof-2-cartao-${TAG}`);
   // private note
@@ -93,10 +96,12 @@ try {
   ok("sugestões: quem está no mesmo servidor e ainda não é amigo", /Pessoas que você talvez conheça/i.test(tx) && new RegExp(`duda_${run}`).test(tx) && /Servidor em comum: Servidor de Teste/.test(tx));
   ok("sugestões: não lista amigos", !/Servidor em comum: Servidor de Teste[\s\S]*teste1 ·/.test(tx.split(/Pessoas que você talvez conheça/i)[1] ?? ""));
   await shot(`prof-3-sugestoes-${TAG}`);
-  await ev(`[...document.querySelectorAll('section[aria-label="Pessoas que você talvez conheça"] button')].find(x=>x.innerText.includes('Adicionar')&&x.closest('.group')?.innerText.includes('duda_${run}'))?.click()`);
+  // the button of THAT person's own row: climb from each "Adicionar" to the first ancestor that names someone; it must name exactly duda_<run> (older runs leave many duda_* behind)
+  await ev(`(()=>{const b=[...document.querySelectorAll('section[aria-label="Pessoas que você talvez conheça"] button')].filter(x=>x.innerText.includes('Adicionar')).find(x=>{let el=x.parentElement;while(el&&!/@duda_/.test(el.innerText))el=el.parentElement;return el&&el.innerText.includes('@duda_${run}')&&(el.innerText.match(/@duda_/g)||[]).length===1});b?.click();return !!b})()`);
   let sent = false; for (let i = 0; i < 24 && !sent; i++) { await sleep(400); sent = (await http("/friends", null, b.token)).d.outgoing.some((r) => r.user.id === D.user.id); }
   await sleep(600);
-  ok("adicionar pela sugestão envia o pedido e a pessoa sai da lista", sent && !(await text()).split(/Pessoas que você talvez conheça/i)[1]?.includes(`duda_${run}`));
+  for (let i = 0; i < 20 && (await text()).split(/Pessoas que você talvez conheça/i)[1]?.includes(`duda_${run}`); i++) await sleep(250);          // the list refreshes after the request goes through
+  { const still = !!(await text()).split(/Pessoas que você talvez conheça/i)[1]?.includes(`duda_${run}`); ok("adicionar pela sugestão envia o pedido e a pessoa sai da lista", sent && !still, `pedido enviado=${sent} ainda na lista=${still}`); }
 
   // ---- phone size ----
   if (!ATTACH) {
@@ -110,6 +115,7 @@ try {
   ok("sem erros de JavaScript", errors.length === 0, errors.slice(0, 2).join(" | ").slice(0, 200));
 } finally {
   await http("/me", { displayName: null, bio: null, bannerColor: null }, a.token, "PATCH");
+  await http(`/servers/${srv.id}/members/${D.user.id}`, null, a.token, "DELETE").catch(() => {});          // leave no duda_* behind: they would fill the friend suggestions of the next runs
   ws.close(); chrome?.kill();
 }
 console.log(`\n${pass} passaram, ${fail} falharam`); process.exit(fail ? 1 : 0);

@@ -8,7 +8,7 @@ const ev = (x) => new Promise((r) => { const i = ++id; w.set(i, r); ws.send(JSON
 const text = () => ev(`document.body.innerText`);
 const setVal = (sel, v) => ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');d.set.call(e,${JSON.stringify(v)});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
 const click = (txt) => ev(`(()=>{const e=[...document.querySelectorAll('button')].find(b=>b.innerText.includes(${JSON.stringify(txt)}));if(e)e.click();return !!e})()`);
-const lastCode = (to) => { const t = readFileSync("/tmp/server.log", "utf8"); const m = [...t.matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))]; return m.length ? m.at(-1)[1] : null; };
+const lastCode = (to) => { const t = readFileSync((process.env.SERVER_LOG ?? "/tmp/server.log"), "utf8"); const m = [...t.matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))]; return m.length ? m.at(-1)[1] : null; };
 const tag = Date.now().toString(36), email = `ui_${tag}@exemplo.dev`, user = `ui_${tag}`.slice(0, 20);
 const fresh = async () => { await ev(`localStorage.clear(); sessionStorage.clear(); location.reload()`); await sleep(2500); };
 

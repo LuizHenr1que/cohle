@@ -16,17 +16,17 @@ ok("e oculta de novo", await ev(`document.querySelector('input[placeholder^="Sen
 ok("«Lembrar de mim» vem marcado", await ev(`[...document.querySelectorAll('label')].find(l=>/Lembrar de mim/.test(l.innerText)).querySelector('input').checked`));
 
 // remember = on: stays in localStorage + e-mail pre-filled next time
-await setVal('input[type="email"]', "teste1@cohle.dev"); await setVal('input[placeholder^="Senha"]', "teste12345"); await click("Entrar"); await sleep(3500);
+await setVal('input[placeholder^="E-mail"]', "teste1@cohle.dev"); await setVal('input[placeholder^="Senha"]', "teste12345"); await click("Entrar"); await sleep(3500);
 ok("lembrar ligado: sessão fica no armazenamento permanente", await ev(`!!localStorage.getItem('token') && !sessionStorage.getItem('token')`));
 await ev(`location.reload()`); await sleep(3500);
 ok("reabrir o app: continua logado", await ev(`!!document.querySelector('nav')`));
 await ev(`(()=>{const t=localStorage.getItem('token');localStorage.removeItem('token');localStorage.removeItem('me');location.reload()})()`); await sleep(2500);
-ok("e-mail lembrado vem preenchido no login", await ev(`document.querySelector('input[type="email"]').value`) === "teste1@cohle.dev");
+ok("e-mail lembrado vem preenchido no login", await ev(`document.querySelector('input[placeholder^="E-mail"]').value`) === "teste1@cohle.dev");
 
 // remember = off: session only
 await fresh();
 await ev(`[...document.querySelectorAll('label')].find(l=>/Lembrar de mim/.test(l.innerText)).querySelector('input').click()`);
-await setVal('input[type="email"]', "teste1@cohle.dev"); await setVal('input[placeholder^="Senha"]', "teste12345"); await click("Entrar"); await sleep(3500);
+await setVal('input[placeholder^="E-mail"]', "teste1@cohle.dev"); await setVal('input[placeholder^="Senha"]', "teste12345"); await click("Entrar"); await sleep(3500);
 ok("lembrar desligado: a sessão não vai para o armazenamento permanente", await ev(`!localStorage.getItem('token') && !!sessionStorage.getItem('token')`));
 ok("e o e-mail não é guardado", await ev(`!localStorage.getItem('cohle:last-email')`));
 ok("na mesma sessão continua logado ao recarregar", (await ev(`location.reload()`), await sleep(3500), await ev(`!!document.querySelector('nav')`)));

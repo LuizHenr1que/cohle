@@ -16,13 +16,15 @@ import { sounds } from "../sounds";
 import { CameraConfirm } from "./CameraConfirm";
 import { friendlyMediaError } from "../lib/mediaErrors";
 import { Soundboard } from "./Soundboard";
+import { GiantButton } from "../shop/GiantButton";
+import { UserName, ItemBadge } from "../shop/UserName";
 import { DevBadge } from "./Badge";
 import { PersonPanel, panelAt, Slider, DEFAULT_VOL, loadVols, VOL_KEY, type Vol, type Moderation, type PanelPos } from "./PersonPanel";
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
 import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
 
-type UserLike = Pick<UserDTO, "username" | "displayName" | "avatarUrl" | "micOff" | "deaf" | "badge">;
+type UserLike = Pick<UserDTO, "username" | "displayName" | "avatarUrl" | "micOff" | "deaf" | "badge" | "fx">;
 /** What the sidebar (hover card, clicking a person) can ask of the call it is looking at. */
 export type VoiceApi = {
   watch: (userId: string) => void;                                       // switch to this person's live (replaces any other one)
@@ -81,7 +83,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
 
       {!track && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-[2cqmin] px-2 pt-7 pb-8">
-          <div className={unwatched && !compact ? "@max-[230px]:hidden" : ""}><Avatar user={user} size={avatarSize} speaking={speaking} /></div>
+          <div className={unwatched && !compact ? "@max-[230px]:hidden" : ""}><Avatar user={user} size={avatarSize} speaking={speaking} live /></div>
           {unwatched && !compact && (
             <button onClick={onWatch} className="grad rounded-xl px-3 @sm:px-4 py-1.5 @sm:py-2 text-xs @sm:text-sm font-semibold text-white whitespace-nowrap shadow-[0_6px_24px_rgb(var(--accent-rgb)/0.45)] inline-flex items-center gap-1.5 hover:brightness-110">
               <MonitorPlay size={15} /> <span className="@max-[260px]:hidden">Assistir transmissão</span><span className="@min-[261px]:hidden">Assistir</span>
@@ -118,7 +120,7 @@ function Tile({ p, user, speaking, watching, compact, vol, onVol, mod, serverMut
 
       <div className="absolute bottom-1.5 inset-x-1.5 @sm:bottom-3 @sm:inset-x-3 flex items-center gap-2 pointer-events-none">
         <span className="min-w-0 truncate text-[11px] @sm:text-xs bg-black/55 px-2 @sm:px-3 py-0.5 @sm:py-1 rounded-full">
-          {p.isLocal ? `${nameOf(user)} (você)` : nameOf(user)}
+          {p.isLocal ? <><UserName user={user} /> (você)</> : <UserName user={user} />}
         </span>
         <DevBadge user={user} />
         {serverMuted
@@ -164,13 +166,13 @@ function Stage({ p, user, vol, onVol, speaking, stageRef, onStop, isScreen, mod,
         <video ref={ref} autoPlay playsInline muted className={`absolute inset-0 w-full h-full object-contain ${track ? "" : "hidden"}`} />
         {!track && (isScreen
           ? <div className="absolute inset-0 grid place-items-center text-sm text-muted">Carregando transmissão…</div>
-          : <div className="absolute inset-0 grid place-items-center"><Avatar user={user} size="clamp(80px, 30cqmin, 220px)" speaking={speaking} /></div>)}
+          : <div className="absolute inset-0 grid place-items-center"><Avatar user={user} size="clamp(80px, 30cqmin, 220px)" speaking={speaking} live /></div>)}
         {isScreen && <span className="absolute top-3 left-3 flex items-center gap-1.5 bg-accent px-2.5 py-1 rounded-full text-[11px] font-semibold shadow-[0_0_16px_rgb(var(--accent-rgb)/0.6)]"><ScreenShare size={13} /> AO VIVO</span>}
       </div>
       <div className="shrink-0 flex flex-wrap items-center gap-x-4 gap-y-2 px-3 sm:px-4 py-2 bg-surface border-t border-line">
         <div className="flex items-center gap-2 min-w-0 flex-1 basis-32">
           <Avatar user={user} size={26} />
-          <span className="truncate text-sm font-medium">{nameOf(user)}</span>
+          <span className="truncate text-sm font-medium"><UserName user={user} /></span>
         </div>
         {!p.isLocal && <div className="flex items-center gap-2">
           {vol.m || vol.s === 0 ? <VolumeX size={16} className="text-accent shrink-0" /> : <Volume2 size={16} className="text-muted shrink-0" />}
@@ -193,10 +195,10 @@ const GAP = 12;
 // Phones' browsers cannot share the screen at all: do not offer a button that can only fail.
 const canShareScreen = !!window.cohle || !!navigator.mediaDevices?.getDisplayMedia;
 
-export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia, onSound, onMessage, onProfile }: {
+export function VoiceRoom({ onGiant, channel, users, serverId, isOwner, onLeave, onSpeakers, onSharing, onMenu, chat, chatOpen, unread, onToggleChat, channelName, onApi, autoWatch, onAutoWatched, onMedia, onSound, onMessage, onProfile }: {
   channel: ChannelDTO; users: UserDTO[]; serverId: string; isOwner: boolean;
   chat?: React.ReactNode; chatOpen?: boolean; unread?: number; onToggleChat?: () => void; channelName?: string;
-  onApi?: (api: VoiceApi | null) => void; autoWatch?: string; onAutoWatched?: () => void; onMedia?: (micOff: boolean, deaf: boolean) => void; onSound?: (id: string) => void; onMessage?: (userId: string) => void; onProfile?: (userId: string) => void;
+  onApi?: (api: VoiceApi | null) => void; autoWatch?: string; onAutoWatched?: () => void; onMedia?: (micOff: boolean, deaf: boolean) => void; onSound?: (id: string) => void; onGiant?: (icon: string) => void; onMessage?: (userId: string) => void; onProfile?: (userId: string) => void;
   onLeave: () => void; onSpeakers: (ids: string[]) => void; onSharing: (on: boolean) => void; onMenu?: () => void;
 }) {
   const roomRef = useRef<Room>();
@@ -598,6 +600,7 @@ export function VoiceRoom({ channel, users, serverId, isOwner, onLeave, onSpeake
           <button title={noise === "off" ? "Ligar a supressão de ruído" : "Desligar a supressão de ruído"} aria-pressed={noise !== "off"} className={`${btn(true)} ${noise !== "off" ? "text-accent2 ring-1 ring-accent2/50" : ""}`} onClick={toggleNoise}><AudioLines size={20} /></button>
           <button title={deafened ? "Desativar ensurdecer" : "Ensurdecer"} className={btn(!deafened)} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}</button>
           {onSound && <Soundboard onPlay={onSound} disabled={meMuted} btnCls={btn(true)} />}
+          {onGiant && <GiantButton onSend={onGiant} disabled={meMuted && false} btnCls={btn(true)} />}
           <button title="Câmera" className={btn(!!lp?.isCameraEnabled)} onClick={() => toggle("cam")}>{lp?.isCameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}</button>
           {canShareScreen && <button title="Compartilhar tela" className={`size-11 sm:size-12 rounded-2xl grid place-items-center ${lp?.isScreenShareEnabled ? "grad text-white" : "bg-white/10"}`} onClick={() => toggle("screen")}><MonitorUp size={20} /></button>}
           <button title="Sair da chamada" className="size-11 sm:size-12 rounded-2xl grid place-items-center bg-red-600" onClick={onLeave}><PhoneOff size={20} /></button>

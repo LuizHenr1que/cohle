@@ -88,3 +88,24 @@ export function playSound(id: string) {
   const c = get(); const fn = PLAY[id as SoundId];
   if (c && fn) fn(c);
 }
+
+// ---- sounds of shop effects (same rule: synthesized, nothing downloaded) ----
+export type FxSound = "hohoho" | "whoosh" | "sleigh" | "boo" | "witch";
+export function playFx(id: FxSound) {
+  const c = get(); if (!c) return;
+  if (id === "hohoho") {                                              // three falling low notes + a handful of bells and paper
+    [0, 0.34, 0.68].forEach((t, i) => tone(c, { type: "triangle", f0: 190 - i * 18, f1: 120 - i * 14, t, d: 0.3, v: 0.22 }));
+    [1568, 2093, 1760, 2349, 1976].forEach((f, i) => tone(c, { f0: f, t: 0.08 + i * 0.07, d: 0.34, v: 0.05 }));
+    noise(c, { t: 1.05, d: 0.5, v: 0.12, kind: "highpass", freq: 3200 });
+  } else if (id === "boo") {                                         // a low ghostly "buuu" that rises and falls, a little wind on top
+    tone(c, { type: "sine", f0: 150, f1: 95, t: 0, d: 0.9, v: 0.2 }); tone(c, { type: "triangle", f0: 220, f1: 130, t: 0.1, d: 0.8, v: 0.08 });
+    noise(c, { t: 0.2, d: 0.9, v: 0.07, kind: "bandpass", freq: 900, q: 0.7 });
+  } else if (id === "witch") {                                        // a short cackle: quick rising squeaks
+    [0, 0.13, 0.26, 0.39].forEach((t, i) => tone(c, { type: "sawtooth", f0: 520 + i * 40, f1: 900 + i * 60, t, d: 0.1, v: 0.05 }));
+  } else if (id === "sleigh") {                                       // bells
+    for (let i = 0; i < 10; i++) tone(c, { f0: 2200 + (i % 3) * 330, t: i * 0.11, d: 0.2, v: 0.04 });
+  } else {                                                            // whoosh of a giant reaction
+    noise(c, { t: 0, d: 0.9, v: 0.2, kind: "bandpass", freq: 700, q: 0.6 });
+    tone(c, { type: "sine", f0: 260, f1: 90, t: 0, d: 0.7, v: 0.12 });
+  }
+}

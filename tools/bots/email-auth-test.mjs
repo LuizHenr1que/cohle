@@ -1,6 +1,6 @@
 // E-mail confirmation + password reset against the dev server (EMAIL_DEV=1: codes are printed in the server log /tmp/server.log).
 import { readFileSync } from "node:fs";
-const API = "http://localhost:3001", LOG = "/tmp/server.log";
+const API = "http://localhost:3001", LOG = process.env.SERVER_LOG ?? "/tmp/server.log";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let pass = 0, fail = 0; const ok = (l, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${l}${x ? "  — " + x : ""}`); };
 const post = async (p, b) => { const r = await fetch(API + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }); return { s: r.status, d: await r.json().catch(() => ({})) }; };

@@ -12,5 +12,7 @@ export default defineConfig(({ mode }) => {
       transformIndexHtml: () => (api ? [{ tag: "link", attrs: { rel: "preconnect", href: new URL(api).origin, crossorigin: "" }, injectTo: "head-prepend" as const }] : []),
     }],
     server: { port: 5173 },
+    // the shop libraries load lazily; optimizing them up front keeps the dev server from re-bundling in the middle of a session (two copies of React)
+    optimizeDeps: { include: ["framer-motion", "@tanstack/react-virtual"] },
   };
 });

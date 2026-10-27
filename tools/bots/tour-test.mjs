@@ -9,14 +9,15 @@ const ev = (x) => cmd("Runtime.evaluate", { expression: x, returnByValue: true, 
 const text = () => ev(`document.body.innerText`);
 const setVal = (sel, v) => ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,${JSON.stringify(v)});e.dispatchEvent(new Event('input',{bubbles:true}))})()`);
 const click = (txt) => ev(`(()=>{const e=[...document.querySelectorAll('button')].find(b=>b.innerText.includes(${JSON.stringify(txt)}));if(e)e.click();return !!e})()`);
-const lastCode = (to) => { const t = readFileSync("/tmp/server.log", "utf8"); const m = [...t.matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))]; return m.at(-1)?.[1]; };
+const lastCode = (to) => { const t = readFileSync((process.env.SERVER_LOG ?? "/tmp/server.log"), "utf8"); const m = [...t.matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))]; return m.at(-1)?.[1]; };
 const tag = Date.now().toString(36), email = `tour_${tag}@exemplo.dev`;
 await ev(`localStorage.clear(); sessionStorage.clear(); location.reload()`); await sleep(2500);
 await click("Não tem conta? Cadastre-se"); await sleep(300);
-await setVal('input[type="email"]', email); await setVal('input[placeholder="Nome de usuário"]', `tour_${tag}`.slice(0, 20)); await setVal('input[type="password"]', "senha-forte-1");
+await setVal('input[type="email"]', email); await setVal('input[aria-label="@usuário"]', `tour_${tag}`.slice(0, 20)); await setVal('input[type="password"]', "senha-forte-1");
+for (let i = 0; i < 40 && !/está disponível/.test(await text()); i++) await sleep(250);          // the @username check goes to the database: wait for it like a person would
 await click("Criar conta"); await sleep(1800);
 await setVal('input[aria-label="Código de 6 dígitos"]', lastCode(email)); await sleep(4000);
-ok("conta nova: o tour abre sozinho", /Pular tour/.test(await text()) && /A resenha agora tem endereço/.test(await text()));
+{ const tt = await text(); ok("conta nova: o tour abre sozinho", /Pular tour/.test(tt) && /A resenha agora tem endereço/.test(tt), /Pular tour/.test(tt) ? "" : tt.slice(0, 300).replace(/\n/g, " / ")); }
 const seen = [];
 for (let i = 0; i < 6; i++) {
   seen.push(await ev(`document.querySelector('[role=dialog] h2').innerText`));

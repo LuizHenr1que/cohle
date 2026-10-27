@@ -3,6 +3,7 @@ import { CornerUpLeft, Download, FileArchive, FileText, Film, Music, SmilePlus, 
 import { nameOf, type AttachmentDTO, type ReactionDTO, type ReactionKey, type ReplyDTO, type UserDTO } from "@cohle/shared";
 import { Avatar } from "../Avatar";
 import { DevBadge } from "../Badge";
+import { UserName, ItemBadge } from "../../shop/UserName";
 import { fileHref, humanSize, thumbHref } from "../../lib/chat";
 import { ReactionChips, ReactionPicker } from "./Reactions";
 
@@ -58,7 +59,7 @@ export function MessageItem({ item, selfId, head, canDelete, onProfile, onReply,
       </div>
       <div className="min-w-0 flex-1">
         {head && (
-          <div className="text-sm"><button onClick={() => onProfile(item.author.id)} className="font-bold hover:underline">{nameOf(item.author)}</button> <DevBadge user={item.author} /> <span className="text-muted text-xs ml-1">{clock(item.createdAt)}</span></div>
+          <div className="text-sm"><button onClick={() => onProfile(item.author.id)} className="font-bold hover:underline"><UserName user={item.author} /></button> <DevBadge user={item.author} /> <ItemBadge user={item.author} /> <span className="text-muted text-xs ml-1">{clock(item.createdAt)}</span></div>
         )}
         {r && (
           <button type="button" onClick={() => r.id && onJump(r.id)} disabled={!r.id} title={r.id ? "Ir para a mensagem" : "A mensagem original foi apagada"}

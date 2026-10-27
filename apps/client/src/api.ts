@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { ReactionDTO, ReactionKey, AttachmentDTO, FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { PrefsDTO, ShopDTO, Slot, ReactionDTO, ReactionKey, AttachmentDTO, FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -62,6 +62,11 @@ const MESSAGES: Record<string, string> = {
   "owner is fixed": "A conta do dono da empresa não pode ser alterada.",
   "not found": "Não encontramos essa pessoa.",
   "user not found": "Não encontramos ninguém com esse @usuário. Confira se está escrito certo.",
+  "not owned": "Você ainda não pegou esse item.",
+  "out of season": "Essa coleção não está mais na vitrine.",
+  "wrong slot": "Esse item não vai nesse lugar.",
+  "nothing owned": "Pegue pelo menos um item da coleção primeiro.",
+  "payment required": "Esse item é pago e o pagamento ainda não está disponível.",
   "too long": "A mensagem passou do limite de 500 caracteres.",
   "too many lines": "Muitas linhas: use no máximo 12.",
   "slow down": "Calma: você está mandando rápido demais. Espere alguns segundos.",
@@ -185,6 +190,13 @@ export const api = {
   join: (code: string) => req<ServerDTO>(`/servers/join/${code}`, "POST"),
   createChannel: (serverId: string, name: string, type: "TEXT" | "VOICE") =>
     req(`/servers/${serverId}/channels`, "POST", { name, type }),
+  shop: () => req<ShopDTO>("/shop"),
+  claimItem: (id: string) => req<{ ok: true }>(`/shop/items/${id}/claim`, "POST", {}),
+  equipItem: (slot: Slot, itemId: string | null) => req<{ equipped: Partial<Record<Slot, string>>; bonus: string | null }>("/shop/equipped", "PUT", { slot, itemId }),
+  equipSet: (collectionId: string) => req<{ equipped: Partial<Record<Slot, string>>; bonus: string | null; complete: boolean }>("/shop/equipped/set", "POST", { collectionId }),
+  putPrefs: (p: Partial<PrefsDTO>) => req<PrefsDTO>("/me/prefs", "PUT", p),
+  serverSettings: (id: string) => req<{ blockedCategories: string[] }>(`/servers/${id}/settings`),
+  putServerSettings: (id: string, blockedCategories: string[]) => req<{ blockedCategories: string[] }>(`/servers/${id}/settings`, "PUT", { blockedCategories }),
   react: (id: string, key: ReactionKey) => req<{ reactions: ReactionDTO[] }>(`/messages/${id}/reactions`, "POST", { key }),
   reactDm: (id: string, key: ReactionKey) => req<{ reactions: ReactionDTO[] }>(`/dm-messages/${id}/reactions`, "POST", { key }),
   deleteUpload: (id: string) => req<{ ok: true }>(`/uploads/${id}`, "DELETE"),

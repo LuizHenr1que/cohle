@@ -158,8 +158,9 @@ try {
   ok("conversa direta: resposta com citação", await waitFor(`[...document.querySelectorAll('[data-mid]')].some(x=>x.innerText.includes('resposta direta')&&x.innerText.includes('oi, é o teste2'))`));
   await ev(`document.getElementById('msg-${dmm.message.id}').querySelector('button[aria-label="Reagir"]').click()`); await sleep(300); await ev(`document.querySelector('[role=menu][aria-label="Reagir"] button[aria-label="Curtir"]').click()`);
   ok("conversa direta: reação", await waitFor(`!!document.getElementById('msg-${dmm.message.id}').querySelector('button[aria-label="Curtir: 1"]')`));
+  await waitFor(`document.querySelector('textarea[aria-label="Mensagem"]')?.value === ""`, 8000);          // the reply above is still being confirmed: like a person, wait for the box to be free before attaching
   await attach([imgPath]); await waitFor(`!!document.querySelector('ul[aria-label="Arquivos para enviar"] li img')&&/KB|MB/.test(document.querySelector('ul[aria-label="Arquivos para enviar"]').innerText)`, 15000); await sendByClick();
-  const dmImgs0 = 0; ok("conversa direta: imagem", await waitFor(`document.querySelectorAll('[data-mid] img[alt="captura de tela.webp"]').length > 0`, 15000), String(await ev(`document.querySelector('[role=alert]')?.innerText ?? "sem aviso; chips: " + (document.querySelector('ul[aria-label="Arquivos para enviar"]')?.innerText ?? "nenhum")`)));
+  const dmImgs0 = 0; ok("conversa direta: imagem", await waitFor(`document.querySelectorAll('[data-mid] img[alt="captura de tela.webp"]').length > 0`, 15000), String(await ev(`document.querySelector('[role=alert]')?.innerText ?? "sem aviso; chips: " + (document.querySelector('ul[aria-label="Arquivos para enviar"]')?.innerText ?? "nenhum") + " | imgs: " + [...document.querySelectorAll('[data-mid] img')].map(i=>i.alt+"@"+i.naturalWidth).join(",") + " | último: " + ([...document.querySelectorAll('[data-mid]')].at(-1)?.innerHTML ?? "").slice(0,400)`)));
   await shot(`chat-4-dm-${TAG}`);
 
   // ---- phone size ----

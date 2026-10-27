@@ -18,8 +18,11 @@ import { DropZone } from "./chat/DropZone";
 import { Lightbox } from "./chat/Lightbox";
 import { RetentionNote } from "./chat/RetentionNote";
 import { toggled } from "../lib/chat";
+import { ShopProvider } from "../shop/ShopProvider";
+import { UserName } from "../shop/UserName";
+import { ShopLayer } from "../shop/ShopLayer";
 import { useStickToBottom } from "../lib/stick";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, Store } from "lucide-react";
 const AdminPanel = lazy(() => import("./AdminPanel"));
 import { UserProfile } from "./UserProfile";
 import { FriendsPanel } from "./FriendsPanel";
@@ -59,6 +62,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
   const [newChannelType, setNewChannelType] = useState<"TEXT" | "VOICE">();
   const [notice, setNotice] = useState<string>();
   // the call keeps running while you read/write in text channels: `view` only decides what is on screen
@@ -271,6 +275,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   );
 
   return (
+    <ShopProvider socket={() => socket.current}>
     <div className="h-full flex gap-2 sm:gap-3 p-2 sm:p-3 min-w-0">
       {!wide && navOpen && <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setNavOpen(false)} />}
       {(wide || navOpen) && (
@@ -306,6 +311,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           );
         })}
         <div className={`h-px bg-line my-1 shrink-0 ${railOpen ? "w-full" : "w-8"}`} />
+        {rb({ title: "Loja", icon: <Store size={20} />, onClick: () => setShopOpen(true), cls: "bg-white/5 text-accent2 hover:bg-white/10" })}
         {rb({ title: "Criar servidor", icon: <Plus size={18} />, onClick: () => setServerModal("create"), cls: "bg-white/5 text-accent2 hover:bg-white/10" })}
         {rb({ title: "Entrar com convite", icon: <Link2 size={18} />, onClick: () => setServerModal("join"), cls: "bg-white/5 text-accent hover:bg-white/10" })}
         <div className="flex-1" />
@@ -371,7 +377,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
             <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(self.id) ? "bg-emerald-400" : "bg-muted"}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm truncate flex items-center gap-1.5">{nameOf(self)}<DevBadge user={self} /></div>
+            <div className="text-sm truncate flex items-center gap-1.5"><UserName user={self} /><DevBadge user={self} /></div>
             <div className="text-[11px] text-muted">{online.has(self.id) ? "Online" : "Offline"}</div>
           </div>
           <Settings size={16} className="text-muted" />
@@ -391,7 +397,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {voice && (
           <div className={view === "call" && !dmOpen ? "flex-1 flex flex-col min-h-0 min-w-0" : "hidden"}>
           <Suspense fallback={<div className="flex-1 grid place-items-center text-muted text-sm">Carregando chamada...</div>}>
-            <VoiceRoom key={voice.id} channel={voice} onApi={(a) => { voiceApi.current = a; }} onMessage={(uid) => { const u = Object.values(voiceUsers).flat().find((x) => x.id === uid); if (u) openDm(u); }} onProfile={setProfileId} onSound={(id) => socket.current?.emit("voice:sound", id)} onMedia={(micOff, deaf) => { deafRef.current = deaf; socket.current?.emit("voice:media", { micOff, deaf }); }} autoWatch={autoWatch} onAutoWatched={() => setAutoWatch(undefined)} chat={view === "call" && chatOpen ? chatPane(true) : null} chatOpen={chatOpen} unread={unread} onToggleChat={() => setChatOpen((v) => !v)} channelName={channel?.name} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
+            <VoiceRoom key={voice.id} channel={voice} onApi={(a) => { voiceApi.current = a; }} onMessage={(uid) => { const u = Object.values(voiceUsers).flat().find((x) => x.id === uid); if (u) openDm(u); }} onProfile={setProfileId} onSound={(id) => socket.current?.emit("voice:sound", id)} onGiant={(icon) => socket.current?.emit("fx:giant", icon)} onMedia={(micOff, deaf) => { deafRef.current = deaf; socket.current?.emit("voice:media", { micOff, deaf }); }} autoWatch={autoWatch} onAutoWatched={() => setAutoWatch(undefined)} chat={view === "call" && chatOpen ? chatPane(true) : null} chatOpen={chatOpen} unread={unread} onToggleChat={() => setChatOpen((v) => !v)} channelName={channel?.name} users={roomUsers} serverId={voice.serverId} isOwner={server?.id === voice.serverId && isOwner} onLeave={leaveVoice} onSpeakers={(ids) => setSpeakers((prev) => (prev.size === ids.length && ids.every((i) => prev.has(i)) ? prev : new Set(ids)))} onMenu={wide ? undefined : () => setNavOpen(true)} onSharing={(on) => { sharingRef.current = on; socket.current?.emit("voice:sharing", on); }} />
           </Suspense>
           </div>
         )}
@@ -424,6 +430,8 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         <ProfileModal user={self} onClose={() => setProfileOpen(false)} onTour={() => setTour(true)}
           onSaved={(u) => { setSelf(u); localStorage.setItem("me", JSON.stringify(u)); }} />
       )}
+      <ShopLayer self={self} socket={() => socket.current} voiceId={voice?.id} nameFor={(id) => { const u = Object.values(voiceUsers).flat().find((x) => x.id === id); return u ? nameOf(u) : "Alguém"; }} open={shopOpen} onClose={() => setShopOpen(false)} />
     </div>
+    </ShopProvider>
   );
 }

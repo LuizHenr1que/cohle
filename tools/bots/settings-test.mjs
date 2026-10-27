@@ -20,7 +20,7 @@ const bad = await http("/me/password", { current: "errada-123456", password: "no
 ok("trocar senha com a atual errada é recusado", bad.s === 401);
 const tag = Date.now().toString(36), e = `cfg_${tag}@exemplo.dev`;
 await http("/auth/register", { email: e, username: `cfg_${tag}`.slice(0, 20), password: "senha-forte-1" });
-const code = [...readFileSync("/tmp/server.log", "utf8").matchAll(new RegExp(`to=${e.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))].at(-1)[1];
+const code = [...readFileSync((process.env.SERVER_LOG ?? "/tmp/server.log"), "utf8").matchAll(new RegExp(`to=${e.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))].at(-1)[1];
 const u = (await http("/auth/verify", { email: e, code })).d;
 ok("trocar senha com a atual certa funciona", (await http("/me/password", { current: "senha-forte-1", password: "nova-senha-777" }, u.token)).s === 200 && (await http("/auth/login", { email: e, password: "nova-senha-777" })).s === 200 && (await http("/auth/login", { email: e, password: "senha-forte-1" })).s === 401);
 const prof = await http(`/users/${login.user.id}/profile`, null, a.token);

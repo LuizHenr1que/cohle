@@ -56,12 +56,14 @@ export const Composer = forwardRef<ComposerHandle, {
   async function send() {
     if (busy || uploading || empty || disabled) return;
     setBusy(true); setErr("");
-    const e = await onSend({ content: text, ...(reply ? { replyToId: reply.id } : {}), attachmentIds: ready.map((f) => f.att!.id) }).catch(() => "Não foi possível enviar. Tente de novo.");
+    const sentText = text, sent = new Set(ready.map((f) => f.key));
+    const e = await onSend({ content: sentText, ...(reply ? { replyToId: reply.id } : {}), attachmentIds: ready.map((f) => f.att!.id) }).catch(() => "Não foi possível enviar. Tente de novo.");
     setBusy(false);
     if (e) return setErr(e);
-    files.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
-    setText(""); setFiles([]); onCancelReply();
-    if (area.current) area.current.style.height = "auto";
+    ready.forEach((f) => f.preview && URL.revokeObjectURL(f.preview));
+    setText((t) => (t === sentText ? "" : t));                       // clear only what was sent: what the person typed or attached while the send was in flight stays
+    setFiles((l) => l.filter((f) => !sent.has(f.key))); onCancelReply();
+    if (area.current && area.current.value === sentText) area.current.style.height = "auto";
     area.current?.focus();
   }
   const near = text.length >= MESSAGE_MAX * 0.8;

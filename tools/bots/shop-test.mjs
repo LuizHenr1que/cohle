@@ -83,6 +83,23 @@ ok("collections.ativo=false: sai da vitrine na hora", !(await shop(D)).collectio
 ok("collections.ativo=false: deixa de ser entregue aos outros (fx some)", !(await http(`/channels/${ch}/messages`, null, B.token)).d.some((m) => m.author.id === A.user.id && m.author.fx));
 ok("collections.ativo=false: não dá para pegar", (await http(`/shop/items/${item(sd, "natal.theme").id}/claim`, {}, D.token)).s === 403);
 await SET({ ativo: true, fim: orig.fim }); ok("religar volta tudo", (await shop(D)).collections.some((c) => c.key === "natal"));
+// ---- Halloween: a second seasonal collection that works like Natal; when its season ends whoever claimed keeps it and nobody new can ----
+const HW = ["halloween.theme", "halloween.frame.pumpkin", "halloween.frame.web", "halloween.badge.spooky", "halloween.entrance.boo", "halloween.name.pumpkin", "halloween.name.ghost", "halloween.reactions"];
+const hwCol = await prisma.collection.findUnique({ where: { key: "halloween" } });
+const hwSet = async (data) => { await prisma.collection.update({ where: { key: "halloween" }, data }); await sleep(450); };
+const H = await mk("hel"); let sh = await shop(H);
+const hc = sh.collections.find((c) => c.key === "halloween");
+ok("Halloween está em temporada, sazonal, com 8 itens e dias restantes", !!hc && hc.visible && hc.sazonal && hc.daysLeft > 0 && hc.itemIds.length === 8 && HW.every((k) => item(sh, k)), JSON.stringify(hc));
+ok("Natal e Halloween aparecem juntos na vitrine", sh.collections.some((c) => c.key === "natal") && sh.collections.some((c) => c.key === "halloween"));
+for (const k of HW) await claim(H, sh, k);
+r = await http("/shop/equipped/set", { collectionId: hc.id }, H.token);
+ok("equipar o conjunto de Halloween libera a bruxa extra (bônus)", r.s === 200 && r.d.bonus === "halloween.witch", JSON.stringify(r.d));
+ok("o conjunto de Halloween vira fx (tema, moldura, nome, emblema) para os outros", (await http("/me", null, H.token)).d.fx?.frame?.startsWith("halloween.") && (await http("/me", null, H.token)).d.fx?.nameEffect?.startsWith("halloween."));
+await hwSet({ fim: new Date(Date.now() - 86_400_000) });
+const hD = await shop(D), hH = await shop(H);
+ok("fim da temporada: some da vitrine de quem não pegou e não dá para pegar", !hD.collections.some((c) => c.key === "halloween") && (await http(`/shop/items/${item(sh, "halloween.theme").id}/claim`, {}, D.token)).s === 403);
+ok("fim da temporada: quem pegou continua com tudo e pode equipar", HW.every((k) => item(hH, k)) && (await equip(H, "theme", item(sh, "halloween.theme").id)).s === 200);
+await hwSet({ ativo: hwCol.ativo, inicio: hwCol.inicio, fim: hwCol.fim });
 // ---- preferences ----
 r = await http("/me/prefs", null, A.token); ok("preferências começam com o padrão", r.d.effectsOff === false && r.d.seasonalAuto === true && r.d.lite === "auto" && r.d.hidePolitical === false);
 r = await http("/me/prefs", { effectsOff: true, lite: "on" }, A.token, "PUT"); ok("salvar preferências (parcial)", r.d.effectsOff === true && r.d.lite === "on" && r.d.seasonalAuto === true);

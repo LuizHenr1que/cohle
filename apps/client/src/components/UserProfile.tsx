@@ -4,6 +4,7 @@ import { nameOf, NOTE_MAX, type ActivityDTO, type ProfileDTO } from "@cohle/shar
 import { api, assetUrl } from "../api";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
+import { UserName, ItemBadge } from "../shop/UserName";
 import { bannerBg, monthYear } from "../lib/profile";
 
 /** What the person is doing right now. The place is only sent when the viewer is in that server too. */
@@ -59,10 +60,10 @@ export function UserProfile({ id, onClose, onMessage, onEdit, onFriendsChanged, 
           {err && <p className="pt-14 pb-6 text-center text-sm text-muted">{err}</p>}
           {!err && !p && <p className="pt-14 pb-6 text-center text-sm text-muted">Carregando perfil...</p>}
           {p && (<>
-            <div className="ring-4 ring-surface rounded-full w-fit"><Avatar user={p.user} size={88} /></div>
+            <div className="ring-4 ring-surface rounded-full w-fit"><Avatar user={p.user} size={88} live /></div>
             <div className="mt-3 flex items-center flex-wrap gap-2">
-              <h2 className="text-2xl font-extrabold tracking-tight break-words min-w-0">{nameOf(p.user)}</h2>
-              <DevBadge user={p.user} full />
+              <h2 className="text-2xl font-extrabold tracking-tight break-words min-w-0"><UserName user={p.user} live /></h2>
+              <DevBadge user={p.user} full /><ItemBadge user={p.user} full />
             </div>
             <p className="text-sm text-muted mt-0.5">@{p.user.username}{p.isSelf && " · este é o seu perfil"}</p>
             <Activity a={p.activity} />

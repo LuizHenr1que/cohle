@@ -5,7 +5,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const API = "http://localhost:3001";
 let pass = 0, fail = 0; const ok = (l, c, x = "") => { c ? pass++ : fail++; console.log(`${c ? "PASS" : "FAIL"}  ${l}${x ? "  — " + x : ""}`); };
 const http = async (p, b, tok, m) => { const r = await fetch(API + p, { method: m ?? (b ? "POST" : "GET"), headers: { "Content-Type": "application/json", ...(tok ? { Authorization: "Bearer " + tok } : {}) }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, d: await r.json().catch(() => ({})) }; };
-const codeFor = (to) => [...readFileSync("/tmp/server.log", "utf8").matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))].at(-1)?.[1];
+const codeFor = (to) => [...readFileSync((process.env.SERVER_LOG ?? "/tmp/server.log"), "utf8").matchAll(new RegExp(`to=${to.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))].at(-1)?.[1];
 const DEV = "verticeappempresa@gmail.com", tag = Date.now().toString(36);
 // the team account (wipe a previous local one so the test is repeatable)
 let r = await http("/auth/register", { email: DEV, username: "verticeapps", password: "senha-forte-1" });

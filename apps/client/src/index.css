@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./shop/shop.css";
 
 @theme {
   --color-bg: #0a0507;
@@ -18,6 +19,9 @@ html[data-theme="ocean"] { --color-bg: #050a12; --color-surface: #0a121c; --colo
 html[data-theme="forest"] { --color-bg: #050b07; --color-surface: #09130d; --color-surface-2: #0f1d14; --color-ink: #eaf6ee; --color-muted: #86a08e; --color-accent: #22b35e; --color-accent2: #9be15d; --accent-rgb: 34 179 94; --accent2-rgb: 155 225 93; --glass-a: rgba(18, 38, 26, 0.82); --glass-b: rgba(10, 20, 14, 0.9); --orb-core: #d4f5de; --orb-deep: #0b4a22; --orb-dark: #031a0b; }
 html[data-theme="violet"] { --color-bg: #08050f; --color-surface: #100a1c; --color-surface-2: #170f2a; --color-ink: #f0eafc; --color-muted: #9a8ab5; --color-accent: #8b5cf6; --color-accent2: #e056d9; --accent-rgb: 139 92 246; --accent2-rgb: 224 86 217; --glass-a: rgba(32, 22, 52, 0.82); --glass-b: rgba(18, 12, 30, 0.9); --orb-core: #e6d8ff; --orb-deep: #3a0f6b; --orb-dark: #11041f; }
 html[data-theme="sunset"] { --color-bg: #0b0604; --color-surface: #170d08; --color-surface-2: #22140b; --color-ink: #fbeee4; --color-muted: #a8907f; --color-accent: #ff6a3d; --color-accent2: #ffb347; --accent-rgb: 255 106 61; --accent2-rgb: 255 179 71; --glass-a: rgba(44, 28, 18, 0.82); --glass-b: rgba(24, 14, 9, 0.9); --orb-core: #ffe2c9; --orb-deep: #6b2a0b; --orb-dark: #1f0c04; }
+
+html[data-theme="natal"] { --color-bg: #06101c; --color-surface: #0b1a2b; --color-surface-2: #10243a; --color-ink: #f2f7ff; --color-muted: #8aa0b8; --color-accent: #e63946; --color-accent2: #3ddc84; --accent-rgb: 230 57 70; --accent2-rgb: 61 220 132; --glass-a: rgba(16, 36, 58, 0.82); --glass-b: rgba(8, 20, 34, 0.9); --orb-core: #ffd6da; --orb-deep: #5c0b14; --orb-dark: #0a1626; }
+html[data-theme="halloween"] { --color-bg: #0d0716; --color-surface: #160d24; --color-surface-2: #1f1233; --color-ink: #f6efff; --color-muted: #a597bd; --color-accent: #ff7a1a; --color-accent2: #a06bff; --accent-rgb: 255 122 26; --accent2-rgb: 160 107 255; --glass-a: rgba(31, 18, 51, 0.82); --glass-b: rgba(15, 8, 26, 0.9); --orb-core: #ffd9b0; --orb-deep: #5a2200; --orb-dark: #120a1e; }
 
 @custom-variant electron-mac (&:where(.electron-mac, .electron-mac *));
 

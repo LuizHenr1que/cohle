@@ -1,5 +1,7 @@
 // Color themes. The CSS (index.css) defines the tokens per [data-theme]; here are the names and the swatches for the picker.
-export type ThemeId = "cohle" | "ocean" | "forest" | "violet" | "sunset" | "custom";
+export type ThemeId = "cohle" | "ocean" | "forest" | "violet" | "sunset" | "custom" | "natal" | "halloween";
+/** Themes that come from the shop (not in the picker: you wear them by owning and equipping the item). */
+export const SHOP_THEMES: ThemeId[] = ["natal", "halloween"];
 export const THEMES: { id: ThemeId; name: string; hint: string; a: string; b: string; bg: string }[] = [
   { id: "cohle", name: "Cohle", hint: "Vermelho, o clássico", a: "#ff3b5c", b: "#ff8a5b", bg: "#140a0e" },
   { id: "ocean", name: "Oceano", hint: "Azul profundo", a: "#3b8cff", b: "#35c8ff", bg: "#0a121c" },
@@ -8,7 +10,7 @@ export const THEMES: { id: ThemeId; name: string; hint: string; a: string; b: st
   { id: "sunset", name: "Pôr do sol", hint: "Laranja quente", a: "#ff6a3d", b: "#ffb347", bg: "#170d08" },
 ];
 const KEY = "cohle:theme";
-export const getTheme = (): ThemeId => { try { const t = localStorage.getItem(KEY) as ThemeId | null; return t === "custom" || THEMES.some((x) => x.id === t) ? t! : "cohle"; } catch { return "cohle"; } };
+export const getTheme = (): ThemeId => { try { const t = localStorage.getItem(KEY) as ThemeId | null; return t === "custom" || THEMES.some((x) => x.id === t) || SHOP_THEMES.includes(t as ThemeId) ? t! : "cohle"; } catch { return "cohle"; } };
 // ---- custom color: the whole palette is derived from ONE color the person picks ----
 const CKEY = "cohle:theme-color";
 export const getCustomColor = (): string => { try { const c = localStorage.getItem(CKEY); return c && /^#[0-9a-f]{6}$/i.test(c) ? c : "#ff3b5c"; } catch { return "#ff3b5c"; } };

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 // Direct messages (server + real client) and the camera confirmation. Needs the dev stack, bots.mjs --count 2 and the Electron test app (CDP 9341, fake camera flags).
 import { io } from "../bots/node_modules/socket.io-client/build/esm/index.js";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -25,14 +26,20 @@ const hist = (await http(`/dms/${b.user.id}/messages`, "GET", undefined, a.token
 ok("histórico guarda as duas mensagens em ordem", hist.messages.map((m) => m.content).slice(-2).join("|") === `oi ${tag}|resposta ${tag}`);
 ok("mensagens vazias/enormes são recusadas", !(await send(sa, b.user.id, "")).ok && !(await send(sa, b.user.id, "x".repeat(4001))).ok);
 // stranger: a fresh account that shares no server cannot be messaged
-const u = (await http("/auth/register", "POST", { email: `${tag}@x.dev`, username: `est_${tag}`.slice(0, 20), password: "estranho-12345" }));
+const stEmail = `${tag}@x.dev`;
+let u = (await http("/auth/register", "POST", { email: stEmail, username: `est_${tag}`.slice(0, 20), password: "estranho-12345" }));
+if (u.d.needsVerification) {                                                    // accounts confirm the e-mail first (Versão 6): the dev server prints the code in its log
+  let code; for (let i = 0; i < 20 && !code; i++) { code = [...readFileSync(process.env.SERVER_LOG ?? "/tmp/server.log", "utf8").matchAll(new RegExp(`to=${stEmail.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))].at(-1)?.[1]; if (!code) await sleep(300); }
+  u = await http("/auth/verify", "POST", { email: stEmail, code });
+}
 if (u.d.token) { ok("estranho (sem servidor em comum) não recebe mensagem", !(await send(sa, u.d.user.id, "spam")).ok); }
 else ok("conta de estranho criada para o teste", false, JSON.stringify(u.d));
 // paging
 for (let i = 0; i < 55; i++) await send(sa, b.user.id, `m${i} ${tag}`);
 const p1 = (await http(`/dms/${b.user.id}/messages`, "GET", undefined, a.token)).d;
 const p2 = (await http(`/dms/${b.user.id}/messages?before=${p1.messages[0].id}`, "GET", undefined, a.token)).d;
-ok("histórico paginado (50 + anteriores sem repetir)", p1.messages.length === 50 && p1.more && p2.messages.length > 0 && !p2.messages.some((m) => p1.messages.some((x) => x.id === m.id)), `${p1.messages.length}+${p2.messages.length}`);
+// since Versão 11 only the last 15 messages of a conversation are kept (KEEP_MESSAGES): one full page, nothing older to page into
+ok("histórico guarda só as últimas 15 (sem páginas anteriores)", p1.messages.length === 15 && p1.more === false, `${p1.messages.length} more=${p1.more}`);
 
 // ---- real client ----
 const t = (await (await fetch(`http://localhost:${PORT}/json`)).json()).find((t) => t.type === "page" && !t.url.includes("overlay.html"));
@@ -44,10 +51,11 @@ const click = (sel, txt) => ev(`(()=>{const e=[...document.querySelectorAll(${JS
 await click('button[title="Mensagens diretas"]'); await sleep(1200);
 ok("abre a área de mensagens diretas com a conversa existente", await ev(`document.body.innerText.includes('Mensagens diretas') && document.body.innerText.includes('teste2')`));
 await click("aside button", "teste2"); await sleep(1500);
-ok("histórico aparece no chat (últimas 50)", await ev(`document.body.innerText.includes(${JSON.stringify("m54 " + tag)})`));
+ok("histórico aparece no chat (mais recentes)", await ev(`document.body.innerText.includes(${JSON.stringify("m54 " + tag)})`));
 // send from the UI
 await ev(`(()=>{const t=document.querySelector('textarea');const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;set.call(t,${JSON.stringify("da interface " + tag)});t.dispatchEvent(new Event('input',{bubbles:true}))})()`);
-got = null; await ev(`document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`); await sleep(800);
+got = null; await ev(`document.querySelector('textarea').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
+for (let i = 0; i < 32 && !(got && await ev(`document.body.innerText.includes(${JSON.stringify("da interface " + tag)})`)); i++) await sleep(250);          // the round trip to the dev database is slow: poll instead of a fixed wait
 ok("enviar pelo chat entrega ao outro e aparece na tela", got?.content === "da interface " + tag && await ev(`document.body.innerText.includes(${JSON.stringify("da interface " + tag)})`));
 // live receive + persistence after reload
 await send(sb, a.user.id, `ao vivo ${tag}`); await sleep(700);

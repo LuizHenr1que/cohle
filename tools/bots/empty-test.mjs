@@ -16,7 +16,7 @@ const login = async (tok, user) => { await ev(`sessionStorage.clear();localStora
 // a brand-new account (confirmed through the dev log code)
 const tag = Date.now().toString(36), email = `vazio_${tag}@exemplo.dev`;
 await http("/auth/register", { email, username: `vazio_${tag}`.slice(0, 20), password: "senha-forte-1" });
-const code = [...readFileSync("/tmp/server.log", "utf8").matchAll(new RegExp(`to=${email.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))].at(-1)[1];
+const code = [...readFileSync((process.env.SERVER_LOG ?? "/tmp/server.log"), "utf8").matchAll(new RegExp(`to=${email.replace(/[.+]/g, "\\$&")} subject="(\\d{6})`, "g"))].at(-1)[1];
 const me = (await http("/auth/verify", { email, code })).d;
 await login(me.token, me.user);
 ok("sem servidor: aparece a tela de boas-vindas (não mais em branco)", /Bem-vindo ao Cohle/.test(await text()) && /Criar o meu servidor/.test(await text()) && /Entrar com um convite/.test(await text()));

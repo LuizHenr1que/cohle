@@ -7,6 +7,7 @@ import { Modal, inputCls, primaryCls, ghostCls } from "./Modal";
 import { IconPicker } from "./IconPicker";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
+import { Switch } from "./Switch";
 
 type Tab = "general" | "channels" | "members" | "bans";
 
@@ -20,6 +21,8 @@ export function ServerSettings({ server, selfId, online, rev, onClose, onAddChan
   const [members, setMembers] = useState<MemberDTO[]>([]);
   const [bans, setBans] = useState<BanDTO[]>([]);
   const [msg, setMsg] = useState("");
+  const [blockPol, setBlockPol] = useState<boolean>();            // "block political items in this server" (owner)
+  useEffect(() => { if (owner) api.serverSettings(server.id).then((r) => setBlockPol(r.blockedCategories.includes("politica"))).catch(() => {}); }, [server.id, owner]);
   const [err, setErr] = useState("");
   const [copied, setCopied] = useState(false);
   const [confirm, setConfirm] = useState<string>();   // id of the thing awaiting a 2nd click
@@ -84,6 +87,10 @@ export function ServerSettings({ server, selfId, online, rev, onClose, onAddChan
               <button className="rounded-xl px-5 py-3 border border-red-500/40 text-red-400 hover:bg-red-500/10 text-sm inline-flex items-center gap-2"
                 onClick={() => setConfirm("delete")}><Trash2 size={15} /> Excluir servidor</button>
             )}
+          </div>
+          <div className="mt-6 rounded-2xl border border-line bg-white/[0.03] p-4 flex items-center gap-4" aria-label="Itens da loja neste servidor">
+            <div className="min-w-0 flex-1"><div className="text-sm font-medium">Bloquear itens políticos aqui</div><div className="text-xs text-muted mt-0.5 leading-relaxed">Molduras, nomes e badges da categoria política de quem está neste servidor não aparecem nas mensagens nem nas chamadas dele.</div></div>
+            <Switch on={!!blockPol} disabled={blockPol === undefined} label="Bloquear itens políticos neste servidor" onChange={(v) => { setBlockPol(v); api.putServerSettings(server.id, v ? ["politica"] : []).catch(() => setBlockPol(!v)); }} />
           </div>
         </>)}
 
