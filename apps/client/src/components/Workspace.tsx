@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu, Compass } from "lucide-react";
-import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO } from "@cohle/shared";
-import { nameOf } from "@cohle/shared";
-import { api, connectSocket } from "../api";
+import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO, AttachmentDTO, ReactionKey, MessageGoneEvent, MessageReactionsEvent } from "@cohle/shared";
+import { nameOf, KEEP_MESSAGES } from "@cohle/shared";
+import { api, connectSocket, friendlyError } from "../api";
 // The call UI (and the LiveKit SDK, the heaviest dependency) loads only when you join a voice channel.
 import type { VoiceApi } from "./VoiceRoom";
 import { PersonRow } from "./PersonRow";
@@ -12,6 +12,14 @@ import { DmChat, DmSidebar, useDms } from "./DirectMessages";
 import { Tour } from "./Tour";
 import { DevBadge } from "./Badge";
 import { SettingsModal } from "./SettingsModal";
+import { Composer, type ComposerHandle } from "./chat/Composer";
+import { MessageItem, type ChatItem } from "./chat/MessageItem";
+import { DropZone } from "./chat/DropZone";
+import { Lightbox } from "./chat/Lightbox";
+import { RetentionNote } from "./chat/RetentionNote";
+import { toggled } from "../lib/chat";
+import { useStickToBottom } from "../lib/stick";
+import { ArrowDown } from "lucide-react";
 const AdminPanel = lazy(() => import("./AdminPanel"));
 import { UserProfile } from "./UserProfile";
 import { FriendsPanel } from "./FriendsPanel";
@@ -30,13 +38,18 @@ import { InviteModal } from "./InviteModal";
 import { ChannelModal } from "./ChannelModal";
 import { ServerSettings } from "./ServerSettings";
 
+/** The free plan keeps 15 messages per channel: never hold more on screen either. */
+const keepLast = (l: MessageDTO[]): MessageDTO[] => { const n = new Map<string, number>(); for (const m of l) n.set(m.channelId, (n.get(m.channelId) ?? 0) + 1); const over = new Map([...n].map(([c, k]) => [c, k - KEEP_MESSAGES])); return l.filter((m) => { const o = over.get(m.channelId) ?? 0; if (o > 0) { over.set(m.channelId, o - 1); return false; } return true; }); };
+
 export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: { me: UserDTO; onLogout: () => void; fx: boolean; onToggleFx: () => void; lite: boolean; onToggleLite: () => void }) {
   const [self, setSelf] = useState<UserDTO>(me);
   const [servers, setServers] = useState<ServerDTO[]>([]);
   const [serverId, setServerId] = useState<string>();
   const [channel, setChannel] = useState<ChannelDTO>();
   const [messages, setMessages] = useState<MessageDTO[]>([]);
-  const [text, setText] = useState("");
+  const [replyTo, setReplyTo] = useState<{ id: string; authorName: string; text: string }>();
+  const [lightbox, setLightbox] = useState<AttachmentDTO>();
+  const composer = useRef<ComposerHandle>(null);
   const [voice, setVoice] = useState<ChannelDTO>();
   const [voiceUsers, setVoiceUsers] = useState<Record<string, UserDTO[]>>({});
   const [speakers, setSpeakers] = useState<Set<string>>(new Set());
@@ -81,7 +94,6 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const voiceRef = useRef<ChannelDTO>();
   voiceRef.current = voice;
   const sharingRef = useRef(false);
-  const bottom = useRef<HTMLDivElement>(null);
 
   const server = servers.find((s) => s.id === serverId);
   const isOwner = server?.ownerId === self.id;
@@ -122,8 +134,10 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
     s.on("presence:snapshot", (ids: string[]) => setOnline(new Set(ids)));
     s.on("presence", (p: { userId: string; online: boolean }) =>
       setOnline((o) => { const n = new Set(o); p.online ? n.add(p.userId) : n.delete(p.userId); return n; }));
+    s.on("message:gone", (e: MessageGoneEvent) => setMessages((l) => l.filter((m) => !e.ids.includes(m.id))));         // erased by the 15-message limit, or deleted
+    s.on("message:reactions", (e: MessageReactionsEvent) => setMessages((l) => l.map((m) => (m.id === e.id ? { ...m, reactions: e.reactions } : m))));
     s.on("message:new", (m: MessageDTO) => {
-      setMessages((l) => [...l, m]);
+      setMessages((l) => (l.some((x) => x.id === m.id) ? l : keepLast([...l, m])));
       if (m.author.id !== me.id) { sounds.message(); if (voiceRef.current && viewRef.current === "call" && !chatOpenRef.current) setUnread((n) => n + 1); }
     });
     s.on("voice:sound", (e: { id: string; name: string; channelId: string }) => {
@@ -150,24 +164,30 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
 
   useEffect(() => {
     if (!channel) return;
-    setMessages([]);
+    setMessages([]); setReplyTo(undefined);
     api.messages(channel.id).then(setMessages);
     socket.current?.emit("channel:join", channel.id);
   }, [channel?.id]);
 
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(undefined), 7000); return () => clearTimeout(t); }, [notice]);
-  useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
   useEffect(() => { if (server && !channel) setChannel(server.channels.find((c) => c.type === "TEXT")); }, [server]);
 
   const msgs = messages.filter((m) => m.channelId === channel?.id);
+  const stick = useStickToBottom(msgs.at(-1)?.id, channel?.id ?? "", msgs.at(-1)?.author.id === me.id);
   const roomUsers = voice ? voiceUsers[voice.id] ?? [] : [];
 
-  function send(e: React.FormEvent) {
-    e.preventDefault();
-    if (!text.trim() || !channel) return;
-    socket.current?.emit("message:send", { channelId: channel.id, content: text });
-    setText("");
-  }
+  // what the composer calls: sends over the socket and answers with an error text, or null when it went through
+  const sendMessage = (p: { content: string; replyToId?: string; attachmentIds: string[] }) => new Promise<string | null>((resolve) => {
+    const sk = socket.current;
+    if (!sk?.connected || !channel) return resolve("Sem conexão com o servidor. Tente de novo em instantes.");
+    const t = setTimeout(() => resolve("O servidor demorou a responder. Tente de novo."), 15_000);
+    sk.emit("message:send", { channelId: channel.id, ...p }, (a: { ok?: boolean; error?: string }) => { clearTimeout(t); resolve(a?.ok ? null : friendlyError(a?.error)); });
+  });
+  const reactTo = (m: ChatItem, key: ReactionKey) => {
+    setMessages((l) => l.map((x) => (x.id === m.id ? { ...x, reactions: toggled(x.reactions, key, self.id) } : x)));           // at once; the server's answer settles it
+    api.react(m.id, key).then((r) => setMessages((l) => l.map((x) => (x.id === m.id ? { ...x, reactions: r.reactions } : x)))).catch(() => channel && api.messages(channel.id).then(setMessages).catch(() => {}));
+  };
+  const deleteMessage = (m: ChatItem) => { setMessages((l) => l.filter((x) => x.id !== m.id)); api.deleteMessage(m.id).catch(() => channel && api.messages(channel.id).then(setMessages).catch(() => {})); };
   function joinVoice(c: ChannelDTO) {
     setNavOpen(false); setView("call"); setDmOpen(false);
     if (voice?.id === c.id) return;                         // already in this call: just bring it back on screen
@@ -229,26 +249,22 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
             {!wide && !compact && <button onClick={() => setNavOpen(true)} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={20} /></button>}
             <Hash size={18} className="text-muted shrink-0" /> <span className="truncate">{channel?.name ?? "Selecione um canal"}</span>
           </header>
-          <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4 space-y-4">
-            {msgs.map((m) => (
-              <div key={m.id} className="flex gap-3">
-                <button onClick={() => setProfileId(m.author.id)} title="Ver perfil" className="shrink-0 self-start"><Avatar user={m.author.id === self.id ? self : m.author} size={38} /></button>
-                <div className="min-w-0">
-                  <div className="text-sm"><button onClick={() => setProfileId(m.author.id)} className="font-bold hover:underline">{nameOf(m.author)}</button> <DevBadge user={m.author} /> <span className="text-muted text-xs ml-1">{new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span></div>
-                  <p className="text-ink/90 whitespace-pre-wrap break-words">{m.content}</p>
-                </div>
-              </div>
-            ))}
-            <div ref={bottom} />
-          </div>
-          {channel && (
-            <form onSubmit={send} className="p-2 sm:p-4 flex gap-2 border-t border-line">
-              <input value={text} onChange={(e) => { setText(e.target.value); socket.current?.emit("typing", channel.id); }}
-                placeholder={`Mensagem em #${channel.name}`}
-                className="flex-1 rounded-2xl bg-white/5 border border-line px-4 py-3 outline-none focus:border-accent" />
-              <button className="grad rounded-2xl px-5 text-white"><Send size={18} /></button>
-            </form>
-          )}
+          <DropZone onFiles={(f) => composer.current?.addFiles(f)} className="flex-1 flex flex-col min-h-0">
+            <div ref={stick.scroller} onScroll={stick.onScroll} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-6 py-4">
+             <div ref={stick.content}>
+              {channel && <RetentionNote what="deste canal" />}
+              {msgs.map((m, i) => {
+                const prev = msgs[i - 1];
+                const head = !prev || prev.author.id !== m.author.id || !!m.replyTo || new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > 5 * 60_000;
+                return <MessageItem key={m.id} item={m} selfId={self.id} head={head} canDelete={m.author.id === self.id || isOwner}
+                  onProfile={setProfileId} onReply={(x) => setReplyTo({ id: x.id, authorName: nameOf(x.author), text: (x.content || (x.attachments[0] ? "Anexo" : "")).replace(/\s+/g, " ").slice(0, 120) })}
+                  onReact={reactTo} onDelete={deleteMessage} onOpenImage={setLightbox} onJump={stick.jumpTo} />;
+              })}
+             </div>
+            </div>
+            {stick.away > 0 && <button type="button" onClick={() => stick.toBottom(true)} className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1.5 rounded-full grad px-4 py-1.5 text-xs font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.45)]"><ArrowDown size={14} /> {stick.away === 1 ? "1 nova mensagem" : `${stick.away} novas mensagens`}</button>}
+            {channel && <Composer ref={composer} placeholder={`Mensagem em #${channel.name}`} reply={replyTo} onCancelReply={() => setReplyTo(undefined)} onSend={sendMessage} onTyping={() => socket.current?.emit("typing", channel.id)} />}
+          </DropZone>
     </div>
   );
 
@@ -393,6 +409,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       {prefsOpen && <SettingsModal user={self} onAdmin={() => setAdminOpen(true)} onClose={() => setPrefsOpen(false)} onEditProfile={() => { setPrefsOpen(false); setProfileOpen(true); }} onTour={() => setTour(true)} onLogout={onLogout}
         fx={fx} onToggleFx={onToggleFx} lite={lite} onToggleLite={onToggleLite} rail={rail} onToggleRail={toggleRail} wide={wide} />}
       {profileId && <UserProfile id={profileId} onClose={() => setProfileId(undefined)} onMessage={(u) => openDm(u)} onEdit={() => setProfileOpen(true)} onFriendsChanged={friends.load} onProfile={setProfileId} />}
+      {lightbox && <Lightbox att={lightbox} onClose={() => setLightbox(undefined)} />}
       {tour && <Tour name={nameOf(self)} onFinish={closeTour} />}
       {serverModal && <ServerModal initial={serverModal} username={nameOf(self)} onClose={() => setServerModal(undefined)} onDone={afterServerChange} />}
       {inviteOpen && server && <InviteModal server={server} onClose={() => setInviteOpen(false)} />}

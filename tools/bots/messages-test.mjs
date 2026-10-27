@@ -146,6 +146,10 @@ ok("apagar a mensagem apaga os arquivos dela", (await fetch(API + big.url)).stat
 // per-person upload rate: 12 a minute
 const Z = await mk("zed"); const zs = []; for (let i = 0; i < 14; i++) zs.push((await upload(Z.token, "x.exe", Buffer.from("MZ"))).s);
 ok("no máximo 12 envios por minuto por pessoa", zs.slice(0, 12).every((x) => x === 403) && zs.slice(12).every((x) => x === 429), zs.join(","));
+// removing a waiting upload frees its place at once
+{ const Y = await mk("yan"); const u1 = await upload(Y.token, "a.png", await png(30, 30)); const del = await http(`/uploads/${u1.d.id}`, null, Y.token, "DELETE");
+  ok("remover um anexo antes de enviar apaga o upload", del.s === 200 && (await fetch(API + u1.d.url)).status === 404);
+  const u2 = await upload(Y.token, "b.png", await png(31, 31)); ok("só o dono apaga o upload dele", (await http(`/uploads/${u2.d.id}`, null, owner.token, "DELETE")).s === 200 && (await fetch(API + u2.d.url)).status === 200); }
 // pending cap
 const Q = await mk("quin"); const pend = []; for (let i = 0; i < 9; i++) pend.push((await upload(Q.token, `p${i}.png`, await png(20 + i, 20))).s);
 ok("no máximo 8 envios esperando para anexar", pend.slice(0, 8).every((x) => x === 200) && pend[8] === 429, pend.join(","));

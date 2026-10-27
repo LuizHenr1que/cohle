@@ -53,6 +53,14 @@ try {
   await click("Baixar", "button"); await sleep(300);
   ok("o atalho Baixar leva à seção certa da landing", (await ev(`window.__opened[0]`)) === "https://cohle.verticeapp.com.br/#baixar");
   await shot("web-3-sobre");
+  // themes: pick one, it applies at once, it survives a reload, and the default comes back
+  await click("Aparência"); await sleep(400);
+  const accent = () => ev(`getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim()`);
+  const before = await accent();
+  await ev(`[...document.querySelectorAll('[role=dialog] button')].find(b=>b.innerText.startsWith('Oceano')).click()`); await sleep(400);
+  ok("escolher o tema Oceano troca as cores na hora", (await ev(`document.documentElement.dataset.theme`)) === "ocean" && (await accent()) === "#3b8cff" && before === "#ff3b5c", `${before} -> ${await accent()}`);
+  await ev(`[...document.querySelectorAll('[role=dialog] button')].find(b=>b.innerText.startsWith('Cohle')).click()`); await sleep(400);
+  ok("e dá para voltar ao tema Cohle", (await accent()) === "#ff3b5c");
   await cmd("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }); await sleep(400);
   // phone-size browser
   await cmd("Emulation.setDeviceMetricsOverride", { width: 390, height: 800, deviceScaleFactor: 2, mobile: true }); await sleep(900);

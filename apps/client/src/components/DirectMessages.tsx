@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Users, MessageCircle, Search, Send, Menu, ChevronUp } from "lucide-react";
+import { Users, MessageCircle, Search, Menu, ArrowDown } from "lucide-react";
 import type { Socket } from "socket.io-client";
-import type { DirectMessageDTO, DmConversationDTO, UserDTO } from "@cohle/shared";
-import { nameOf } from "@cohle/shared";
-import { api } from "../api";
+import type { AttachmentDTO, DirectMessageDTO, DmConversationDTO, DmGoneEvent, DmReactionsEvent, ReactionKey, UserDTO } from "@cohle/shared";
+import { nameOf, KEEP_MESSAGES } from "@cohle/shared";
+import { api, friendlyError } from "../api";
+import { Composer, type ComposerHandle } from "./chat/Composer";
+import { MessageItem, type ChatItem } from "./chat/MessageItem";
+import { DropZone } from "./chat/DropZone";
+import { Lightbox } from "./chat/Lightbox";
+import { RetentionNote } from "./chat/RetentionNote";
+import { previewOf, toggled } from "../lib/chat";
+import { useStickToBottom } from "../lib/stick";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
 import { sounds } from "../sounds";
@@ -38,8 +45,8 @@ export function useDms(getSocket: () => Socket | null | undefined, selfId: strin
         if (incoming) { if (viewing) api.dmRead(peerId).catch(() => {}); else sounds.message(); }
       };
       const onRead = (e: { peerId: string }) => setConvs((l) => l.map((c) => (c.peer.id === e.peerId ? { ...c, unread: 0 } : c)));
-      s.on("dm:new", onNew); s.on("dm:read", onRead); s.on("connect", load);
-      off = () => { s.off("dm:new", onNew); s.off("dm:read", onRead); s.off("connect", load); };
+      s.on("dm:new", onNew); s.on("dm:read", onRead); s.on("dm:gone", load); s.on("connect", load);        // a message erased by the 15 limit can have been the preview
+      off = () => { s.off("dm:new", onNew); s.off("dm:read", onRead); s.off("dm:gone", load); s.off("connect", load); };
     }, 200);
     return () => { clearInterval(t); off(); };
   }, [selfId]);
@@ -86,7 +93,7 @@ export function DmSidebar({ convs, online, peerId, onOpen, onFriends, friendsAct
             <span className="relative shrink-0"><Avatar user={c.peer} size={36} />{dot(c.peer.id)}</span>
             <span className="min-w-0 flex-1">
               <span className={`flex items-center gap-1.5 text-sm ${c.unread ? "font-semibold text-ink" : ""}`}><span className="truncate">{nameOf(c.peer)}</span><DevBadge user={c.peer} /></span>
-              <span className={`block text-xs truncate ${c.unread ? "text-ink/80" : "text-muted"}`}>{c.last.fromId !== c.peer.id ? "Você: " : ""}{c.last.content}</span>
+              <span className={`block text-xs truncate ${c.unread ? "text-ink/80" : "text-muted"}`}>{c.last.fromId !== c.peer.id ? "Você: " : ""}{previewOf(c.last)}</span>
             </span>
             {c.unread > 0 && <span className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-accent text-white text-[11px] font-bold grid place-items-center">{c.unread > 99 ? "99+" : c.unread}</span>}
           </button>
@@ -109,20 +116,19 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfil
   peer: UserDTO; self: UserDTO; online: boolean; getSocket: () => Socket | null | undefined; onRead: (peerId: string) => void; onMenu?: () => void; onProfile?: (id: string) => void;
 }) {
   const [msgs, setMsgs] = useState<DirectMessageDTO[]>([]);
-  const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [text, setText] = useState("");
-  const [err, setErr] = useState("");
   const [typing, setTyping] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const bottom = useRef<HTMLDivElement>(null);
-  const keep = useRef<number | null>(null);               // scroll height before loading older messages
+  const [replyTo, setReplyTo] = useState<{ id: string; authorName: string; text: string }>();
+  const [lightbox, setLightbox] = useState<AttachmentDTO>();
+  const composer = useRef<ComposerHandle>(null);
   const lastTyping = useRef(0);
+  const mine = (m: DirectMessageDTO) => m.fromId === self.id;
+  const between = (m: { fromId: string; toId: string }) => (m.fromId === peer.id && m.toId === self.id) || (m.fromId === self.id && m.toId === peer.id);
 
   useEffect(() => {
     let dead = false;
-    setMsgs([]); setLoading(true); setMore(false); setText(""); setErr(""); setTyping(false);
-    api.dmMessages(peer.id).then((r) => { if (dead) return; setMsgs(r.messages); setMore(r.more); setLoading(false); onRead(peer.id); }).catch(() => setLoading(false));
+    setMsgs([]); setLoading(true); setTyping(false); setReplyTo(undefined);
+    api.dmMessages(peer.id).then((r) => { if (dead) return; setMsgs(r.messages); setLoading(false); onRead(peer.id); }).catch(() => setLoading(false));
     return () => { dead = true; };
   }, [peer.id]);
 
@@ -132,37 +138,37 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfil
     const t = setInterval(() => {
       const s = getSocket(); if (!s) return; clearInterval(t);
       const onNew = (m: DirectMessageDTO) => {
-        if (!((m.fromId === peer.id && m.toId === self.id) || (m.fromId === self.id && m.toId === peer.id))) return;
-        setMsgs((l) => (l.some((x) => x.id === m.id) ? l : [...l, m]));
+        if (!between(m)) return;
+        setMsgs((l) => (l.some((x) => x.id === m.id) ? l : [...l, m].slice(-KEEP_MESSAGES)));
         if (m.fromId === peer.id) setTyping(false);
       };
+      const onGone = (e: DmGoneEvent) => { if (between(e)) setMsgs((l) => l.filter((m) => !e.ids.includes(m.id))); };            // erased by the 15-message limit, or deleted
+      const onReactions = (e: DmReactionsEvent) => { if (between(e)) setMsgs((l) => l.map((m) => (m.id === e.id ? { ...m, reactions: e.reactions } : m))); };
       const onTyping = (e: { fromId: string }) => { if (e.fromId !== peer.id) return; setTyping(true); clearTimeout(tm); tm = window.setTimeout(() => setTyping(false), 3000); };
-      s.on("dm:new", onNew); s.on("dm:typing", onTyping);
-      off = () => { s.off("dm:new", onNew); s.off("dm:typing", onTyping); };
+      s.on("dm:new", onNew); s.on("dm:gone", onGone); s.on("dm:reactions", onReactions); s.on("dm:typing", onTyping);
+      off = () => { s.off("dm:new", onNew); s.off("dm:gone", onGone); s.off("dm:reactions", onReactions); s.off("dm:typing", onTyping); };
     }, 100);
     return () => { clearInterval(t); off(); clearTimeout(tm); };
   }, [peer.id, self.id]);
 
-  // stay at the bottom for new messages; keep the position when older ones are prepended
-  useLayoutEffect(() => {
-    const el = box.current; if (!el) return;
-    if (keep.current != null) { el.scrollTop = el.scrollHeight - keep.current; keep.current = null; }
-    else bottom.current?.scrollIntoView({ block: "end" });
-  }, [msgs, typing]);
+  const stick = useStickToBottom(msgs.at(-1)?.id, peer.id, msgs.at(-1)?.fromId === self.id);
 
-  async function older() {
-    if (!msgs.length || loading) return;
-    keep.current = box.current?.scrollHeight ?? 0;
-    const r = await api.dmMessages(peer.id, msgs[0].id).catch(() => null);
-    if (!r) { keep.current = null; return; }
-    setMsgs((l) => [...r.messages, ...l]); setMore(r.more);
-  }
-  function send() {
-    const content = text.trim(); const s = getSocket();
-    if (!content || !s) return;
-    setText(""); setErr("");
-    s.emit("dm:send", { toId: peer.id, content }, (a: { ok?: boolean; error?: boolean }) => { if (!a?.ok) { setErr("Não foi possível enviar. Tente de novo."); setText(content); } });
-  }
+  // what the composer calls: sends over the socket and answers with an error text, or null when it went through
+  const send = (p: { content: string; replyToId?: string; attachmentIds: string[] }) => new Promise<string | null>((resolve) => {
+    const s = getSocket();
+    if (!s?.connected) return resolve("Sem conexão com o servidor. Tente de novo em instantes.");
+    const t = setTimeout(() => resolve("O servidor demorou a responder. Tente de novo."), 15_000);
+    s.emit("dm:send", { toId: peer.id, ...p }, (a: { ok?: boolean; error?: string; message?: DirectMessageDTO }) => {
+      clearTimeout(t);
+      if (a?.ok && a.message) setMsgs((l) => (l.some((x) => x.id === a.message!.id) ? l : [...l, a.message!].slice(-KEEP_MESSAGES)));
+      resolve(a?.ok ? null : friendlyError(a?.error));
+    });
+  });
+  const reactTo = (m: ChatItem, key: ReactionKey) => {
+    setMsgs((l) => l.map((x) => (x.id === m.id ? { ...x, reactions: toggled(x.reactions, key, self.id) } : x)));
+    api.reactDm(m.id, key).then((r) => setMsgs((l) => l.map((x) => (x.id === m.id ? { ...x, reactions: r.reactions } : x)))).catch(() => api.dmMessages(peer.id).then((r) => setMsgs(r.messages)).catch(() => {}));
+  };
+  const remove = (m: ChatItem) => { setMsgs((l) => l.filter((x) => x.id !== m.id)); api.deleteDm(m.id).catch(() => api.dmMessages(peer.id).then((r) => setMsgs(r.messages)).catch(() => {})); };
 
   return (
     <div className="flex-1 flex flex-col min-h-0 min-w-0">
@@ -171,52 +177,40 @@ export function DmChat({ peer, self, online, getSocket, onRead, onMenu, onProfil
         <button onClick={() => onProfile?.(peer.id)} className="flex items-center gap-3 min-w-0 text-left rounded-xl hover:bg-white/5 -m-1 p-1 transition" title="Ver perfil"><span className="relative shrink-0"><Avatar user={peer} size={36} /><span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online ? "bg-emerald-400" : "bg-muted"}`} /></span>
         <div className="min-w-0"><div className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{nameOf(peer)}</span><DevBadge user={peer} full /></div><div className="text-[11px] text-muted">{online ? "Online" : "Offline"}</div></div></button>
       </header>
-      <div ref={box} className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
-        {more && <button onClick={older} className="mx-auto mb-3 flex items-center gap-1.5 text-xs text-muted hover:text-ink rounded-full bg-white/5 px-3 py-1.5"><ChevronUp size={14} /> Ver mensagens anteriores</button>}
-        {loading && <p className="text-center text-sm text-muted py-8">Carregando conversa...</p>}
-        {!loading && !msgs.length && (
-          <div className="text-center py-12">
-            <div className="mx-auto mb-3 w-fit"><Avatar user={peer} size={72} /></div>
-            <p className="font-semibold">{nameOf(peer)}</p>
-            <p className="text-sm text-muted mt-1">Este é o começo da sua conversa com <b>{nameOf(peer)}</b>.</p>
-          </div>
-        )}
-        {msgs.map((m, i) => {
-          const prev = msgs[i - 1], mine = m.fromId === self.id;
-          const newDay = !prev || new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
-          const head = newDay || prev.fromId !== m.fromId || new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > 5 * 60_000;
-          return (
-            <div key={m.id}>
-              {newDay && <div className="flex items-center gap-3 my-4 text-[11px] text-muted"><span className="flex-1 h-px bg-line" />{dayLabel(m.createdAt)}<span className="flex-1 h-px bg-line" /></div>}
-              <div className={`flex gap-3 group ${head ? "mt-3" : ""}`}>
-                <div className="w-9 shrink-0">{head && <Avatar user={mine ? self : peer} size={36} />}</div>
-                <div className="min-w-0 flex-1">
-                  {head && <div className="text-sm"><button onClick={() => onProfile?.(mine ? self.id : peer.id)} className="font-bold hover:underline">{mine ? nameOf(self) : nameOf(peer)}</button> <DevBadge user={mine ? self : peer} /> <span className="text-muted text-xs ml-1">{clock(m.createdAt)}</span></div>}
-                  <p className="text-ink/90 whitespace-pre-wrap break-words relative">
-                    {m.content}
-                    {!head && <span className="absolute -left-12 top-0.5 text-[10px] text-muted opacity-0 group-hover:opacity-100">{clock(m.createdAt)}</span>}
-                  </p>
-                </div>
-              </div>
+      <DropZone onFiles={(f) => composer.current?.addFiles(f)} className="flex-1 flex flex-col min-h-0">
+        <div ref={stick.scroller} onScroll={stick.onScroll} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-6 py-4">
+         <div ref={stick.content}>
+          <RetentionNote what="desta conversa" />
+          {loading && <p className="text-center text-sm text-muted py-8">Carregando conversa...</p>}
+          {!loading && !msgs.length && (
+            <div className="text-center py-12">
+              <div className="mx-auto mb-3 w-fit"><Avatar user={peer} size={72} /></div>
+              <p className="font-semibold">{nameOf(peer)}</p>
+              <p className="text-sm text-muted mt-1">Este é o começo da sua conversa com <b>{nameOf(peer)}</b>.</p>
             </div>
-          );
-        })}
-        <div className="h-5 text-xs text-muted mt-2">{typing && `${nameOf(peer)} está digitando...`}</div>
-        <div ref={bottom} />
-      </div>
-      <div className="p-2 sm:p-4 border-t border-line">
-        {err && <p className="text-xs text-accent mb-2">{err}</p>}
-        <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2 items-end">
-          <textarea value={text} rows={1} maxLength={4000} placeholder={`Mensagem para ${nameOf(peer)}`}
-            onChange={(e) => {
-              setText(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
-              if (Date.now() - lastTyping.current > 2000) { lastTyping.current = Date.now(); getSocket()?.emit("dm:typing", peer.id); }
-            }}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
-            className="flex-1 resize-none rounded-2xl bg-white/5 border border-line px-4 py-3 outline-none focus:border-accent max-h-36" />
-          <button disabled={!text.trim()} className="grad rounded-2xl px-5 py-3 text-white disabled:opacity-40" aria-label="Enviar"><Send size={18} /></button>
-        </form>
-      </div>
+          )}
+          {msgs.map((m, i) => {
+            const prev = msgs[i - 1];
+            const newDay = !prev || new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
+            const head = newDay || prev.fromId !== m.fromId || !!m.replyTo || new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > 5 * 60_000;
+            const item: ChatItem = { id: m.id, author: mine(m) ? self : peer, content: m.content, createdAt: m.createdAt, replyTo: m.replyTo, attachments: m.attachments ?? [], reactions: m.reactions ?? [] };
+            return (
+              <div key={m.id}>
+                {newDay && <div className="flex items-center gap-3 my-4 text-[11px] text-muted"><span className="flex-1 h-px bg-line" />{dayLabel(m.createdAt)}<span className="flex-1 h-px bg-line" /></div>}
+                <MessageItem item={item} selfId={self.id} head={head} canDelete={mine(m)} onProfile={(id) => onProfile?.(id)}
+                  onReply={(x) => setReplyTo({ id: x.id, authorName: nameOf(x.author), text: (x.content || (x.attachments[0] ? "Anexo" : "")).replace(/\s+/g, " ").slice(0, 120) })}
+                  onReact={reactTo} onDelete={remove} onOpenImage={setLightbox} onJump={stick.jumpTo} />
+              </div>
+            );
+          })}
+          <div className="h-5 text-xs text-muted mt-2">{typing && `${nameOf(peer)} está digitando...`}</div>
+         </div>
+        </div>
+        {stick.away > 0 && <button type="button" onClick={() => stick.toBottom(true)} className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 inline-flex items-center gap-1.5 rounded-full grad px-4 py-1.5 text-xs font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.45)]"><ArrowDown size={14} /> {stick.away === 1 ? "1 nova mensagem" : `${stick.away} novas mensagens`}</button>}
+        <Composer ref={composer} placeholder={`Mensagem para ${nameOf(peer)}`} reply={replyTo} onCancelReply={() => setReplyTo(undefined)} onSend={send}
+          onTyping={() => { if (Date.now() - lastTyping.current > 2000) { lastTyping.current = Date.now(); getSocket()?.emit("dm:typing", peer.id); } }} />
+      </DropZone>
+      {lightbox && <Lightbox att={lightbox} onClose={() => setLightbox(undefined)} />}
     </div>
   );
 }

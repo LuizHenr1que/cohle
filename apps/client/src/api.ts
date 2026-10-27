@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { ReactionDTO, ReactionKey, AttachmentDTO, FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -62,11 +62,26 @@ const MESSAGES: Record<string, string> = {
   "owner is fixed": "A conta do dono da empresa não pode ser alterada.",
   "not found": "Não encontramos essa pessoa.",
   "user not found": "Não encontramos ninguém com esse @usuário. Confira se está escrito certo.",
+  "too long": "A mensagem passou do limite de 500 caracteres.",
+  "too many lines": "Muitas linhas: use no máximo 12.",
+  "slow down": "Calma: você está mandando rápido demais. Espere alguns segundos.",
+  "empty": "Escreva algo ou anexe um arquivo.",
+  "invalid attachments": "Não foi possível anexar esse arquivo. Envie de novo.",
+  "reply not found": "A mensagem que você está respondendo não existe mais.",
+  "blocked": "Por segurança, não aceitamos executáveis nem scripts.",
+  "type": "Tipo de arquivo não aceito. Aceitamos imagens, PDF, documentos, planilhas, texto, compactados, áudio e vídeo.",
+  "image": "Não conseguimos ler essa imagem. Ela pode estar corrompida.",
+  "heavy": "A imagem é grande demais.",
+  "storage full": "O armazenamento de arquivos do plano grátis está cheio por enquanto.",
+  "too many pending": "Você já tem muitos arquivos esperando para enviar. Envie a mensagem primeiro.",
+  "too many uploads": "Muitos envios seguidos. Espere um minuto.",
   "bad handle": "Digite um @usuário (por exemplo @luiz) ou um e-mail.",
   "self": "Esse é o seu próprio @usuário.",
   "already friends": "Vocês já são amigos.",
   "already requested": "Você já enviou um pedido para essa pessoa. Agora é só esperar.",
 };
+/** A server error code (from a REST call or a socket ack) in clear Portuguese. */
+export const friendlyError = (code: unknown, status = 0) => friendly(code, status);
 function friendly(raw: unknown, status: number): string {
   const key = typeof raw === "string" ? raw : "";
   if (MESSAGES[key]) return MESSAGES[key];
@@ -99,6 +114,27 @@ async function req<T>(path: string, method = "GET", body?: unknown): Promise<T> 
     throw Object.assign(new Error(friendly(data.error ?? data.message, res.status)), { status: res.status, data });
   }
   return data as T;
+}
+
+/** Uploads one file (raw bytes) with progress. Resolves with the attachment to put on the next message. */
+export function uploadFile(file: Blob, name: string, onProgress?: (pct: number) => void): { promise: Promise<AttachmentDTO>; cancel: () => void } {
+  const xhr = new XMLHttpRequest();
+  const promise = new Promise<AttachmentDTO>((resolve, reject) => {
+    xhr.open("POST", `${API}/uploads?name=${encodeURIComponent(name)}`);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100)); };
+    xhr.onerror = () => reject(new Error("Não foi possível enviar. Verifique a internet e tente de novo."));
+    xhr.onabort = () => reject(Object.assign(new Error("cancelado"), { aborted: true }));
+    xhr.onload = () => {
+      let data: any = {}; try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as AttachmentDTO);
+      if (xhr.status === 401) { setToken(null); clearStored("me"); onSessionGone?.(); }
+      reject(new Error(xhr.status === 413 && !data.error ? "O arquivo passa do limite de 10 MB." : friendly(data.error ?? data.message, xhr.status)));
+    };
+    xhr.send(file);
+  });
+  return { promise, cancel: () => xhr.abort() };
 }
 
 export const api = {
@@ -149,6 +185,11 @@ export const api = {
   join: (code: string) => req<ServerDTO>(`/servers/join/${code}`, "POST"),
   createChannel: (serverId: string, name: string, type: "TEXT" | "VOICE") =>
     req(`/servers/${serverId}/channels`, "POST", { name, type }),
+  react: (id: string, key: ReactionKey) => req<{ reactions: ReactionDTO[] }>(`/messages/${id}/reactions`, "POST", { key }),
+  reactDm: (id: string, key: ReactionKey) => req<{ reactions: ReactionDTO[] }>(`/dm-messages/${id}/reactions`, "POST", { key }),
+  deleteUpload: (id: string) => req<{ ok: true }>(`/uploads/${id}`, "DELETE"),
+  deleteMessage: (id: string) => req<{ ok: true }>(`/messages/${id}`, "DELETE"),
+  deleteDm: (id: string) => req<{ ok: true }>(`/dm-messages/${id}`, "DELETE"),
   messages: (channelId: string) => req<MessageDTO[]>(`/channels/${channelId}/messages`),
   dms: () => req<DmConversationDTO[]>("/dms"),
   dmPeople: () => req<UserDTO[]>("/dms/people"),

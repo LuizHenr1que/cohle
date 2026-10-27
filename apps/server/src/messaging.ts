@@ -208,6 +208,11 @@ export function setupMessaging(app: FastifyInstance, d: Deps) {
     });
     return toAttachment(row);
   });
+  // taking a file out of the message box before sending: gone at once (only yours, only while it is still waiting to be attached)
+  app.delete("/uploads/:id", { preHandler: d.auth }, async (req: any) => {
+    await prisma.attachment.deleteMany({ where: { id: String(req.params.id), ownerId: d.uid(req), messageId: null, dmId: null } });
+    return { ok: true };
+  });
   // an upload that was never attached to a message is swept after an hour
   const sweep = () => prisma.attachment.deleteMany({ where: { messageId: null, dmId: null, createdAt: { lt: new Date(Date.now() - PENDING_TTL) } } }).catch(() => {});
   setInterval(() => { void sweep(); }, 10 * 60_000).unref(); void sweep();

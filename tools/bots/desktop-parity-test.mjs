@@ -25,7 +25,7 @@ try {
   ok("é o app de verdade (window.cohle existe)", (await ev(`typeof window.cohle`)) === "object");
   ok("login: e-mail ou @usuário, igual à web", (await ev(`!!document.querySelector('input[placeholder="E-mail ou @usuário"]')`)));
   ok("login: 'Esqueci meu usuário' e 'Esqueci minha senha', igual à web", /Esqueci meu usuário/.test(tx) && /Esqueci minha senha/.test(tx));
-  ok("login: mesmo rótulo de versão da web (Versão 10)", /Versão 10/.test(tx));
+  ok("login: mesmo rótulo de versão da web (Versão 11)", /Versão 11/.test(tx));
   ok("login: a logo é o atalho discreto para a web (sem cartão chamativo)", (await ev(`!!document.querySelector('button[title="Abrir o Cohle na web"] svg')`)) && !/Prefere o navegador/.test(tx));
   await shot("desk-1-login");
   await click("Cadastre-se"); await sleep(400);

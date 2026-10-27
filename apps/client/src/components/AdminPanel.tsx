@@ -98,7 +98,7 @@ function Overview() {
         <Stat icon={Server} label="Servidores" value={o?.content.servers ?? "…"} hint={o ? `${o.content.channels} canais` : undefined} />
         <Stat icon={MessageSquare} label="Mensagens" value={o?.content.messages ?? "…"} hint={o ? `${nf(o.content.dms)} diretas` : undefined} />
         <Stat icon={Gauge} label="Memória do servidor" value={o ? `${o.process.rssMb} MB` : "…"} hint={o ? `ligado há ${up(o.process.uptimeSec)}` : undefined} />
-        <Stat icon={Mic} label="Banco de dados" value={o ? `${o.dbMb} MB` : "…"} hint="limite grátis: 500 MB" />
+        <Stat icon={Mic} label="Banco de dados" value={o ? `${o.dbMb} MB` : "…"} hint={o ? `${o.content.attachmentsMb} MB em arquivos · limite grátis: 500 MB` : "limite grátis: 500 MB"} />
       </div>
       <Card>
         <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
