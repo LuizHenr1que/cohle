@@ -24,6 +24,7 @@ ipcMain.handle("settings:set", (_e, patch) => {
   return readSettings();
 });
 let quitting = false;                              // true only when the person really quits: closing the window just hides it
+const T0 = Date.now();
 const startHidden = process.argv.includes("--hidden");   // started by "open at login"
 // one Cohle at a time (packaged app): opening it again brings the running one back
 const gotLock = !(app.isPackaged && !process.env.COHLE_MULTI) || app.requestSingleInstanceLock();
@@ -123,12 +124,14 @@ ipcMain.on("overlay:interactive", (_e, on) => { if (overlay && !overlay.isDestro
 ipcMain.on("overlay:close", () => { ov.dismissed = true; syncOverlay(); });
 ipcMain.on("overlay:focus-app", () => { if (mainWin && !mainWin.isDestroyed()) { if (mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.focus(); } });
 
-async function createWindow() {
+// `show: false` = the caller reveals it (after the "Cohle atualizado!" card). Otherwise it appears as soon as it has painted (no blank flash).
+// Resolves when the page is ready to be shown.
+async function createWindow({ show = true } = {}) {
   const win = new BrowserWindow({
     width: 1280, height: 800, minWidth: 380, minHeight: 520,
     icon: ICON,
     backgroundColor: "#0a0507",
-    show: !startHidden,
+    show: false,
     // macOS: hidden title bar, the client draws a 44px drag strip under the traffic lights.
     // Windows/Linux: keep the native frame so caption buttons and snapping behave natively.
     ...(process.platform === "darwin"
@@ -156,7 +159,10 @@ async function createWindow() {
   }
 
   mainWin = win;
+  const ready = new Promise((res) => win.once("ready-to-show", res));
+  if (show) ready.then(() => { if (!win.isDestroyed()) win.show(); });
   for (const e of ["focus", "blur", "minimize", "restore", "show", "hide"]) win.on(e, () => setTimeout(syncOverlay, 60));
+  if (process.env.COHLE_TEST) win.on("show", () => console.log(`[t+${Date.now() - T0}ms] janela do app: MOSTRADA`));
   win.on("close", (e) => {            // like Discord: the red X sends Cohle to the tray; calls keep going
     if (quitting) return;
     if (!settings.closeToTray) { quitting = true; app.quit(); return; }      // the person chose "quit when closing"
@@ -165,6 +171,7 @@ async function createWindow() {
   win.on("closed", () => { mainWin = null; if (overlay && !overlay.isDestroyed()) overlay.destroy(); });
   if (isDev) win.loadURL(DEV_URL);
   else win.loadFile(path.join(__dirname, "..", "client", "index.html"));
+  return ready;
 }
 
 app.whenReady().then(async () => {
@@ -176,14 +183,18 @@ app.whenReady().then(async () => {
   started = true;
   trayMod.create({ show: showMain, quit: () => { quitting = true; app.quit(); }, updater });
   const welcome = updater.welcome();                               // "Cohle atualizado!" card on the first launch after an update
-  await createWindow();
-  if (welcome) welcome.close(2200);
+  if (!welcome) { await createWindow({ show: !startHidden }); return; }
+  // First launch after an update: ONLY the card at first (the app window is built hidden behind it), then the card closes and the app opens. Never both at once.
+  const ready = createWindow({ show: false });
+  await Promise.all([Promise.race([ready, new Promise((r) => setTimeout(r, 8000))]), welcome.close(2200)]);
+  if (process.env.COHLE_TEST) console.log(`[t+${Date.now() - T0}ms] cartão "Cohle atualizado!": FECHADO`);
+  if (mainWin && !mainWin.isDestroyed() && !startHidden) { mainWin.show(); mainWin.focus(); }
 });
 let started = false;   // the update window may open and close before the app window exists: that must not quit the app
 app.on("window-all-closed", () => { if (started && process.platform !== "darwin") app.quit(); });
 function showMain() {
   if (mainWin && !mainWin.isDestroyed()) { if (mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.focus(); }
-  else createWindow();
+  else createWindow({ show: true });
 }
 app.on("activate", showMain);
 app.on("second-instance", showMain);

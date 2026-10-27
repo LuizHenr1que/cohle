@@ -25,7 +25,7 @@ try {
   ok("é o app de verdade (window.cohle existe)", (await ev(`typeof window.cohle`)) === "object");
   ok("login: e-mail ou @usuário, igual à web", (await ev(`!!document.querySelector('input[placeholder="E-mail ou @usuário"]')`)));
   ok("login: 'Esqueci meu usuário' e 'Esqueci minha senha', igual à web", /Esqueci meu usuário/.test(tx) && /Esqueci minha senha/.test(tx));
-  ok("login: mesmo rótulo de versão da web (Versão 11)", /Versão 11/.test(tx));
+  ok("login: mesmo rótulo de versão da web (Versão 12)", /Versão 12/.test(tx));
   ok("login: a logo é o atalho discreto para a web (sem cartão chamativo)", (await ev(`!!document.querySelector('button[title="Abrir o Cohle na web"] svg')`)) && !/Prefere o navegador/.test(tx));
   await shot("desk-1-login");
   await click("Cadastre-se"); await sleep(400);
@@ -34,7 +34,7 @@ try {
   await click("Já tem conta"); await sleep(300);
   await setVal('input[placeholder="E-mail ou @usuário"]', "@TESTE1"); await setVal('input[placeholder^="Senha"]', "teste12345");
   await click("Entrar", "button.grad"); await sleep(4200);
-  ok("entra com @TESTE1", /Servidor de Teste/.test(await text()));
+  ok("entra com @TESTE1 e cai na boas-vindas, com seus servidores", /Servidor de Teste/.test(await text()) && /Bem-vindo ao Cohle/.test(await text()) && /Seus servidores/i.test(await text()));
   await ev(`localStorage.setItem('cohle:tour:${a.user.id}','done')`);
   await ev(`document.querySelector('button[title="Mensagens diretas"]').click()`); await sleep(900); tx = await text();
   ok("amigos: as mesmas abas da web", ["Todos", "Online", "Pendentes", "Adicionar amigo"].every((s) => tx.includes(s)));

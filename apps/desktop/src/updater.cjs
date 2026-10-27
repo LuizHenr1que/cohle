@@ -73,7 +73,7 @@ function welcome() {
     const file = path.join(app.getPath("userData"), "last-version.txt");
     const prev = fs.existsSync(file) ? fs.readFileSync(file, "utf8").trim() : "";
     fs.writeFileSync(file, app.getVersion());
-    if (!prev || prev === app.getVersion()) return null;
+    if (!prev || (prev === app.getVersion() && !(process.env.COHLE_TEST && process.env.COHLE_FORCE_WELCOME))) return null;      // (the env is a test hook: never set in releases)
     return splash.open({ title: "Cohle atualizado!", msg: `Você está na Versão ${buildNo()}. Abrindo...`, stat: "", foot: `Cohle · Versão ${buildNo()}`, pct: null, done: true });
   } catch { return null; }
 }

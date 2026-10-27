@@ -32,9 +32,12 @@ const FEATURES = [
 ];
 
 /** Shown when the person is not in any server yet: a clear starting point instead of an empty screen. */
-export function NoServerHome({ name, onCreate, onJoin, onTour, onMenu }: {
+export function NoServerHome({ name, onCreate, onJoin, onTour, onMenu, servers = [], onOpenServer }: {
   name: string; onCreate: () => void; onJoin: (code: string) => Promise<void>; onTour: () => void; onMenu?: () => void;
+  /** the person's servers (the welcome screen is the first thing they see after signing in, even when they already have some) */
+  servers?: ServerDTO[]; onOpenServer?: (id: string) => void;
 }) {
+  const has = servers.length > 0;
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -52,13 +55,27 @@ export function NoServerHome({ name, onCreate, onJoin, onTour, onMenu }: {
         <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-surface via-surface/70 to-transparent md:h-24 md:via-transparent" />
         {onMenu && <button onClick={onMenu} aria-label="Abrir menu" className="absolute top-3 left-3 p-2.5 rounded-xl bg-black/40 hover:bg-black/60"><Menu size={18} /></button>}
         <div className="absolute inset-x-0 bottom-0 md:bottom-auto md:top-1/2 md:-translate-y-1/2 px-5 sm:px-10 pb-5 md:pb-0 md:max-w-[52%]"><div className="ha-in">
-          <p className="text-[11px] uppercase tracking-widest text-accent2 font-semibold">Comece por aqui</p>
+          <p className="text-[11px] uppercase tracking-widest text-accent2 font-semibold">{has ? "Que bom te ver de novo" : "Comece por aqui"}</p>
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight mt-1">Bem-vindo ao Cohle, {name}</h1>
-          <p className="text-muted mt-1.5 max-w-xl text-sm sm:text-base">Aqui as conversas acontecem em servidores. Crie o seu ou entre em um com um convite.</p>
+          <p className="text-muted mt-1.5 max-w-xl text-sm sm:text-base">{has ? "Escolha um servidor para continuar a conversa, ou crie outro e entre com um convite." : "Aqui as conversas acontecem em servidores. Crie o seu ou entre em um com um convite."}</p>
         </div></div>
       </div>
 
       <div className="px-4 sm:px-10 pb-10 max-w-5xl mx-auto -mt-1">
+        {has && (
+          <section className="mb-6 ha-in" aria-label="Seus servidores">
+            <h3 className="mb-3 text-[11px] uppercase tracking-widest text-muted">Seus servidores</h3>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {servers.map((sv) => (
+                <button key={sv.id} onClick={() => onOpenServer?.(sv.id)} className="glass rounded-2xl p-4 flex items-center gap-3 text-left hover:border-accent/50 transition group">
+                  <ServerIcon server={sv} size={46} />
+                  <span className="min-w-0 flex-1"><span className="block font-semibold truncate">{sv.name}</span><span className="block text-xs text-muted">{sv.channels.filter((c) => c.type === "TEXT").length} de texto · {sv.channels.filter((c) => c.type === "VOICE").length} de voz</span></span>
+                  <ArrowRight size={16} className="text-muted group-hover:text-accent transition shrink-0" />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="grid md:grid-cols-2 gap-4">
           <section className="glass rounded-3xl p-5 sm:p-6 flex flex-col gap-3 ha-in" style={{ animationDelay: ".08s" }}>
             <div className="size-12 rounded-2xl grad grid place-items-center text-white shadow-[0_8px_24px_rgb(var(--accent-rgb)/0.4)]"><Plus size={22} /></div>

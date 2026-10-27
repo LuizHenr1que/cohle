@@ -80,7 +80,7 @@ function open(ui = {}) {
   let ready = false, pending = ui;
   const push = (o) => { pending = { ...pending, ...o }; if (ready && !w.isDestroyed()) w.webContents.executeJavaScript(`ui(${JSON.stringify(pending)})`).catch(() => {}); };
   w.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(HTML));
-  w.webContents.once("did-finish-load", () => { ready = true; push({}); w.show(); });
+  w.webContents.once("did-finish-load", () => { ready = true; push({}); w.show(); if (process.env.COHLE_TEST) console.log(`[splash] cartão ABERTO`); });
   return {
     window: w,
     set: push,

@@ -83,6 +83,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   const auto = useAutoUpdate();
   const [prefsOpen, setPrefsOpen] = useState(false);          // settings screen
   const [profileId, setProfileId] = useState<string>();         // whose profile card is open
+  const [home, setHome] = useState(true);                  // the welcome screen: what every sign-in starts on, until the person picks something
   const [dmOpen, setDmOpen] = useState(false);              // "home": direct messages instead of a server
   const [dmPeer, setDmPeer] = useState<UserDTO>();
   const deafRef = useRef(false);
@@ -189,7 +190,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   };
   const deleteMessage = (m: ChatItem) => { setMessages((l) => l.filter((x) => x.id !== m.id)); api.deleteMessage(m.id).catch(() => channel && api.messages(channel.id).then(setMessages).catch(() => {})); };
   function joinVoice(c: ChannelDTO) {
-    setNavOpen(false); setView("call"); setDmOpen(false);
+    setNavOpen(false); setView("call"); setDmOpen(false); setHome(false);
     if (voice?.id === c.id) return;                         // already in this call: just bring it back on screen
     setVoice(c); socket.current?.emit("voice:join", c.id);
   }
@@ -203,11 +204,12 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
     setAutoWatch(u.sharing ? u.id : undefined);
     joinVoice(c);
   }
+  function goHome() { setHome(true); setDmOpen(false); setDmPeer(undefined); setNavOpen(false); }
   function openDm(u: UserDTO) { setDmPeer(u); setDmOpen(true); setNavOpen(false); dms.load(); }
   function leaveVoice() { setVoice(undefined); setChatOpen(false); setView("text"); socket.current?.emit("voice:leave"); }
   async function afterServerChange(s: ServerDTO) {
     socket.current?.emit("server:join", s.id);
-    await reload(); setServerId(s.id); setChannel(undefined);
+    await reload(); setHome(false); setServerId(s.id); setChannel(undefined);
   }
 
   const section = (label: string, type: "TEXT" | "VOICE") => (
@@ -218,7 +220,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   );
 
   const textChan = (c: ChannelDTO) => (
-    <button key={c.id} onClick={() => { setDmOpen(false); setChannel(c); setView("text"); setNavOpen(false); }}
+    <button key={c.id} onClick={() => { setHome(false); setDmOpen(false); setChannel(c); setView("text"); setNavOpen(false); }}
       className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${channel?.id === c.id && (!voice || view === "text") ? "bg-accent/15 text-ink" : "text-muted hover:bg-white/5"}`}>
       <Hash size={16} /> {c.name}
     </button>
@@ -277,11 +279,11 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       <nav className={`glass rounded-3xl shrink-0 flex flex-col gap-2 py-3 overflow-y-auto no-scrollbar ${railOpen ? "w-[232px] items-stretch px-2.5" : "w-[72px] items-center"}`}>
         {railOpen ? (
           <div className="flex items-center gap-2.5 px-1 mb-1 shrink-0">
-            <Logo size={36} /><span className="font-bold tracking-tight flex-1">Cohle</span>
+            <button onClick={goHome} title="Início" aria-label="Ir para o início" className="flex items-center gap-2.5 flex-1 min-w-0 rounded-xl hover:bg-white/5 -m-1 p-1 transition text-left"><Logo size={36} /><span className="font-bold tracking-tight flex-1">Cohle</span></button>
             <button onClick={() => toggleRail(false)} title="Recolher a barra lateral" aria-label="Recolher a barra lateral" className="p-2 rounded-xl text-muted hover:text-ink hover:bg-white/10"><PanelLeftClose size={18} /></button>
           </div>
         ) : (<>
-          <div title="Cohle" className="mb-0.5 shrink-0"><Logo size={40} /></div>
+          <button onClick={goHome} title="Início" aria-label="Ir para o início" aria-current={home && !dmOpen ? "page" : undefined} className="mb-0.5 shrink-0 rounded-2xl hover:bg-white/5 transition"><Logo size={40} /></button>
           {wide && <button onClick={() => toggleRail(true)} title="Expandir a barra lateral (nomes e botões)" aria-label="Expandir a barra lateral" className="shrink-0 size-9 rounded-xl text-muted grid place-items-center hover:text-ink hover:bg-white/10"><PanelLeftOpen size={18} /></button>}
         </>)}
         {rb({ title: "Mensagens diretas", icon: <MessageCircle size={20} />, onClick: () => { setDmOpen(true); setDmPeer(undefined); dms.load(); friends.load(); },
@@ -294,7 +296,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         {servers.map((s) => {
           const on = !dmOpen && s.id === serverId;
           return (
-            <button key={s.id} title={s.name} aria-current={on ? "true" : undefined} onClick={() => { setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
+            <button key={s.id} title={s.name} aria-current={on ? "true" : undefined} onClick={() => { setHome(false); setDmOpen(false); setServerId(s.id); setChannel(undefined); }}
               className={`group relative shrink-0 transition ${railOpen ? `w-full flex items-center gap-3 rounded-2xl pl-2 pr-3 ${on ? "bg-accent/15" : "hover:bg-white/5"}` : ""}`}>
               {/* active: a bar on the left edge + a clean outline with a gap + a soft glow (inactive ones are dimmed) */}
               <span className={`absolute ${railOpen ? "left-0" : "-left-[9px]"} top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-accent transition-all duration-200 ${on ? "h-9 opacity-100 shadow-[0_0_12px_rgb(var(--accent-rgb)/0.8)]" : "h-2 opacity-0 group-hover:opacity-70 group-hover:h-5"}`} />
@@ -316,7 +318,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
 
       {/* channels */}
       <aside className={`glass rounded-3xl p-3 flex flex-col min-w-0 ${wide ? "w-64" : "flex-1"}`}>
-        {dmOpen ? <DmSidebar convs={dms.convs} online={online} peerId={dmPeer?.id} onOpen={openDm} onFriends={() => { setDmPeer(undefined); setNavOpen(false); }} friendsActive={!dmPeer} pending={friends.pending} /> : (<>
+        {dmOpen || home ? <DmSidebar convs={dms.convs} online={online} peerId={dmOpen ? dmPeer?.id : undefined} onOpen={openDm} onFriends={() => { setDmOpen(true); setDmPeer(undefined); setNavOpen(false); dms.load(); friends.load(); }} friendsActive={dmOpen && !dmPeer} pending={friends.pending} /> : (<>
         <div className="px-2 py-2 border-b border-line mb-1">
           <div className="flex items-center gap-2">
             {server && <ServerIcon server={server} size={32} />}
@@ -397,8 +399,8 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           ? <DmChat key={dmPeer.id} peer={dmPeer} self={self} online={online.has(dmPeer.id)} getSocket={() => socket.current} onRead={dms.markRead} onProfile={setProfileId} onMenu={wide ? undefined : () => setNavOpen(true)} />
           : <FriendsPanel self={self} data={friends.data} online={online} onMessage={openDm} onProfile={setProfileId} onChanged={friends.load} onMenu={wide ? undefined : () => setNavOpen(true)} />)}
         {!dmOpen && (!voice || view === "text") && (
-          !server
-            ? <NoServerHome name={nameOf(self)} onCreate={() => setServerModal("create")} onTour={() => setTour(true)} onMenu={wide ? undefined : () => setNavOpen(true)}
+          home || !server
+            ? <NoServerHome name={nameOf(self)} servers={servers} onOpenServer={(id) => { setHome(false); setServerId(id); setChannel(undefined); }} onCreate={() => setServerModal("create")} onTour={() => setTour(true)} onMenu={wide ? undefined : () => setNavOpen(true)}
                 onJoin={async (code) => { const s = await api.join(code); await afterServerChange(s); }} />
             : !channel
               ? <NoChannelHome server={server} isOwner={isOwner} onOpen={(c) => (c.type === "VOICE" ? joinVoice(c) : (setChannel(c), setView("text")))} onInvite={() => setInviteOpen(true)} onNewChannel={(t) => setNewChannelType(t)} onMenu={wide ? undefined : () => setNavOpen(true)} />

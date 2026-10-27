@@ -35,7 +35,12 @@ try {
   await click("Entrar", "button.grad"); await sleep(4000);
   let tx = await text();
   ok("login pelo formulário leva ao app", /Servidor de Teste/.test(tx) || /geral/.test(tx), tx.slice(0, 80).replace(/\n/g, " | "));
+  ok("depois do login, mesmo com servidor, fica na tela de boas-vindas", /Bem-vindo ao Cohle/.test(tx) && /Seus servidores/i.test(tx) && /Servidor de Teste/.test(tx) && !(await ev(`!!document.querySelector('textarea[aria-label="Mensagem"]')`)));
   await shot("web-2-app");
+  await click("Servidor de Teste", "section[aria-label=\"Seus servidores\"] button"); await sleep(1200);
+  ok("clicar no servidor abre o servidor (canais) e sai da boas-vindas", /TEXTO/i.test(await text()) && !/Seus servidores/i.test(await text()));
+  await ev(`document.querySelector('button[aria-label="Ir para o início"]').click()`); await sleep(700);
+  ok("o logo do Cohle volta para a tela de boas-vindas", /Bem-vindo ao Cohle/.test(await text()) && /Seus servidores/i.test(await text()));
   // text chat in the browser
   await ev(`(document.querySelector('button[title="Servidor de Teste"]')||[...document.querySelectorAll('button')].find(b=>b.innerText.includes('Servidor de Teste')))?.click()`); await sleep(1200);
   await click("geral", "button, a, div[role=button]"); await sleep(1500);
