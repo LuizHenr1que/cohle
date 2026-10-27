@@ -42,7 +42,7 @@ try {
   const msg = "mensagem web " + Date.now();
   const typed = await ev(`(()=>{const i=document.querySelector('input[placeholder^="Mensagem em"],textarea[placeholder^="Mensagem em"]');if(!i)return false;const d=Object.getOwnPropertyDescriptor(i.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value');d.set.call(i,${JSON.stringify(msg)});i.dispatchEvent(new Event('input',{bubbles:true}));i.focus();return true})()`);
   await sleep(300); await ev(`document.querySelector('form button.grad').click()`); await sleep(1800);
-  ok("manda e recebe mensagem de texto no navegador", typed && (await text()).includes(msg));
+  ok("manda e recebe mensagem de texto no navegador", typed && await (async () => { for (let i = 0; i < 24; i++) { if ((await text()).includes(msg)) return true; await sleep(400); } return false; })());
   // settings: web has no "Aplicativo" tab, and offers the desktop download
   await ev(`document.querySelector('button[title="Configurações e perfil"]').click()`); await sleep(700);
   tx = await text();
