@@ -2,9 +2,10 @@
 import type { FastifyInstance } from "fastify";
 import type { PrismaClient } from "@prisma/client";
 import type { Server as IOServer } from "socket.io";
-import { equipSchema, equipSetSchema, prefsSchema, serverSettingsSchema, seasonActive, daysLeft, DEFAULT_PREFS, SLOTS,
-  type CollectionDTO, type FxDTO, type PrefsDTO, type ShopDTO, type ShopItemDTO, type Slot, type UserDTO } from "@cohle/shared";
+import { equipSchema, equipSetSchema, giftSchema, lockSchema, prefsSchema, serverSettingsSchema, seasonActive, daysLeft, DEFAULT_PREFS, SLOTS,
+  type CollectionDTO, type FxDTO, type GiftDTO, type GiftResultDTO, type GiftTargetDTO, type PrefsDTO, type ShopDTO, type ShopItemDTO, type Slot, type UserDTO } from "@cohle/shared";
 import { COLLECTIONS, ITEMS, BASE_GIANT } from "./catalog.js";
+import { roleOf } from "../admin.js";
 
 type Deps = {
   prisma: PrismaClient; io: () => IOServer; auth: (req: any, reply: any) => Promise<any>; uid: (req: any) => string;
@@ -45,7 +46,7 @@ export function setupShop(app: FastifyInstance, d: Deps) {
   }
   const flush = () => { snap = null; };
 
-  const toItem = (i: any): ShopItemDTO => ({ id: i.id, key: i.key, tipo: i.tipo, nome: i.nome, descricao: i.descricao, raridade: i.raridade, categoria: i.categoria, price: i.price, isFreeBeta: i.isFreeBeta, collectionId: i.collectionId, meta: (i.meta ?? {}) as Record<string, unknown> });
+  const toItem = (i: any): ShopItemDTO => ({ id: i.id, key: i.key, tipo: i.tipo, nome: i.nome, descricao: i.descricao, raridade: i.raridade, categoria: i.categoria, price: i.price, isFreeBeta: i.isFreeBeta, locked: i.locked !== false, collectionId: i.collectionId, meta: (i.meta ?? {}) as Record<string, unknown> });
   const toCollection = (c: any, items: any[], now: Date): CollectionDTO => ({
     id: c.id, key: c.key, nome: c.nome, descricao: c.descricao, categoria: c.categoria, sazonal: c.sazonal, inicio: c.inicio?.toISOString() ?? null, fim: c.fim?.toISOString() ?? null, ativo: c.ativo,
     visible: seasonActive(c, now), daysLeft: daysLeft(c, now), bonus: c.bonus, itemIds: items.filter((i) => i.collectionId === c.id).map((i) => i.id),
@@ -107,17 +108,22 @@ export function setupShop(app: FastifyInstance, d: Deps) {
     return p ? { effectsOff: p.effectsOff, soundsOff: p.soundsOff, seasonalAuto: p.seasonalAuto, hidePolitical: p.hidePolitical, lite: p.lite as PrefsDTO["lite"], serverGroups: Array.isArray(p.serverGroups) ? (p.serverGroups as unknown as PrefsDTO["serverGroups"]) : [] } : { ...DEFAULT_PREFS };
   };
 
+  /** Only the company's master account (confirmed e-mail) can give gifts and unlock items. */
+  const isOwnerAccount = async (userId: string) => { const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerifiedAt: true, role: true } }); return !!u && roleOf(u) === "OWNER"; };
+
   // ---- routes ----
   app.get("/shop", { preHandler: d.auth }, async (req: any): Promise<ShopDTO> => {
     const me = d.uid(req), now = new Date();
     const betaTester = await ensureBeta(me).catch(() => false);
-    const [c, owned, equipped, prefs] = await Promise.all([catalog(), prisma.userItem.findMany({ where: { userId: me }, select: { itemId: true } }), equippedMap(me), prefsOf(me)]);
+    const [c, owned, equipped, prefs, canGift] = await Promise.all([catalog(), prisma.userItem.findMany({ where: { userId: me }, select: { itemId: true, seen: true, giftedBy: true, giftNote: true } }), equippedMap(me), prefsOf(me), isOwnerAccount(me)]);
     const ownedSet = new Set(owned.map((o) => o.itemId));
     const visibleCols = new Set(c.collections.filter((x) => seasonActive(x, now)).map((x) => x.id));
     // the storefront shows items of collections in season (and loose ones); what you own always stays in your inventory
     const items = c.items.filter((i) => ownedSet.has(i.id) || (i.ativo && (!i.collectionId || visibleCols.has(i.collectionId))));
     const cols = c.collections.filter((x) => visibleCols.has(x.id) || items.some((i) => i.collectionId === x.id && ownedSet.has(i.id)));
-    return { items: items.map(toItem), collections: cols.map((x) => toCollection(x, items, now)), owned: [...ownedSet], equipped, bonus: bonusOf(equipped, c), prefs, now: now.toISOString(), betaTester };
+    const unseenRows = owned.filter((o) => !o.seen), givers = unseenRows.length ? await prisma.user.findMany({ where: { id: { in: [...new Set(unseenRows.map((o) => o.giftedBy).filter(Boolean) as string[])] } }, select: { id: true, username: true, displayName: true } }) : [];
+    const unseenGifts: GiftDTO[] = unseenRows.map((o) => { const g = givers.find((x) => x.id === o.giftedBy); return { itemId: o.itemId, from: g ? (g.displayName || g.username) : "Cohle", note: o.giftNote ?? null }; });
+    return { items: items.map(toItem), collections: cols.map((x) => toCollection(x, items, now)), owned: [...ownedSet], equipped, bonus: bonusOf(equipped, c), prefs, now: now.toISOString(), betaTester, canGift, unseenGifts };
   });
 
   app.post("/shop/items/:id/claim", { preHandler: d.auth }, async (req: any, reply) => {
@@ -125,11 +131,56 @@ export function setupShop(app: FastifyInstance, d: Deps) {
     if (!d.rate(me, "claim", 30, 60_000)) return reply.code(429).send({ error: "slow down" });
     const c = await catalog(), it = c.items.find((i) => i.id === id);
     if (!it || !it.ativo) return reply.code(404).send({ error: "not found" });
+    if (it.locked !== false && !(await isOwnerAccount(me))) return reply.code(403).send({ error: "item locked" });                  // "Em breve": only the owner account can take it; everybody else gets it as a gift
     const col = c.collections.find((x) => x.id === it.collectionId);
     if (col && !seasonActive(col)) { const has = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: me, itemId: id } } }); if (!has) return reply.code(403).send({ error: "out of season" }); }
     if (!(it.isFreeBeta || it.price === 0)) return reply.code(402).send({ error: "payment required" });         // checkout is not built yet: this is where it will plug in
     await prisma.userItem.upsert({ where: { userId_itemId: { userId: me, itemId: id } }, create: { userId: me, itemId: id, source: "beta" }, update: {} });
     return { ok: true };
+  });
+
+  // ---- gifts and locks (owner only) ----
+  const targetOf = (u: any): GiftTargetDTO => ({ id: u.id, username: u.username, displayName: u.displayName ?? null, email: u.email });
+  app.get("/shop/gift-targets", { preHandler: d.auth }, async (req: any, reply) => {
+    const me = d.uid(req); if (!(await isOwnerAccount(me))) return reply.code(403).send({ error: "owner only" });
+    if (!d.rate(me, "gift-search", 60, 60_000)) return reply.code(429).send({ error: "slow down" });
+    const q = String(req.query?.q ?? "").trim().replace(/^@/, ""); if (q.length < 2) return [];
+    const rows = await prisma.user.findMany({ where: { OR: [{ username: { contains: q, mode: "insensitive" } }, { displayName: { contains: q, mode: "insensitive" } }, { email: { contains: q, mode: "insensitive" } }] }, orderBy: { createdAt: "desc" }, take: 8 });
+    return rows.map(targetOf);
+  });
+  /** The whole catalog, whatever the season or lock: the owner picks gifts from here. */
+  app.get("/shop/admin/catalog", { preHandler: d.auth }, async (req: any, reply) => {
+    const me = d.uid(req); if (!(await isOwnerAccount(me))) return reply.code(403).send({ error: "owner only" });
+    const c = await catalog(), now = new Date();
+    return { items: c.items.filter((i) => i.ativo).map(toItem), collections: c.collections.map((x: any) => toCollection(x, c.items, now)) };
+  });
+  app.post("/shop/gifts", { preHandler: d.auth }, async (req: any, reply) => {
+    const me = d.uid(req); if (!(await isOwnerAccount(me))) return reply.code(403).send({ error: "owner only" });
+    const p = giftSchema.safeParse(req.body); if (!p.success) return reply.code(400).send({ error: "invalid input" });
+    if (!d.rate(me, "gift", 60, 60_000)) return reply.code(429).send({ error: "slow down" });
+    const to = p.data.to.replace(/^@/, "");
+    const target = await prisma.user.findFirst({ where: { OR: [{ id: to }, { username: { equals: to, mode: "insensitive" } }, { email: { equals: to, mode: "insensitive" } }] } });
+    if (!target) return reply.code(404).send({ error: "user not found" });
+    const c = await catalog();
+    const wanted = new Set<string>(p.data.itemIds ?? []);
+    if (p.data.collectionId) for (const i of c.items) if (i.collectionId === p.data.collectionId) wanted.add(i.id);
+    const items = c.items.filter((i) => i.ativo && wanted.has(i.id));
+    if (!items.length) return reply.code(404).send({ error: "no such items" });
+    const have = new Set((await prisma.userItem.findMany({ where: { userId: target.id, itemId: { in: items.map((i) => i.id) } }, select: { itemId: true } })).map((o) => o.itemId));
+    const fresh = items.filter((i) => !have.has(i.id));
+    if (fresh.length) await prisma.userItem.createMany({ data: fresh.map((i) => ({ userId: target.id, itemId: i.id, source: "gift", giftedBy: me, giftNote: p.data.note || null, seen: false })), skipDuplicates: true });
+    forget(target.id);
+    if (fresh.length) { const from = await prisma.user.findUnique({ where: { id: me }, select: { username: true, displayName: true } }); d.io().to(`user:${target.id}`).emit("shop:gift", { from: from?.displayName || from?.username || "Cohle", count: fresh.length }); }
+    const res: GiftResultDTO = { ok: true, given: fresh.length, skipped: items.length - fresh.length, to: targetOf(target) };
+    return res;
+  });
+  app.post("/shop/gifts/seen", { preHandler: d.auth }, async (req: any) => { await prisma.userItem.updateMany({ where: { userId: d.uid(req), seen: false }, data: { seen: true } }); return { ok: true }; });
+  /** Unlock ("Em breve" off) or lock again, per item or per collection, without a deploy. */
+  app.put("/shop/admin/lock", { preHandler: d.auth }, async (req: any, reply) => {
+    const me = d.uid(req); if (!(await isOwnerAccount(me))) return reply.code(403).send({ error: "owner only" });
+    const p = lockSchema.safeParse(req.body); if (!p.success) return reply.code(400).send({ error: "invalid input" });
+    const r = await prisma.shopItem.updateMany({ where: { OR: [...(p.data.itemIds?.length ? [{ id: { in: p.data.itemIds } }] : []), ...(p.data.collectionId ? [{ collectionId: p.data.collectionId }] : [])] }, data: { locked: p.data.locked } });
+    flush(); return { ok: true, changed: r.count };
   });
 
   const afterEquip = async (me: string, reply?: any) => {

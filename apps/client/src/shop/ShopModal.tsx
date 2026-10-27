@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { LazyMotion, domAnimation, m } from "framer-motion";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowLeft, Check, Gift, Package, Play, Sliders, Sparkles, Store, Trophy, X } from "lucide-react";
+import { ArrowLeft, Check, Gift, Lock, LockOpen, Package, Play, Sliders, Sparkles, Store, Trophy, X } from "lucide-react";
 import { BETA_LABEL, BETA_NOTE, ITEM_TYPES, RARITIES, RARITY_LABEL, SLOTS, TYPE_LABEL, type CollectionDTO, type ItemType, type Rarity, type ShopItemDTO, type Slot, type UserDTO } from "@cohle/shared";
 import { Avatar } from "../components/Avatar";
 import { Switch } from "../components/Switch";
@@ -12,6 +12,8 @@ import { GIANT_LABEL, GiantArt } from "./GiantIcons";
 import { ENTRANCE_OF, RARITY_COLOR, THEME_OF, THEME_PREVIEW, SEASON_LOOK } from "./registry";
 import { setPrefs, usePrefs } from "./prefs";
 import { PreviewModal, SeasonDeco, SEASON_STYLE, Showcase, type PreviewReq } from "./ShopShowcase";
+import { GiftModal, type GiftPre } from "./GiftModal";
+import { api } from "../api";
 
 type Tab = "vitrine" | "itens" | "colecoes" | "inventario" | "prefs";
 const TABS: [Tab, string, typeof Store][] = [["vitrine", "Vitrine", Sparkles], ["itens", "Itens", Package], ["colecoes", "Coleções", Trophy], ["inventario", "Inventário", Gift], ["prefs", "Preferências", Sliders]];
@@ -21,6 +23,7 @@ const BetaTag = ({ small = false }: { small?: boolean }) => (
 );
 const Rarity = ({ r }: { r: Rarity }) => <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: RARITY_COLOR[r], background: `${RARITY_COLOR[r]}22`, border: `1px solid ${RARITY_COLOR[r]}55` }}>{RARITY_LABEL[r]}</span>;
 const OpenPreview = createContext<(r: PreviewReq) => void>(() => {});
+const OpenGift = createContext<(g: GiftPre) => void>(() => {});
 const preview = (kind: "entrance" | "giant", p: object) => window.dispatchEvent(new CustomEvent("cohle:fx-preview", { detail: { kind, ...p } }));
 
 /** The live preview of an item, on the person's own avatar and name. */
@@ -57,7 +60,8 @@ function Card({ item, me }: { item: ShopItemDTO; me: UserDTO }) {
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
   const owned = shop.owned.includes(item.id), worn = (SLOTS as readonly string[]).includes(item.tipo) && shop.equipped[item.tipo as Slot] === item.id;
   const col = shop.collections.find((c) => c.id === item.collectionId);
-  const open = useContext(OpenPreview);
+  const open = useContext(OpenPreview), openGift = useContext(OpenGift);
+  const locked = item.locked && !owned && !shop.canGift;                  // "Em breve": it cannot be claimed, except by the owner account (which also gives gifts)
   const show = () => open({ title: item.nome, subtitle: item.descricao, items: [item], collection: undefined });
   const act = async () => {
     setBusy(true); setErr("");
@@ -66,7 +70,7 @@ function Card({ item, me }: { item: ShopItemDTO; me: UserDTO }) {
   };
   return (
     <m.div whileHover={{ y: -3 }} transition={{ type: "spring", stiffness: 400, damping: 26 }} onClick={(e) => { if (!(e.target as HTMLElement).closest("button,a")) show(); }} className="rounded-2xl border border-line bg-white/[0.03] p-3.5 flex flex-col gap-2 h-full cursor-pointer" data-item={item.key}>
-      <div className="flex items-center gap-1.5 flex-wrap"><Rarity r={item.raridade} /><BetaTag small />{col?.sazonal && col.daysLeft !== null && !owned && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30">Edição Limitada</span>}{owned && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">Já é seu</span>}{worn && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-white text-black"><span className="size-1.5 rounded-full bg-emerald-500" />Ativo</span>}</div>
+      <div className="flex items-center gap-1.5 flex-wrap"><Rarity r={item.raridade} /><BetaTag small />{col?.sazonal && col.daysLeft !== null && !owned && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30">Edição Limitada</span>}{locked && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-white/10 text-white/80 border border-white/20"><Lock size={10} />Em breve</span>}{owned && <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30">Já é seu</span>}{worn && <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-white text-black"><span className="size-1.5 rounded-full bg-emerald-500" />Ativo</span>}</div>
       <Preview item={item} me={me} />
       <div><div className="font-semibold">{item.nome}</div><p className="text-xs text-muted leading-relaxed mt-0.5">{item.descricao}</p></div>
       {col?.sazonal && col.daysLeft !== null && !owned && <p className="text-[11px] text-amber-300">{col.daysLeft === 0 ? "Último dia" : `${col.daysLeft} dia${col.daysLeft === 1 ? "" : "s"} restante${col.daysLeft === 1 ? "" : "s"}`}</p>}
@@ -75,9 +79,12 @@ function Card({ item, me }: { item: ShopItemDTO; me: UserDTO }) {
         <button onClick={show} aria-label={`Ver prévia de ${item.nome}`} className="w-full rounded-xl py-1.5 text-xs font-semibold text-muted hover:text-ink bg-white/5 hover:bg-white/10 inline-flex items-center justify-center gap-1.5"><Play size={12} /> Ver prévia</button>
         {item.tipo === "reaction" && owned
           ? <div className="inline-flex items-center gap-1.5 text-xs text-emerald-300 font-semibold"><Check size={14} /> Você tem</div>
-          : <button disabled={busy} onClick={act} className={`w-full rounded-xl py-2 text-sm font-semibold transition disabled:opacity-60 ${worn ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30" : owned ? "bg-white/10 hover:bg-white/15" : "grad text-white hover:brightness-110"}`}>
-            {busy ? "Aguarde..." : worn ? "Equipado (tirar)" : owned ? "Equipar" : "Pegar grátis (Beta)"}
-          </button>}
+          : locked
+            ? <button disabled aria-label={`${item.nome}: em breve (trancado)`} data-locked="true" className="w-full rounded-xl py-2 text-sm font-semibold bg-white/5 text-white/60 border border-dashed border-white/20 cursor-not-allowed inline-flex items-center justify-center gap-1.5"><Lock size={14} /> Em breve</button>
+            : <button disabled={busy} onClick={act} className={`w-full rounded-xl py-2 text-sm font-semibold transition disabled:opacity-60 ${worn ? "bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30" : owned ? "bg-white/10 hover:bg-white/15" : "grad text-white hover:brightness-110"}`}>
+              {busy ? "Aguarde..." : worn ? "Equipado (tirar)" : owned ? "Equipar" : "Pegar (Beta)"}
+            </button>}
+        {shop.canGift && <button onClick={() => openGift({ itemIds: [item.id] })} aria-label={`Presentear ${item.nome}`} className="w-full rounded-xl py-1.5 text-xs font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25 inline-flex items-center justify-center gap-1.5"><Gift size={12} /> Presentear</button>}
       </div>
     </m.div>
   );
@@ -106,12 +113,13 @@ function VirtualGrid({ items, me, scroller }: { items: ShopItemDTO[]; me: UserDT
 }
 
 function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: ShopItemDTO[]; me: UserDTO; hero?: boolean }) {
-  const ctx = useShop()!, shop = ctx.shop!, open = useContext(OpenPreview);
+  const ctx = useShop()!, shop = ctx.shop!, open = useContext(OpenPreview), openGift = useContext(OpenGift);
   const mine = items.filter((i) => shop.owned.includes(i.id)), complete = mine.length === items.length;
+  const missing = items.filter((i) => !shop.owned.includes(i.id)), lockedAll = missing.length > 0 && !shop.canGift && missing.every((i) => i.locked), anyLocked = items.some((i) => i.locked);
   const [busy, setBusy] = useState(""), [msg, setMsg] = useState("");
   const wearable = items.filter((i) => (SLOTS as readonly string[]).includes(i.tipo));
   const wornAll = wearable.length > 0 && wearable.every((i) => shop.equipped[i.tipo as Slot] === i.id);
-  const claimAll = async () => { setBusy("claim"); setMsg(""); try { for (const i of items) if (!shop.owned.includes(i.id)) await ctx.claim(i); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
+  const claimAll = async () => { setBusy("claim"); setMsg(""); try { for (const i of items) if (!shop.owned.includes(i.id) && (!i.locked || shop.canGift)) await ctx.claim(i); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
   const wear = async () => { setBusy("wear"); setMsg(""); try { const done = await ctx.equipSet(c.id); setMsg(done && c.bonus ? "Conjunto completo equipado: bônus liberado!" : "Equipei o que você tem desta coleção."); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
   const [expanded, setExpanded] = useState(false);
   const st = SEASON_STYLE[c.key], tint = SEASON_LOOK[c.key]?.tint ?? "rgba(230,57,70,0.28)";
@@ -131,6 +139,7 @@ function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: S
         <div className="flex gap-2 shrink-0 flex-wrap">
           <button onClick={seeSet} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center gap-1.5"><Play size={12} /> Ver prévia do conjunto</button>
           <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>
+          {shop.canGift && <button onClick={() => openGift({ collectionId: c.id })} aria-label={`Presentear a coleção ${c.nome}`} className="rounded-xl px-3 py-2 text-xs font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25 inline-flex items-center gap-1.5"><Gift size={12} /> Presentear</button>}
           <button onClick={() => setExpanded(true)} aria-label={`Ver os itens de ${c.nome}`} className="rounded-xl px-3 py-2 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10">Ver itens</button>
         </div>
       </div>
@@ -147,7 +156,7 @@ function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: S
           </div>
           <h3 className={`${hero ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"} font-black tracking-tight mt-1.5`}>{hero && st ? st.headline : c.nome}</h3>
           <p className="text-sm text-white/75 mt-1.5">{st?.pitch ?? c.descricao}</p>
-          {c.sazonal && c.daysLeft !== null && <p className="mt-2 text-xs font-semibold text-amber-200">{c.daysLeft === 0 ? "Último dia para pegar." : `Só ${c.daysLeft} dia${c.daysLeft === 1 ? "" : "s"} para pegar: depois sai da Loja. Quem pegou, fica.`}</p>}
+          {c.sazonal && c.daysLeft !== null && <p className="mt-2 text-xs font-semibold text-amber-200">{lockedAll ? (c.daysLeft === 0 ? "Último dia da temporada." : `A temporada termina em ${c.daysLeft} dia${c.daysLeft === 1 ? "" : "s"}. Quem ganhou o conjunto, fica com ele.`) : (c.daysLeft === 0 ? "Último dia para pegar." : `Só ${c.daysLeft} dia${c.daysLeft === 1 ? "" : "s"} para pegar: depois sai da Loja. Quem pegou, fica.`)}</p>}
         </div>
         <Showcase items={items} me={me} />
         <div className="flex flex-col lg:flex-row gap-4 lg:items-end justify-between">
@@ -158,7 +167,11 @@ function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: S
           </div>
           <div className="flex flex-col sm:flex-row gap-2 shrink-0">
             <button onClick={seeSet} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center justify-center gap-1.5"><Play size={14} /> Ver prévia do conjunto</button>
-            {!complete && <button disabled={!!busy} onClick={claimAll} className="grad rounded-xl px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">{busy === "claim" ? "Pegando..." : "Pegar o conjunto (Beta)"}</button>}
+            {!complete && (lockedAll
+              ? <button disabled data-locked="true" aria-label={`${c.nome}: em breve (trancado)`} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/5 text-white/70 border border-dashed border-white/25 cursor-not-allowed inline-flex items-center justify-center gap-2"><Lock size={15} /> Em breve</button>
+              : <button disabled={!!busy} onClick={claimAll} className="grad rounded-xl px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">{busy === "claim" ? "Pegando..." : "Pegar o conjunto (Beta)"}</button>)}
+            {shop.canGift && <button onClick={() => openGift({ collectionId: c.id })} aria-label={`Presentear a coleção ${c.nome}`} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25 inline-flex items-center justify-center gap-2"><Gift size={15} /> Presentear</button>}
+            {shop.canGift && <button disabled={!!busy} onClick={async () => { setBusy("lock"); try { const r = await api.adminLock({ locked: !anyLocked ? true : false, collectionId: c.id }); setMsg(`${anyLocked ? "Destrancado" : "Trancado"}: ${r.changed} itens.`); await ctx.refresh(); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } }} aria-label={`${anyLocked ? "Destrancar" : "Trancar"} a coleção ${c.nome}`} className="rounded-xl px-3 py-2.5 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 inline-flex items-center justify-center gap-1.5">{anyLocked ? <LockOpen size={14} /> : <Lock size={14} />}{anyLocked ? "Destrancar" : "Trancar"}</button>}
             {mine.length > 0 && <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>}
             {complete && <button onClick={() => setExpanded(false)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/10">Recolher</button>}
           </div>
@@ -189,7 +202,7 @@ function Prefs() {
 export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () => void }) {
   const ctx = useShop(), shop = ctx?.shop;
   const [tab, setTab] = useState<Tab>("vitrine");
-  const [pv, setPv] = useState<PreviewReq | null>(null);
+  const [pv, setPv] = useState<PreviewReq | null>(null), [gift, setGift] = useState<GiftPre | null>(null);
   const [type, setType] = useState<ItemType | "all">("all"), [rar, setRar] = useState<Rarity | "all">("all"), [colF, setColF] = useState("all");
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [onClose]);
@@ -203,7 +216,7 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
   const chip = (on: boolean) => `rounded-full px-3 py-1.5 text-xs font-medium border transition ${on ? "border-accent bg-accent/15 text-ink" : "border-line text-muted hover:text-ink"}`;
 
   return (
-    <LazyMotion features={domAnimation}><OpenPreview.Provider value={setPv}>
+    <LazyMotion features={domAnimation}><OpenPreview.Provider value={setPv}><OpenGift.Provider value={setGift}>
       <m.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} role="dialog" aria-label="Loja" className="fixed inset-0 z-[60] bg-bg flex flex-col">
         <div className="titlebar-drag hidden electron-mac:block" />
         <header className="shrink-0 border-b border-line px-3 sm:px-6 py-3 flex items-center gap-3">
@@ -218,6 +231,13 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
         <div ref={scroller} className="flex-1 min-h-0 overflow-y-auto"><div className="max-w-6xl mx-auto p-3 sm:p-6">
           {ctx?.loading && <p className="text-center text-muted py-20">Abrindo a loja...</p>}
           {ctx?.error && <p className="text-center text-accent py-20" role="alert">{ctx.error}</p>}
+          {shop && shop.items.some((i) => i.locked && !shop.owned.includes(i.id)) && (
+            <div role="note" aria-label="Loja trancada" className="mb-4 flex items-center gap-3 flex-wrap rounded-2xl border border-dashed border-white/20 bg-white/[0.04] px-4 py-3">
+              <span className="size-9 rounded-xl grid place-items-center bg-white/10 text-white/80 shrink-0"><Lock size={17} /></span>
+              <p className="flex-1 min-w-[220px] text-sm text-white/80"><b>A Loja está trancada por enquanto.</b> Veja tudo à vontade e use a prévia: os itens chegam em breve. {shop.canGift ? "Só você (conta dona) pode pegar e presentear por enquanto." : "Por enquanto só o dono do Cohle usa e presenteia: quem ganha um item já pode usar."}</p>
+              {shop.canGift && <button onClick={() => setGift({})} className="rounded-xl px-4 py-2 text-sm font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25 inline-flex items-center gap-2"><Gift size={15} /> Presentear alguém</button>}
+            </div>
+          )}
           {shop && tab === "vitrine" && (
             <div className="space-y-5">
               {featured.length ? featured.map((c) => <Collection key={c.id} c={c} items={itemsOf(c)} me={me} hero />) : <p className="text-muted text-sm">Nenhuma coleção de temporada agora. Volte em breve.</p>}
@@ -246,6 +266,7 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
         </div></div>
       </m.div>
       {pv && <PreviewModal req={pv} me={me} onClose={() => setPv(null)} />}
-    </OpenPreview.Provider></LazyMotion>
+      {gift && <GiftModal pre={gift} onClose={() => setGift(null)} onDone={() => void ctx?.refresh()} />}
+    </OpenGift.Provider></OpenPreview.Provider></LazyMotion>
   );
 }

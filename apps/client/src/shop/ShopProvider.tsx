@@ -32,7 +32,7 @@ export function ShopProvider({ socket, children }: { socket: () => Socket | null
   useEffect(() => { void refresh(); }, [refresh]);
   // the equipped items changed on another device
   useEffect(() => {
-    let off = () => {}; const t = setInterval(() => { const s = socket(); if (!s) return; clearInterval(t); const h = () => void refresh(); s.on("shop:equipped", h); off = () => s.off("shop:equipped", h); }, 300);
+    let off = () => {}; const t = setInterval(() => { const s = socket(); if (!s) return; clearInterval(t); const h = () => void refresh(); s.on("shop:equipped", h); s.on("shop:gift", h); off = () => { s.off("shop:equipped", h); s.off("shop:gift", h); }; }, 300);
     return () => { clearInterval(t); off(); };
   }, [refresh, socket]);
 

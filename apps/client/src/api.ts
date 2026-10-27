@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import type { PrefsDTO, ShopDTO, Slot, ReactionDTO, ReactionKey, AttachmentDTO, FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
+import type { GiftResultDTO, GiftTargetDTO, ShopItemDTO, CollectionDTO, PrefsDTO, ShopDTO, Slot, ReactionDTO, ReactionKey, AttachmentDTO, FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
 // The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
 const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
@@ -66,6 +66,9 @@ const MESSAGES: Record<string, string> = {
   "out of season": "Essa coleção não está mais na vitrine.",
   "wrong slot": "Esse item não vai nesse lugar.",
   "nothing owned": "Pegue pelo menos um item da coleção primeiro.",
+  "item locked": "Esse item chega em breve. Por enquanto só dá para ganhar de presente.",
+  "owner only": "Só a conta dona do Cohle pode fazer isso.",
+  "no such items": "Esses itens não existem.",
   "payment required": "Esse item é pago e o pagamento ainda não está disponível.",
   "too long": "A mensagem passou do limite de 500 caracteres.",
   "too many lines": "Muitas linhas: use no máximo 12.",
@@ -191,6 +194,12 @@ export const api = {
   createChannel: (serverId: string, name: string, type: "TEXT" | "VOICE") =>
     req(`/servers/${serverId}/channels`, "POST", { name, type }),
   shop: () => req<ShopDTO>("/shop"),
+  // gifts and unlocking (owner account only; the server enforces it)
+  giftTargets: (q: string) => req<GiftTargetDTO[]>(`/shop/gift-targets?q=${encodeURIComponent(q)}`),
+  adminCatalog: () => req<{ items: ShopItemDTO[]; collections: CollectionDTO[] }>("/shop/admin/catalog"),
+  gift: (b: { to: string; itemIds?: string[]; collectionId?: string; note?: string }) => req<GiftResultDTO>("/shop/gifts", "POST", b),
+  giftsSeen: () => req<{ ok: true }>("/shop/gifts/seen", "POST", {}),
+  adminLock: (b: { locked: boolean; itemIds?: string[]; collectionId?: string }) => req<{ ok: true; changed: number }>("/shop/admin/lock", "PUT", b),
   claimItem: (id: string) => req<{ ok: true }>(`/shop/items/${id}/claim`, "POST", {}),
   equipItem: (slot: Slot, itemId: string | null) => req<{ equipped: Partial<Record<Slot, string>>; bonus: string | null }>("/shop/equipped", "PUT", { slot, itemId }),
   equipSet: (collectionId: string) => req<{ equipped: Partial<Record<Slot, string>>; bonus: string | null; complete: boolean }>("/shop/equipped/set", "POST", { collectionId }),

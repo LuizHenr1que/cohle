@@ -1,6 +1,6 @@
 # Loja de itens visuais (Preview Beta)
 
-Vale igual no app e na web (mesmo cliente, mesmo servidor). **Tudo é grátis durante o beta**; a Loja mostra o selo "Preview Beta" e o aviso "Grátis durante o beta. No futuro alguns itens serão pagos." Não há Pix nem checkout: `price` e `isFreeBeta` já existem no banco, e o único ponto em que o pagamento entra depois é `POST /shop/items/:id/claim`.
+Vale igual no app e na web (mesmo cliente, mesmo servidor). Decisão do dono: **a Loja está trancada ("Em breve") para todo mundo**: dá para ver tudo e usar a prévia, mas ninguém pega item; só a conta dona (`verticeappempresa@gmail.com`) **presenteia**. A Loja **não será grátis**: quando abrir, os itens terão preço (os campos `price` e `isFreeBeta` já existem e o pagamento entra no `claim`); a Loja mostra o selo "Preview Beta" e o aviso "Grátis durante o beta. No futuro alguns itens serão pagos." Não há Pix nem checkout: `price` e `isFreeBeta` já existem no banco, e o único ponto em que o pagamento entra depois é `POST /shop/items/:id/claim`.
 
 ## Coleções de temporada (produto único sazonal)
 | Coleção | Janela (America/Sao_Paulo) | Tema | Bônus do conjunto completo |
@@ -60,3 +60,10 @@ Quem tem muitos servidores organiza em **grupos**: botão "Novo grupo" (ou cliqu
 
 ## Ano Novo (Etapa 2)
 Coleção sazonal de 8 itens: tema **Virada**, molduras Aro dourado e Confete, emblema Virada, entrada **Feliz 20XX!** (champanhe, fogos e relógios caindo), nomes Ouro e Fogos e reações (fogos, champanhe, relógio). O ano mostrado na contagem e nos textos é sempre o da próxima virada. **Os fogos não estouram à meia-noite sozinhos**: seguem a regra "nada acontece sozinho" e só saem quando a pessoa clica na garrafa. A coleção só aparece na janela; para ver antes no banco de desenvolvimento, ajuste `inicio`/`fim` em `Collection` (o `shop-test` e o `shop-ui-test` fazem isso e restauram no fim).
+
+## Loja trancada e presentes
+- **Trancada:** todo item nasce com `ShopItem.locked = true` (coluna runtime: o seed nunca a sobrescreve). `POST /shop/items/:id/claim` responde 403 `item locked`. A tela mostra o cadeado e "Em breve" no lugar de "Pegar grátis", nos itens, nos banners das coleções e na prévia. A prévia continua liberada.
+- **Presentear (só o dono):** botão "Presentear" em cada item e coleção, e "Presentear alguém" no aviso do topo. Janela: busca a pessoa por @usuário, nome ou e-mail, marca itens ou "coleção inteira", recado de até 140 caracteres. Funciona com item trancado ou fora de temporada (dá para presentear Ano Novo antes de 20/12). `POST /shop/gifts`, `GET /shop/gift-targets`, `GET /shop/admin/catalog` (todos 403 para quem não é dono; o dono é a conta com `OWNER_EMAILS`/`verticeappempresa@gmail.com` confirmada).
+- **Quem recebe:** vê a tela "Você ganhou um presente!" uma vez (remetente, recado e itens), com "Equipar agora" e "Ver na Loja"; online, aparece na hora (`shop:gift`). `UserItem.seen` controla isso.
+- **Destrancar sem deploy:** botão "Destrancar" por coleção na tela (dono) ou `PUT /shop/admin/lock` com `itemIds` ou `collectionId`. SQL: `update "ShopItem" set locked = false where key = 'natal.theme';`.
+- Testes: `shop-test.mjs` (API: trava, autorização, presentes, recado, pulo de itens que já tem, evento ao vivo, destrancar) e `shop-gift-ui-test.mjs` (tela, web e Electron).

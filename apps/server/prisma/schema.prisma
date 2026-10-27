@@ -283,6 +283,7 @@ model ShopItem {
   assetUrl     String?
   price        Int      @default(0)   // cents, for when charging starts
   isFreeBeta   Boolean  @default(true)
+  locked       Boolean  @default(true)   // "Em breve": nobody can claim it; the owner can still give it as a gift (runtime switch, never overwritten by the seed)
   ativo        Boolean  @default(true)
   meta         Json     @default("{}")
   collectionId String?
@@ -296,8 +297,11 @@ model ShopItem {
 model UserItem {
   userId     String
   itemId     String
-  source     String   @default("beta") // beta | achievement | auto
+  source     String   @default("beta") // beta | achievement | auto | gift
   acquiredAt DateTime @default(now())
+  giftedBy   String?                      // user id of the owner who gave it
+  giftNote   String?
+  seen       Boolean  @default(true)       // gifts start unseen: the receiver gets a "you got a gift" screen once
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   item       ShopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 

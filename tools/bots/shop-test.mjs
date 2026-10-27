@@ -25,6 +25,7 @@ const NATAL = ["natal.theme", "natal.frame.garland", "natal.frame.santahat", "na
 const col = () => prisma.collection.findUnique({ where: { key: "natal" } });
 const SET = async (data) => { await prisma.collection.update({ where: { key: "natal" }, data }); await sleep(450); };
 const orig = await col();
+await prisma.shopItem.updateMany({ data: { locked: false } }); await sleep(450);          // the Loja ships locked ("Em breve"): the older checks below claim items, so unlock for them (locked again at the end)
 
 const A = await mk("ana"), B = await mk("bia"), owner = (await http("/auth/login", { email: "teste1@cohle.dev", password: "teste12345" })).d;
 // ---- catalog and the Beta Tester badge ----
@@ -128,6 +129,44 @@ ok("equipar o conjunto de Ano Novo entrega moldura, nome e emblema", r.s === 200
 await nySet({ fim: new Date(Date.now() - 3600_000) });
 ok("fim da temporada: quem pegou fica, quem não pegou não consegue pegar", (await equip(Y, "theme", item(sy, "anonovo.theme").id)).s === 200 && (await http(`/shop/items/${item(sy, "anonovo.theme").id}/claim`, {}, (await mk("ano2")).token)).s === 403);
 await nySet({ ativo: nyCol.ativo, inicio: nyCol.inicio, fim: nyCol.fim });
+// ---- the Loja is locked ("Em breve"); only the owner gives gifts ----
+await prisma.shopItem.updateMany({ data: { locked: true } }); await sleep(450);
+const Gf = await mk("gif"), Gs = await mk("gis"); let sg = await shop(Gf);
+ok("trancada: todos os itens vêm com locked=true", sg.items.length > 20 && sg.items.every((i) => i.locked === true));
+r = await claim(Gf, sg, "natal.theme");
+ok("trancada: ninguém pega item (403 'locked')", r.s === 403 && r.d.error === "item locked", `${r.s} ${JSON.stringify(r.d)}`);
+ok("a conta dona pode pegar item trancado (ela usa e presenteia)", (await claim(owner, await shop(owner), "natal.theme")).s === 200);
+ok("quem não é dono não presenteia (403)", (await http("/shop/gifts", { to: "@" + Gs.user.username, itemIds: [item(sg, "natal.theme").id] }, Gf.token)).s === 403);
+ok("quem não é dono não vê o catálogo completo nem busca pessoas (403)", (await http("/shop/admin/catalog", null, Gf.token)).s === 403 && (await http("/shop/gift-targets?q=teste", null, Gf.token)).s === 403 && (await http("/shop/admin/lock", { locked: false, itemIds: [item(sg, "natal.theme").id] }, Gf.token, "PUT")).s === 403);
+ok("canGift: só o dono (teste1) tem", (await shop(owner)).canGift === true && sg.canGift === false);
+const tg = await http("/shop/gift-targets?q=" + Gs.user.username.slice(0, 6), null, owner.token);
+ok("o dono busca a pessoa para presentear", tg.s === 200 && tg.d.some((u) => u.id === Gs.user.id), JSON.stringify(tg.d).slice(0, 120));
+r = await http("/shop/gifts", { to: "@" + Gs.user.username, itemIds: [item(sg, "natal.theme").id, item(sg, "aura.fire").id], note: "bem-vindo ao Cohle!" }, owner.token);
+ok("o dono presenteia 2 itens por @usuário (mesmo trancados)", r.s === 200 && r.d.given === 2 && r.d.skipped === 0 && r.d.to.id === Gs.user.id, JSON.stringify(r.d).slice(0, 140));
+let sgs = await shop(Gs);
+ok("quem recebeu vê os itens como seus e o presente ainda não visto, com remetente e recado", sgs.owned.includes(item(sg, "natal.theme").id) && sgs.unseenGifts.length === 2 && sgs.unseenGifts[0].note === "bem-vindo ao Cohle!" && sgs.unseenGifts[0].from.length > 0, JSON.stringify(sgs.unseenGifts[0]));
+ok("o presente pode ser equipado normalmente", (await equip(Gs, "frame", item(sg, "aura.fire").id)).s === 200);
+await http("/shop/gifts/seen", {}, Gs.token); sgs = await shop(Gs);
+ok("marcar como visto zera a lista de presentes novos", sgs.unseenGifts.length === 0 && sgs.owned.includes(item(sg, "aura.fire").id));
+r = await http("/shop/gifts", { to: `gis.${run}@cohle.dev`, itemIds: [item(sg, "natal.theme").id, item(sg, "gamer.theme").id] }, owner.token);
+ok("presentear por e-mail: o que a pessoa já tem é pulado", r.s === 200 && r.d.given === 1 && r.d.skipped === 1);
+const gamer = sg.collections.find((c) => c.key === "gamer");
+r = await http("/shop/gifts", { to: Gs.user.id, collectionId: gamer.id }, owner.token);
+ok("presentear uma coleção inteira por id", r.s === 200 && r.d.given === 7 && r.d.skipped === 1, JSON.stringify(r.d).slice(0, 100));
+const sock = io(API, { auth: { token: Gf.token }, transports: ["websocket"] }); await new Promise((rr) => sock.on("connect", rr)); let gotGift = null; sock.on("shop:gift", (e) => (gotGift = e));
+await http("/shop/gifts", { to: "@" + Gf.user.username, itemIds: [item(sg, "hacker.badge.root").id] }, owner.token); await until(() => gotGift, 6000); sock.close();
+ok("quem está online é avisado na hora (shop:gift)", !!gotGift && gotGift.count === 1 && gotGift.from.length > 0, JSON.stringify(gotGift));
+ok("pessoa inexistente: 404; dados inválidos: 400", (await http("/shop/gifts", { to: "@nao_existe_zz9", itemIds: [item(sg, "natal.theme").id] }, owner.token)).s === 404 && (await http("/shop/gifts", { to: "@" + Gs.user.username }, owner.token)).s === 400 && (await http("/shop/gifts", { to: "@" + Gs.user.username, itemIds: ["nao-existe"] }, owner.token)).s === 404);
+const ac = await http("/shop/admin/catalog", null, owner.token);
+ok("o dono vê o catálogo completo, até o que está fora de temporada (Ano Novo)", ac.s === 200 && ac.d.collections.some((c) => c.key === "anonovo") && ac.d.items.some((i) => i.key.startsWith("anonovo.")));
+r = await http("/shop/gifts", { to: "@" + Gs.user.username, itemIds: [ac.d.items.find((i) => i.key === "anonovo.theme").id] }, owner.token);
+ok("dá para presentear item de temporada que ainda não começou", r.s === 200 && r.d.given === 1);
+r = await http("/shop/admin/lock", { locked: false, itemIds: [item(sg, "queen.theme").id] }, owner.token, "PUT");
+await sleep(450); sg = await shop(Gf);
+ok("o dono destranca um item e aí qualquer pessoa pega (sem deploy)", r.s === 200 && r.d.changed === 1 && item(sg, "queen.theme").locked === false && (await claim(Gf, sg, "queen.theme")).s === 200);
+r = await http("/shop/admin/lock", { locked: true, collectionId: gamer.id }, owner.token, "PUT"); await sleep(450);
+ok("trancar de novo por coleção", r.s === 200 && r.d.changed === 8 && (await shop(Gf)).items.filter((i) => i.collectionId === gamer.id).every((i) => i.locked));
+await prisma.shopItem.updateMany({ data: { locked: false } }); await sleep(450);          // the rest of the suite claims items again
 // ---- the real sounds: small files that exist ----
 for (const f of ["santa-hohoho.mp3", "ghost-boo.mp3"]) { const rr = await fetch(`http://localhost:5173/sfx/${f}`); const buf = Buffer.from(await rr.arrayBuffer()); ok(`som real ${f}: existe, é áudio e é leve (< 40 KB)`, rr.status === 200 && /audio|mpeg/.test(rr.headers.get("content-type") ?? "") && buf.length > 3000 && buf.length < 40_000, `${rr.status} ${buf.length} bytes`); }
 // ---- preferences ----
@@ -135,7 +174,7 @@ r = await http("/me/prefs", null, A.token); ok("preferências começam com o pad
 r = await http("/me/prefs", { effectsOff: true, lite: "on" }, A.token, "PUT"); ok("salvar preferências (parcial)", r.d.effectsOff === true && r.d.lite === "on" && r.d.seasonalAuto === true);
 ok("preferência inválida: 400", (await http("/me/prefs", { lite: "turbo" }, A.token, "PUT")).s === 400);
 // ---- blocking a category inside a server ----
-const pol = await prisma.shopItem.create({ data: { key: "teste.politica." + run, tipo: "badge", nome: "Teste político", raridade: "comum", categoria: "politica", meta: {} } });
+const pol = await prisma.shopItem.create({ data: { key: "teste.politica." + run, tipo: "badge", nome: "Teste político", raridade: "comum", categoria: "politica", meta: {}, locked: false } });
 await sleep(450); const sb = await shop(B); await http(`/shop/items/${pol.id}/claim`, {}, B.token); await equip(B, "badge", pol.id);
 await new Promise((rr) => sB.emit("message:send", { channelId: ch, content: "oi" }, rr));
 ok("antes do bloqueio o item político aparece", (await http(`/channels/${ch}/messages`, null, A.token)).d.some((m) => m.author.id === B.user.id && m.author.fx?.badge === pol.key));
@@ -172,5 +211,6 @@ const rr2 = (await Promise.all(Array.from({ length: 33 }, () => http(`/shop/item
 ok("pegar itens em rajada é limitado (30 por minuto)", rr2.filter((x) => x === 429).length >= 1, rr2.filter((x) => x === 429).length + " bloqueados");
 await prisma.shopItem.delete({ where: { id: pol.id } }); await SET({ ativo: orig.ativo, inicio: orig.inicio, fim: orig.fim });
 for (const slot of ["frame", "badge", "theme", "entrance", "name_effect"]) await equip(owner, slot, null);          // leave the shared teste1 account as found (other suites expect the default theme)
+await prisma.shopItem.updateMany({ data: { locked: true } });          // back to the shipped state
 for (const s of [sA, sB, sO]) s.close(); await prisma.$disconnect();
 console.log(`\n${pass} passaram, ${fail} falharam`); process.exit(fail ? 1 : 0);

@@ -5,7 +5,10 @@ import { spawn } from "node:child_process"; import { mkdtempSync } from "node:fs
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); const API = "http://localhost:3001", WEB = process.env.WEB ?? "http://localhost:5191";
 const http = async (p, b, tok, m) => { const r = await fetch(API + p, { method: m ?? (b ? "POST" : "GET"), headers: { ...(b ? { "Content-Type": "application/json" } : {}), ...(tok ? { Authorization: "Bearer " + tok } : {}) }, body: b ? JSON.stringify(b) : undefined }); return { s: r.status, d: await r.json().catch(() => ({})) }; };
 const u = (await http("/auth/login", { email: "teste2@cohle.dev", password: "teste12345" })).d;
-const sh = (await http("/shop", null, u.token)).d; for (const it of sh.items) await http(`/shop/items/${it.id}/claim`, {}, u.token);
+// the Loja is locked: the owner account gives the test user every item as a gift
+const own = (await http("/auth/login", { email: "teste1@cohle.dev", password: "teste12345" })).d, cat = (await http("/shop/admin/catalog", null, own.token)).d;
+for (let i = 0; i < cat.items.length; i += 80) await http("/shop/gifts", { to: "@teste2", itemIds: cat.items.slice(i, i + 80).map((x) => x.id) }, own.token);
+const sh = (await http("/shop", null, u.token)).d; await http("/shop/gifts/seen", {}, u.token);
 const by = (k) => sh.items.find((i) => i.key === k).id;
 const SLOTS = [["theme", "natal.theme"], ["frame", "natal.frame.garland"], ["name_effect", "natal.name.lights"], ["badge", "natal.badge.spirit"], ["entrance", "natal.entrance.hohoho"]];
 const equip = async (on) => { for (const [slot, k] of SLOTS) await http("/shop/equipped", { slot, itemId: on ? by(k) : null }, u.token, "PUT"); };

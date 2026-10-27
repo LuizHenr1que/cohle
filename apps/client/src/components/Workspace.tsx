@@ -422,7 +422,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         <ProfileModal user={self} onClose={() => setProfileOpen(false)} onTour={() => setTour(true)}
           onSaved={(u) => { setSelf(u); localStorage.setItem("me", JSON.stringify(u)); }} />
       )}
-      <ShopLayer self={self} socket={() => socket.current} voiceId={voice?.id} nameFor={(id) => { const u = Object.values(voiceUsers).flat().find((x) => x.id === id); return u ? nameOf(u) : "Alguém"; }} open={shopOpen} onClose={() => setShopOpen(false)} />
+      <ShopLayer self={self} socket={() => socket.current} voiceId={voice?.id} nameFor={(id) => { const u = Object.values(voiceUsers).flat().find((x) => x.id === id); return u ? nameOf(u) : "Alguém"; }} open={shopOpen} onClose={() => setShopOpen(false)} onOpenShop={() => setShopOpen(true)} />
     </div>
     </ShopProvider>
   );

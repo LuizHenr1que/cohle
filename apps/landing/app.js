@@ -146,10 +146,10 @@ const SHOTS = {
   "login": ["Tela de entrada do Cohle", "A porta de entrada. Login social (Google e GitHub) está na fila de construção."],
 };
 const LOJA_SHOTS = {
-  "vitrine": ["Vitrine da Loja do Cohle com as coleções de Natal e Halloween e o selo Preview Beta", "A vitrine: coleções de temporada com contagem regressiva, tudo com o selo Preview Beta (grátis durante o beta)."],
+  "vitrine": ["Vitrine da Loja do Cohle com as coleções de Natal e Halloween e os itens trancados (em breve)", "A vitrine: coleções de temporada com contagem regressiva, itens trancados (em breve). Dá para ver tudo e usar a prévia."],
   "auras": ["Coleção de Auras da Loja com oito auras animadas: fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon", "As auras giram, queimam e brilham em volta do seu avatar. Passe o mouse e veja. Fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon."],
   "colecoes": ["Banners das coleções Hacker, Gamer, Barbearia e Rainha com a arte de cada item", "Cada coleção mostra tudo o que vem nela: tema, moldura, nome, emblema, entrada e reações. Clicou, viu, decidiu."],
-  "previa": ["Prévia grande de um conjunto da Loja no avatar da própria pessoa", "A prévia mostra o conjunto no seu próprio avatar, com a entrada tocando ao vivo. Gostou? Pega. Não gostou? Sai."],
+  "previa": ["Prévia grande de um conjunto da Loja no avatar da própria pessoa", "A prévia mostra o conjunto no seu próprio avatar, com a entrada tocando ao vivo. Gostou? Fica na lista de espera. Não gostou? Sai."],
   "natal": ["Cohle com o tema de Natal: neve, luzinhas, árvore e contagem para o Natal", "Tema de Natal: neve, luzinhas e uma árvore no canto. Clique nela e o Papai Noel passa no trenó."],
   "halloween": ["Cohle com o tema de Halloween: luzes laranja e roxas, abóbora no canto e contagem", "Tema de Halloween: luzes laranja e roxas e uma abóbora no canto. Clique nela e a bruxa passa de vassoura."],
   "hacker": ["Cohle com o tema Hacker: verde de terminal, luzes verdes e terminal no canto", "Tema Hacker: verde de terminal sobre preto. Clique no terminal para ver ACCESS GRANTED."],

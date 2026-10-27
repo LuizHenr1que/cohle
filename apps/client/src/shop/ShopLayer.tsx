@@ -6,10 +6,11 @@ import { usePrefs } from "./prefs";
 
 const EffectsHost = lazy(() => import("./fx/EffectsHost"));
 const ShopModal = lazy(() => import("./ShopModal"));
+const GiftReceived = lazy(() => import("./GiftReceived"));
 
 /** Sits inside the ShopProvider. Loads the effects only when something needs them, and the Shop screen only when it is opened. */
-export function ShopLayer({ self, socket, voiceId, nameFor, open, onClose }: {
-  self: UserDTO; socket: () => Socket | null | undefined; voiceId?: string; nameFor: (userId: string) => string; open: boolean; onClose: () => void;
+export function ShopLayer({ self, socket, voiceId, nameFor, open, onClose, onOpenShop }: {
+  self: UserDTO; socket: () => Socket | null | undefined; voiceId?: string; nameFor: (userId: string) => string; open: boolean; onClose: () => void; onOpenShop: () => void;
 }) {
   const ctx = useShop(), prefs = usePrefs();
   const shop = ctx?.shop, keys = ctx?.keys ?? {};
@@ -19,6 +20,7 @@ export function ShopLayer({ self, socket, voiceId, nameFor, open, onClose }: {
     <>
       {need && !prefs.effectsOff && <Suspense fallback={null}><EffectsHost keys={keys} bonus={shop?.bonus ?? null} season={season} socket={socket} voiceId={voiceId} nameFor={nameFor} /></Suspense>}
       {open && <Suspense fallback={null}><ShopModal me={self} onClose={onClose} /></Suspense>}
+      {!!shop?.unseenGifts?.length && <Suspense fallback={null}><GiftReceived gifts={shop.unseenGifts} onOpenShop={onOpenShop} /></Suspense>}
     </>
   );
 }

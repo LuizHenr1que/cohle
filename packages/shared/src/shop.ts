@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // ---- The visual-items shop (Preview Beta: everything is free for now; price/isFreeBeta are ready for charging later) ----
 export const BETA_LABEL = "Preview Beta";
-export const BETA_NOTE = "Grátis durante o beta. No futuro alguns itens serão pagos.";
+export const BETA_NOTE = "Loja em breve: os itens estão trancados por enquanto. Só o dono do Cohle libera e presenteia.";
 
 export const ITEM_TYPES = ["frame", "badge", "theme", "entrance", "name_effect", "banner", "pet", "status", "reaction"] as const;
 export type ItemType = (typeof ITEM_TYPES)[number];
@@ -18,7 +18,7 @@ export const BLOCKABLE_CATEGORIES = ["politica"] as const;
 
 export interface ShopItemDTO {
   id: string; key: string; tipo: ItemType; nome: string; descricao: string; raridade: Rarity; categoria: string;
-  price: number; isFreeBeta: boolean; collectionId: string | null; meta: Record<string, unknown>;
+  price: number; isFreeBeta: boolean; /** "Em breve": cannot be claimed yet (gifts only) */ locked: boolean; collectionId: string | null; meta: Record<string, unknown>;
 }
 export interface CollectionDTO {
   id: string; key: string; nome: string; descricao: string; categoria: string; sazonal: boolean;
@@ -35,7 +35,11 @@ export const DEFAULT_PREFS: PrefsDTO = { effectsOff: false, soundsOff: false, se
 export interface ShopDTO {
   items: ShopItemDTO[]; collections: CollectionDTO[]; owned: string[];
   equipped: Partial<Record<Slot, string>>; /** item ids */ bonus: string | null; prefs: PrefsDTO; now: string; betaTester: boolean;
+  /** only the owner account can give gifts */ canGift: boolean; /** gifts not opened yet */ unseenGifts: GiftDTO[];
 }
+export interface GiftDTO { itemId: string; from: string; note: string | null; }
+export interface GiftTargetDTO { id: string; username: string; displayName: string | null; email: string; }
+export interface GiftResultDTO { ok: true; given: number; skipped: number; to: GiftTargetDTO; }
 /** What others see of a person's equipped items: only keys (tiny), resolved by the client registry. */
 export interface FxDTO { frame?: string; badge?: string; nameEffect?: string; pet?: string; status?: string; banner?: string; }
 
@@ -49,6 +53,13 @@ export const prefsSchema = z.object({
     serverIds: z.array(z.string().min(1).max(40)).max(200), open: z.boolean(),
   })).max(GROUPS_MAX).optional(),
 });
+export const GIFT_NOTE_MAX = 140, GIFT_ITEMS_MAX = 80;
+/** `to`: @username, e-mail or user id. Items by id, or a whole collection. */
+export const giftSchema = z.object({
+  to: z.string().trim().min(2).max(120), itemIds: z.array(z.string().max(40)).max(GIFT_ITEMS_MAX).optional(), collectionId: z.string().max(40).optional(),
+  note: z.string().trim().max(GIFT_NOTE_MAX).optional(),
+}).refine((g) => (g.itemIds?.length ?? 0) > 0 || !!g.collectionId, { message: "no items" });
+export const lockSchema = z.object({ locked: z.boolean(), itemIds: z.array(z.string().max(40)).max(400).optional(), collectionId: z.string().max(40).optional() }).refine((g) => (g.itemIds?.length ?? 0) > 0 || !!g.collectionId, { message: "nothing" });
 export const serverSettingsSchema = z.object({ blockedCategories: z.array(z.enum(BLOCKABLE_CATEGORIES)).max(BLOCKABLE_CATEGORIES.length) });
 
 type Season = { sazonal: boolean; ativo: boolean; inicio?: string | Date | null; fim?: string | Date | null };

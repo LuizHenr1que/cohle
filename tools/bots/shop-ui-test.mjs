@@ -13,6 +13,8 @@ const http = async (p, b, tok, m) => { const r = await fetch(API + p, { method: 
 const last = (re) => [...readFileSync(LOG, "utf8").matchAll(re)].at(-1)?.[1];
 const run = Date.now().toString(36).slice(-6);
 const mk = async (name) => { const email = `${name}.${run}@cohle.dev`; const r = await http("/auth/register", { email, username: `${name}_${run}`, password: "senhaSegura123" }); if (r.d.token) return r.d; await sleep(500); return (await http("/auth/verify", { email, code: last(/Seu código do Cohle: (\d{6})/g) })).d; };
+// the Loja ships locked ("Em breve"); these flows claim items through the screen, so unlock them for the run (locked again at the end)
+await prisma.shopItem.updateMany({ data: { locked: false } }); await sleep(600);
 // Ano Novo starts on 20 Dec: open its window in the dev database for this run (restored at the end)
 const nyOrig = await prisma.collection.findUnique({ where: { key: "anonovo" } });
 await prisma.collection.update({ where: { key: "anonovo" }, data: { inicio: new Date(Date.now() - 86_400_000), fim: new Date(Date.now() + 10 * 86_400_000) } }); await sleep(600);
@@ -62,7 +64,7 @@ try {
   ok("a Loja e os efeitos NÃO são baixados antes de precisar (chunks sob demanda)", early.length === 0, early.map((n) => n.split("/").pop()).join(", "));
   ok("botão Loja na barra lateral", !!(await ev(`!!document.querySelector('button[title="Loja"]')`)));
   await ev(`document.querySelector('button[title="Loja"]').click()`);
-  ok("a Loja abre, com Preview Beta e o aviso de que no futuro alguns itens serão pagos", await waitFor(`/Preview Beta/i.test(document.body.innerText) && /Grátis durante o beta\\. No futuro alguns itens serão pagos\\./.test(document.body.innerText)`));
+  ok("a Loja abre, com Preview Beta e o aviso de que a Loja está em breve e trancada", await waitFor(`/Preview Beta/i.test(document.body.innerText) && /Loja em breve: os itens estão trancados por enquanto/.test(document.body.innerText)`));
   ok("agora o código da Loja foi baixado (e só agora)", await loaded("/ShopModal/"));
   let tx = await text();
   ok("vitrine em destaque: Natal, Edição Limitada e dias restantes", /Natal/.test(tx) && /Edição Limitada · \d+ dias?/.test(tx));
@@ -71,8 +73,8 @@ try {
   await shot(`shop-1-vitrine-${TAG}`);
 
   // ---- claim, wear one piece ----
-  await ev(`[...document.querySelectorAll('[data-item="natal.frame.garland"] button')].find(b=>/Pegar grátis/.test(b.innerText)).click()`);
-  ok("'Pegar grátis (Beta)' pega o item", await waitFor(`/Equipar/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'') && !/Pegar grátis/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`));
+  await ev(`[...document.querySelectorAll('[data-item="natal.frame.garland"] button')].find(b=>/Pegar \\(Beta\\)/.test(b.innerText)).click()`);
+  ok("'Pegar (Beta)' pega o item", await waitFor(`/Equipar/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'') && !/Pegar grátis/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`));
   await ev(`[...document.querySelectorAll('[data-item="natal.frame.garland"] button')].find(b=>b.innerText.trim()==='Equipar').click()`);
   ok("equipar a moldura: o servidor passa a entregar a chave aos outros", await waitFor(`/Equipado/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`) && (await http("/me", null, A.token)).d.fx?.frame === "natal.frame.garland");
   ok("a moldura aparece no meu avatar (sem recarregar)", await waitFor(`!!document.querySelector('.fx-frame svg.fx-art')`));
@@ -227,5 +229,5 @@ try {
     ok("celular: a Loja não rola para o lado", await noSide()); await shot(`shop-5-celular-${TAG}`);
   }
   ok("sem erros de JavaScript", errors.length === 0, errors.slice(0, 2).join(" | ").slice(0, 240));
-} finally { ws.close(); chrome?.kill(); await prisma.collection.update({ where: { key: "anonovo" }, data: { inicio: nyOrig.inicio, fim: nyOrig.fim } }).catch(() => {}); await prisma.$disconnect(); }
+} finally { ws.close(); chrome?.kill(); await prisma.collection.update({ where: { key: "anonovo" }, data: { inicio: nyOrig.inicio, fim: nyOrig.fim } }).catch(() => {}); await prisma.shopItem.updateMany({ data: { locked: true } }).catch(() => {}); await prisma.$disconnect(); }
 console.log(`\n${pass} passaram, ${fail} falharam`); process.exit(fail ? 1 : 0);
