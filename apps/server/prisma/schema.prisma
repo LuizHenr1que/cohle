@@ -33,6 +33,10 @@ model User {
   notesAbout   UserNote[] @relation("NoteTarget")
   reactions    Reaction[]
   uploads      Attachment[]
+  items        UserItem[]
+  equipped     UserEquipped[]
+  prefs        UserPrefs?
+  stats        UserStats?
   allowEmailFind Boolean @default(true) // others may find me by e-mail when adding friends
   accesses     AccessLog[]
   emailCodes   EmailCode[]
@@ -54,6 +58,7 @@ model Server {
   members    Member[]
   channels   Channel[]
   bans       Ban[]
+  settings   ServerSetting[]
 }
 
 model Member {
@@ -248,4 +253,91 @@ model Attachment {
   @@index([ownerId, createdAt])
   @@index([messageId])
   @@index([dmId])
+}
+
+// ---- Visual-items shop (Preview Beta) ----
+// A themed set (e.g. Natal). `ativo`, `inicio` and `fim` are runtime switches (edit the row, no deploy); the rest comes from the code catalog.
+model Collection {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  nome      String
+  descricao String   @default("")
+  categoria String
+  sazonal   Boolean  @default(false)
+  ativo     Boolean  @default(true)
+  inicio    DateTime?
+  fim       DateTime?
+  bonus     String?  // effect unlocked by equipping the whole set
+  bannerUrl String?
+  items     ShopItem[]
+}
+
+model ShopItem {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  tipo         String   // see ITEM_TYPES in @cohle/shared
+  nome         String
+  descricao    String   @default("")
+  raridade     String   // comum | raro | epico | lendario
+  categoria    String   // e.g. natal, base, politica
+  assetUrl     String?
+  price        Int      @default(0)   // cents, for when charging starts
+  isFreeBeta   Boolean  @default(true)
+  ativo        Boolean  @default(true)
+  meta         Json     @default("{}")
+  collectionId String?
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  owners       UserItem[]
+  equippedBy   UserEquipped[]
+
+  @@index([collectionId])
+}
+
+model UserItem {
+  userId     String
+  itemId     String
+  source     String   @default("beta") // beta | achievement | auto
+  acquiredAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item       ShopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([userId, itemId])
+}
+
+model UserEquipped {
+  userId String
+  slot   String
+  itemId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item   ShopItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([userId, slot])
+}
+
+model ServerSetting {
+  serverId String
+  key      String
+  value    Json
+  server   Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@id([serverId, key])
+}
+
+model UserPrefs {
+  userId        String  @id
+  effectsOff    Boolean @default(false)
+  soundsOff     Boolean @default(false)
+  seasonalAuto  Boolean @default(true)
+  hidePolitical Boolean @default(false)
+  lite          String  @default("auto") // auto | on | off
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Per-person counters (messages are erased after 15, so achievements need their own count).
+model UserStats {
+  userId        String @id
+  messages      Int    @default(0)
+  voiceMinutes  Int    @default(0)
+  longestCallMin Int   @default(0)
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -16,7 +16,8 @@ import {
 import { emailMode, sendMail, verifyEmail, resetEmail, welcomeEmail, usernameEmail } from "./email.js";
 import { issueCode, checkCode } from "./codes.js";
 import { registerAdmin, roleOf } from "./admin.js";
-import { setupMessaging } from "./messaging.js";
+import { setupMessaging, rate } from "./messaging.js";
+import { setupShop, seedCatalog } from "./shop/shop.js";
 
 const prisma = new PrismaClient();
 // Admin API of the LiveKit server (mute / disconnect people at the SFU, not just in the UI).
@@ -126,7 +127,8 @@ const usernameMailAt = new Map<string, number>();                      // userId
 const logAccess = (userId: string, kind: "register" | "login" | "open") => prisma.accessLog.create({ data: { userId, kind } }).catch(() => {});
 const session = async (user: any, kind: "register" | "login" = "login") => {
   const u = await withBadge(user); logAccess(u.id, kind); prisma.user.update({ where: { id: u.id }, data: { lastSeenAt: new Date() } }).catch(() => {});
-  return { token: app.jwt.sign({ sub: u.id }), user: toSelf(u) };
+  const me = toSelf(u); await shop.decorate([me]);
+  return { token: app.jwt.sign({ sub: u.id }), user: me };
 };
 // Without a mail service configured the address is simply trusted (development, or before the key is set up).
 const verifying = emailMode !== "off";
@@ -239,7 +241,8 @@ app.post("/auth/reset", authLimit, async (req, reply) => {
 app.get("/me", { preHandler: auth }, async (req, reply) => {
   const full = await prisma.user.findUnique({ where: { id: uid(req) } });
   if (!full) return reply.code(401).send({ error: "unauthorized" });
-  return toSelf(await withBadge(full));            // people who were already signed in get the badge too
+  const me = toSelf(await withBadge(full)); await shop.decorate([me]);
+  return me;            // people who were already signed in get the badge too
 });
 
 // private account details (settings screen)
@@ -305,6 +308,7 @@ app.get("/users/:id/profile", { preHandler: auth }, async (req: any, reply) => {
     ...(fr?.status === "ACCEPTED" ? { friendSince: (fr.acceptedAt ?? fr.createdAt).toISOString() } : {}),
     ...(note ? { note: note.text } : {}), activity, mutualFriends: friendUsers.map(toUser), mutualFriendsCount: mutualIds.length,
   };
+  await shop.decorate([out.user]);
   return out;
 });
 
@@ -332,7 +336,8 @@ app.patch("/me", { preHandler: auth }, async (req, reply) => {
       ...(avatarUrl !== undefined ? { avatarUrl, avatarVersion: avatarUrl ? { increment: 1 } : 0 } : {}),
     },
   });
-  return toSelf(await withBadge(u));            // the full row: the role and the e-mail rules need it (a "light" user would drop the admin entry)
+  const me = toSelf(await withBadge(u)); await shop.decorate([me]);
+  return me;            // the full row: the role and the e-mail rules need it (a "light" user would drop the admin entry)
 });
 
 // A private note about another person. Same visibility rule as the profile (a shared server or a friendship). Empty text deletes it.
@@ -579,11 +584,13 @@ app.delete("/channels/:id", { preHandler: auth }, async (req: any, reply) => {
 });
 
 // ---- messages ----
+// The channel, if this person is a member of its server. One round trip (the two lookups do not depend on each other): this runs on every message sent.
 async function memberOfChannel(userId: string, channelId: string) {
-  const ch = await prisma.channel.findUnique({ where: { id: channelId } });
-  if (!ch) return null;
-  const m = await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId: ch.serverId } } });
-  return m ? ch : null;
+  const [ch, m] = await Promise.all([
+    prisma.channel.findUnique({ where: { id: channelId } }),
+    prisma.member.findFirst({ where: { userId, server: { channels: { some: { id: channelId } } } }, select: { userId: true } }),
+  ]);
+  return ch && m ? ch : null;
 }
 
 // ---- direct messages (1:1, with history) ----
@@ -601,7 +608,10 @@ const unreadFrom = async (me: string, peer: string) => {
 };
 
 // messages, replies, reactions, files and the 15-message history live in messaging.ts
-const messaging = setupMessaging(app, { prisma, io: () => io, auth, uid, toUser, lightUser, memberOfChannel, isOwner, canDm });
+// the visual-items shop (catalog, equipping, live effects) lives in shop/shop.ts
+const shop = setupShop(app, { prisma, io: () => io, auth, uid, isOwner, rate,
+  onEquipChanged: (id) => { const ch = voiceOf.get(id), v = ch ? voice.get(ch) : undefined; if (ch && v) void shop.warm([id], v.serverId).then(() => io.to(`server:${v.serverId}`).emit("voice:state", voiceDTO(ch))); } });
+const messaging = setupMessaging(app, { prisma, io: () => io, auth, uid, toUser, lightUser, memberOfChannel, isOwner, canDm, decorate: shop.decorate, onMessage: (u) => shop.bumpStats(u, { messages: 1 }) });
 const { toDm } = messaging;
 
 // conversations I have, newest first, with the unread count
@@ -739,7 +749,7 @@ const online = new Map<string, number>();
 const voice = new Map<string, { serverId: string; users: Map<string, UserDTO> }>();
 const voiceOf = new Map<string, string>(); // userId -> channelId
 registerAdmin(app, { prisma, auth, uid, live: () => ({ online: online.size, voice: voiceOf.size, rooms: voice.size }), isOnline: (id) => online.has(id) });
-const voiceDTO = (channelId: string) => ({ channelId, users: [...(voice.get(channelId)?.users.values() ?? [])] });
+const voiceDTO = (channelId: string) => { const v = voice.get(channelId); return { channelId, users: [...(v?.users.values() ?? [])].map((u) => { const fx = shop.fxOf(u.id, v!.serverId); return fx ? { ...u, fx } : u; }) }; };
 
 const joinedAt = new Map<string, number>();   // userId -> when we last heard "voice:join" (grace while the app is still connecting to LiveKit)
 const SOUND_IDS = new Set(["scare", "fireworks", "laugh", "call", "tatakae"]);
@@ -747,8 +757,11 @@ const soundAt = new Map<string, number>();
 const sharingAt = new Map<string, number>();  // userId -> last time the app told us it started/stopped sharing
 const absent = new Map<string, number>();     // userId -> consecutive checks in which LiveKit did not list them
 
+const callSince = new Map<string, number>();    // userId -> when this call started (achievement counters)
 function leaveVoice(userId: string) {
   absent.delete(userId);
+  const since = callSince.get(userId); callSince.delete(userId);
+  if (since) { const min = Math.round((Date.now() - since) / 60_000); if (min > 0) shop.bumpStats(userId, { voiceMinutes: min, longestCallMin: min }); }
   const channelId = voiceOf.get(userId);
   if (!channelId) return;
   voiceOf.delete(userId);
@@ -886,18 +899,26 @@ io.on("connection", (socket) => {
     await ready;
     const ch = await memberOfChannel(userId, channelId);
     if (!ch || ch.type !== "VOICE") return;
-    const user = await prisma.user.findUnique({ where: { id: userId }, ...lightUser });
-    if (!user) return;
     if (voiceOf.get(userId) && voiceOf.get(userId) !== channelId) leaveVoice(userId);
     let v = voice.get(channelId);
     if (!v) { v = { serverId: ch.serverId, users: new Map() }; voice.set(channelId, v); }
-    const member = await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId: ch.serverId } } });
+    // everything this needs from the database, in one round trip: who they are, their member row, and what the people already here (and they) wear
+    const [user, member] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, ...lightUser }),
+      prisma.member.findUnique({ where: { userId_serverId: { userId, serverId: ch.serverId } } }),
+      shop.warm([...v.users.keys(), userId], ch.serverId).catch(() => {}),
+    ]);
+    if (!user) return;
     v.users.set(userId, { ...toUser(user), sharing: !!socket.data.sharing, muted: !!member?.muted, micOff: !!socket.data.micOff, deaf: !!socket.data.deaf });
     voiceOf.set(userId, channelId);
     joinedAt.set(userId, Date.now()); absent.delete(userId);
     socket.data.voice = true;
+    if (!callSince.has(userId)) callSince.set(userId, Date.now());
     io.to(`server:${ch.serverId}`).emit("voice:state", voiceDTO(channelId));
+    void shop.announceEntrance(userId, channelId, [...v.users.keys()]).catch(() => {});
   });
+  // a "giant reaction" for everybody in my call
+  socket.on("fx:giant", (icon: unknown) => { const ch = voiceOf.get(userId), v = ch ? voice.get(ch) : undefined; if (v) void shop.giant(userId, icon, ch, [...v.users.keys()]).catch(() => {}); });
   socket.on("voice:leave", () => { socket.data.sharing = false; socket.data.micOff = false; socket.data.deaf = false; leaveVoice(userId); });
   socket.on("voice:sharing", (on: boolean) => {
     socket.data.sharing = !!on;   // remembered even if voice:join is still being processed (reconnect race)
@@ -963,4 +984,5 @@ app.setErrorHandler((err: any, req, reply) => {
   return reply.send(err);
 });
 
+try { await seedCatalog(prisma); } catch (e) { console.error("shop catalog seed failed", e); }
 await app.listen({ port: Number(process.env.PORT ?? 3001), host: "0.0.0.0" });

@@ -11,6 +11,8 @@ type Deps = {
   memberOfChannel: (userId: string, channelId: string) => Promise<{ id: string; serverId: string } | null>;
   isOwner: (userId: string, serverId: string) => Promise<boolean>;
   canDm: (a: string, b: string) => Promise<boolean>;
+  /** adds the equipped-items `fx` to people (in place) */ decorate?: (users: UserDTO[], serverId?: string) => Promise<void>;
+  /** a message was sent (achievement counters) */ onMessage?: (userId: string) => void;
 };
 export type SendResult<T> = { ok: true; message: T } | { error: string };
 
@@ -21,7 +23,7 @@ const PENDING_TTL = 60 * 60_000;
 
 // small in-memory limiter per person (one API instance): `rate(userId, "send", 8, 10_000)`
 const hits = new Map<string, number[]>();
-function rate(userId: string, what: string, max: number, windowMs: number) {
+export function rate(userId: string, what: string, max: number, windowMs: number) {
   const k = `${what}:${userId}`, now = Date.now();
   const l = (hits.get(k) ?? []).filter((t) => now - t < windowMs);
   if (l.length >= max) { hits.set(k, l); return false; }
@@ -101,6 +103,8 @@ export function setupMessaging(app: FastifyInstance, d: Deps) {
     }
     const m = await prisma.message.create({ data: { channelId: ch.id, authorId: userId, content: p.data.content, ...reply, ...(ids.length ? { attachments: { connect: ids.map((id) => ({ id })) } } : {}) }, include: msgInclude });
     const dto = toMessage(m);
+    await d.decorate?.([dto.author], ch.serverId);
+    d.onMessage?.(userId);
     d.io().to(ch.id).emit("message:new", dto);
     void pruneChannel(ch.id).catch(() => {});
     return { ok: true, message: dto };
@@ -122,6 +126,7 @@ export function setupMessaging(app: FastifyInstance, d: Deps) {
     }
     const m = await prisma.directMessage.create({ data: { senderId: userId, recipientId: to, content: p.data.content, ...reply, ...(ids.length ? { attachments: { connect: ids.map((id) => ({ id })) } } : {}) }, include: withRels });
     const dto = toDm(m);
+    d.onMessage?.(userId);
     d.io().to(`user:${to}`).to(`user:${userId}`).emit("dm:new", dto);
     void pruneDm(userId, to).catch(() => {});
     return { ok: true, message: dto };
@@ -129,9 +134,12 @@ export function setupMessaging(app: FastifyInstance, d: Deps) {
 
   // ---- history (always at most 15) ----
   app.get("/channels/:id/messages", { preHandler: d.auth }, async (req: any, reply) => {
-    if (!(await d.memberOfChannel(d.uid(req), req.params.id))) return reply.code(403).send({ error: "forbidden" });
+    const ch = await d.memberOfChannel(d.uid(req), req.params.id);
+    if (!ch) return reply.code(403).send({ error: "forbidden" });
     const msgs = await prisma.message.findMany({ where: { channelId: req.params.id }, include: msgInclude, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: KEEP_MESSAGES });
-    return msgs.reverse().map(toMessage);
+    const out = msgs.reverse().map(toMessage);
+    await d.decorate?.(out.map((m) => m.author), ch.serverId);
+    return out;
   });
   app.get("/dms/:peerId/messages", { preHandler: d.auth }, async (req: any) => {
     const me = d.uid(req), peer = String(req.params.peerId);

@@ -41,9 +41,12 @@ try {
   ok("plano grátis lista Render, Supabase e LiveKit", /Render: horas/.test(tx) && /Render: memória/.test(tx) && /Supabase: tamanho do banco/.test(tx) && /LiveKit: minutos/.test(tx));
   ok("plano grátis traz o veredito do mês", /plano grátis|limite grátis|ficar de olho/.test(tx));
   await shot("admin-2-plano-gratis");
-  await click("Pessoas"); await sleep(1800); tx = await text();
-  ok("pessoas mostra e-mails e o dono", /teste2@cohle\.dev/.test(tx) && /teste1@cohle\.dev/.test(tx) && /Dono/i.test(tx));
-  await click("Tornar admin"); await sleep(1500);
+  await click("Pessoas"); await sleep(800);
+  await ev(`(()=>{const i=document.querySelector('input[placeholder^="Buscar por nome ou e-mail"]');const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');d.set.call(i,'teste');i.dispatchEvent(new Event('input',{bubbles:true}))})()`);        // the list is paged (25 newest first): search so the test accounts are on the page, whatever other tests left behind
+  for (let i = 0; i < 20 && !/teste2@cohle\.dev/.test(await text()); i++) await sleep(400);
+  tx = await text();
+  ok("pessoas mostra e-mails e o dono", /teste2@cohle\.dev/.test(tx) && /teste1@cohle\.dev/.test(tx) && /Dono/i.test(tx), tx.replace(/\n/g, " | ").slice(0, 260));
+  await ev(`[...document.querySelectorAll('tr')].find(r=>r.innerText.includes('teste2@cohle.dev'))?.querySelector('button')?.click()`); await sleep(1500);
   ok("dono promove teste2 a Admin pela tela", (await http("/admin/overview", null, (await login("teste2@cohle.dev")).token)).s === 200);
   await shot("admin-3-pessoas");
   await http(`/admin/users/${b.user.id}/role`, { role: "USER" }, a.token);

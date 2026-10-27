@@ -59,7 +59,7 @@ try {
   await setVal('input[aria-label="@usuário ou e-mail"]', "teste2@cohle.dev"); await click("Enviar pedido"); await sleep(1200);
   ok("e-mail de conta real: mesma resposta neutra", /Se existir uma conta com esse e-mail/.test(await text()));
   await click("Pendentes"); await sleep(500);
-  ok("o pedido por e-mail aparece em Enviados", /Enviados \(1\)/i.test(await text()) && /@teste2/.test(await text()));
+  ok("o pedido por e-mail aparece em Enviados (para @teste2)", /Enviados \(\d+\)/i.test(await text()) && /@teste2/.test(await text()) && (await http("/friends", null, a.token)).d.outgoing.some((r) => r.user.username === "teste2"));
   await shot("id-2-amigos-pendentes");
   const inc = (await http("/friends", null, b.token)).d.incoming; ok("teste2 recebeu o pedido feito por e-mail", inc.length === 1 && inc[0].user.username === "teste1");
   if (inc[0]) await http(`/friends/${inc[0].id}/accept`, {}, b.token); await sleep(1200);

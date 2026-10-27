@@ -1,0 +1,58 @@
+import { z } from "zod";
+
+// ---- The visual-items shop (Preview Beta: everything is free for now; price/isFreeBeta are ready for charging later) ----
+export const BETA_LABEL = "Preview Beta";
+export const BETA_NOTE = "Grátis durante o beta. No futuro alguns itens serão pagos.";
+
+export const ITEM_TYPES = ["frame", "badge", "theme", "entrance", "name_effect", "banner", "pet", "status", "reaction"] as const;
+export type ItemType = (typeof ITEM_TYPES)[number];
+/** Things a person wears at once, one per slot. (Reaction packs are owned, not equipped.) */
+export const SLOTS = ["frame", "badge", "theme", "entrance", "name_effect", "banner", "pet", "status"] as const;
+export type Slot = (typeof SLOTS)[number];
+export const RARITIES = ["comum", "raro", "epico", "lendario"] as const;
+export type Rarity = (typeof RARITIES)[number];
+export const RARITY_LABEL: Record<Rarity, string> = { comum: "Comum", raro: "Raro", epico: "Épico", lendario: "Lendário" };
+export const TYPE_LABEL: Record<ItemType, string> = { frame: "Molduras", badge: "Badges", theme: "Temas", entrance: "Entradas", name_effect: "Nomes", banner: "Banners", pet: "Pets", status: "Status", reaction: "Reações" };
+/** Categories an owner can block inside a server. */
+export const BLOCKABLE_CATEGORIES = ["politica"] as const;
+
+export interface ShopItemDTO {
+  id: string; key: string; tipo: ItemType; nome: string; descricao: string; raridade: Rarity; categoria: string;
+  price: number; isFreeBeta: boolean; collectionId: string | null; meta: Record<string, unknown>;
+}
+export interface CollectionDTO {
+  id: string; key: string; nome: string; descricao: string; categoria: string; sazonal: boolean;
+  inicio: string | null; fim: string | null; ativo: boolean;
+  /** in season right now (and active): shown on the storefront */ visible: boolean;
+  /** days until the season ends, for "Edição Limitada" */ daysLeft: number | null; bonus: string | null; itemIds: string[];
+}
+export interface PrefsDTO { effectsOff: boolean; soundsOff: boolean; seasonalAuto: boolean; hidePolitical: boolean; lite: "auto" | "on" | "off"; }
+export const DEFAULT_PREFS: PrefsDTO = { effectsOff: false, soundsOff: false, seasonalAuto: true, hidePolitical: false, lite: "auto" };
+export interface ShopDTO {
+  items: ShopItemDTO[]; collections: CollectionDTO[]; owned: string[];
+  equipped: Partial<Record<Slot, string>>; /** item ids */ bonus: string | null; prefs: PrefsDTO; now: string; betaTester: boolean;
+}
+/** What others see of a person's equipped items: only keys (tiny), resolved by the client registry. */
+export interface FxDTO { frame?: string; badge?: string; nameEffect?: string; pet?: string; status?: string; banner?: string; }
+
+export const equipSchema = z.object({ slot: z.enum(SLOTS), itemId: z.string().max(40).nullable() });
+export const equipSetSchema = z.object({ collectionId: z.string().max(40) });
+export const prefsSchema = z.object({
+  effectsOff: z.boolean().optional(), soundsOff: z.boolean().optional(), seasonalAuto: z.boolean().optional(), hidePolitical: z.boolean().optional(),
+  lite: z.enum(["auto", "on", "off"]).optional(),
+});
+export const serverSettingsSchema = z.object({ blockedCategories: z.array(z.enum(BLOCKABLE_CATEGORIES)).max(BLOCKABLE_CATEGORIES.length) });
+
+type Season = { sazonal: boolean; ativo: boolean; inicio?: string | Date | null; fim?: string | Date | null };
+const ms = (v?: string | Date | null) => (v ? new Date(v).getTime() : null);
+/** A collection is on the storefront when active and (not seasonal, or now is inside its season). Owners keep what they got afterwards. */
+export function seasonActive(c: Season, now: Date = new Date()): boolean {
+  if (!c.ativo) return false;
+  if (!c.sazonal) return true;
+  const a = ms(c.inicio), b = ms(c.fim), t = now.getTime();
+  return (a === null || t >= a) && (b === null || t < b);
+}
+export function daysLeft(c: Season, now: Date = new Date()): number | null {
+  const b = ms(c.fim);
+  return c.sazonal && b !== null ? Math.max(0, Math.ceil((b - now.getTime()) / 86_400_000)) : null;
+}

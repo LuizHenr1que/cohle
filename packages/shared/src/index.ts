@@ -1,4 +1,6 @@
 import { z } from "zod";
+export * from "./shop.js";
+import type { FxDTO } from "./shop.js";
 
 const emailField = z.string().trim().toLowerCase().email().max(200);
 
@@ -114,7 +116,7 @@ export interface VoiceStateDTO { channelId: string; users: UserDTO[]; }
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export interface UserDTO { id: string; username: string; displayName?: string; bio?: string; bannerColor?: string; tag?: string; badge?: "DEV" | null; role?: "ADMIN" | "OWNER"; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
+export interface UserDTO { id: string; username: string; displayName?: string; bio?: string; bannerColor?: string; fx?: FxDTO; tag?: string; badge?: "DEV" | null; role?: "ADMIN" | "OWNER"; avatarUrl?: string | null; sharing?: boolean; muted?: boolean; micOff?: boolean; deaf?: boolean; }
 export type Relation = "self" | "none" | "friend" | "incoming" | "outgoing";
 export interface ProfileDTO {
   user: UserDTO; createdAt: string; mutual: { id: string; name: string; iconUrl: string | null; owner: boolean }[]; isSelf: boolean; relation: Relation; requestId?: string;
