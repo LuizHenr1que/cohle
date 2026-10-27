@@ -7,8 +7,11 @@ import { BETA_LABEL, BETA_NOTE, type CollectionDTO, type ShopItemDTO, type UserD
 import { Avatar } from "../components/Avatar";
 import { ItemBadge, UserName } from "./UserName";
 import { GIANT_LABEL, GiantArt } from "./GiantIcons";
-import { ENTRANCE_OF, THEME_OF, THEME_PREVIEW } from "./registry";
+import { ENTRANCE_OF, PET_OF, THEME_OF, THEME_PREVIEW } from "./registry";
 import { CornerArt } from "./art";
+import { PetArt, PetWidget, type PetKind } from "./pets";
+import { StatusChip } from "./StatusChip";
+import { BannerArt } from "./AnimatedBanner";
 import { useShop } from "./ShopProvider";
 
 export type PreviewReq = { title: string; subtitle?: string; items: ShopItemDTO[]; collection?: CollectionDTO };
@@ -20,6 +23,13 @@ const first = (items: ShopItemDTO[], tipo: string) => items.find((i) => i.tipo =
 export const SEASON_STYLE: Record<string, { bg: string; ring: string; kicker: string; headline: string; pitch: string }> = {
   natal: { bg: "radial-gradient(120% 140% at 15% 0%, rgba(230,57,70,.45), transparent 62%), radial-gradient(90% 120% at 100% 100%, rgba(61,220,132,.22), transparent 60%), linear-gradient(135deg,#0d2038,#06101c)", ring: "#e63946", kicker: "Edição de Natal", headline: "O Natal chegou no Cohle", pitch: "Neve caindo, luzinhas nas bordas e uma árvore no canto: clique nela e o Papai Noel passa no trenó." },
   anonovo: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(255,209,102,.38), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(255,143,207,.26), transparent 60%), linear-gradient(135deg,#1a1626,#07060d)", ring: "#ffd166", kicker: "Edição de Ano Novo", headline: "Virada com estilo", pitch: "Céu escuro, dourado e uma garrafa de champanhe no canto: clique nela e os fogos da virada estouram." },
+  pets: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(255,160,90,.34), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(255,143,207,.24), transparent 60%), linear-gradient(135deg,#2a1a14,#120a0c)", ring: "#ffb067", kicker: "Coleção de Pets", headline: "Um bichinho para chamar de seu", pitch: "Ele fica pousado no seu cartão: passe o mouse e ele se mexe, clique e ele pula, solta corações e faz barulhinho." },
+  status: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(61,220,132,.28), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(25,194,255,.24), transparent 60%), linear-gradient(135deg,#0d1f1a,#070c0c)", ring: "#3ddc84", kicker: "Status animados", headline: "Seu status, com vida", pitch: "Jogando, ouvindo música, dormindo, codando... um status que se mexe ao lado do seu nome (no hover e no perfil)." },
+  banners: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(91,140,255,.34), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(181,123,255,.3), transparent 60%), linear-gradient(135deg,#0c1230,#070813)", ring: "#8fb8ff", kicker: "Banners animados", headline: "A capa do seu perfil em movimento", pitch: "Aurora, chuva neon, ondas, estrelas, lava, sakura, pôr do sol e código verde. Abra o perfil e veja." },
+  brasil: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(0,196,106,.4), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(255,223,0,.28), transparent 60%), linear-gradient(135deg,#072814,#031a0e)", ring: "#ffdf00", kicker: "Coleção Brasil", headline: "Verde, amarelo e orgulho", pitch: "Louros, uma bola no canto (clique e comemore) e a entrada GOOOOL!" },
+  carnaval: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(255,79,216,.42), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(255,209,102,.3), transparent 60%), linear-gradient(135deg,#2a0f3d,#12061f)", ring: "#ff4fd8", kicker: "Edição de Carnaval", headline: "Bora pro bloco", pitch: "Confete, glitter e uma máscara no canto: clique nela e o bloco sai tocando." },
+  memes: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(163,230,53,.32), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(181,123,255,.3), transparent 60%), linear-gradient(135deg,#1a1633,#0b0a14)", ring: "#a3e635", kicker: "Coleção Memes", headline: "Só zoeira", pitch: "Óculos de pixel, aura +1000, texto Impact e a entrada SEXTOUUU! Arte 100% original." },
+  anime: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(255,143,184,.4), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(165,180,252,.3), transparent 60%), linear-gradient(135deg,#1a2148,#0a0d1e)", ring: "#ff8fb8", kicker: "Coleção Anime", headline: "Sakura Dojo", pitch: "Pétalas, olhar brilhante e um portal torii no canto: clique nele. Sem personagens oficiais, só o clima." },
   auras: { bg: "radial-gradient(110% 130% at 10% 0%, rgba(255,122,26,.38), transparent 58%), radial-gradient(100% 120% at 100% 20%, rgba(90,168,255,.34), transparent 60%), radial-gradient(90% 120% at 60% 110%, rgba(160,107,255,.32), transparent 60%), linear-gradient(135deg,#0d1020,#070812)", ring: "#8fb8ff", kicker: "Coleção de Auras", headline: "Energia em volta de você", pitch: "Fogo, gelo, raios, sakura, sombra, ouro, cosmos e neon girando ao redor do seu avatar. Passe o mouse e veja." },
   hacker: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(61,255,122,.3), transparent 60%), linear-gradient(135deg,#06150b,#030a05)", ring: "#3dff7a", kicker: "Coleção Hacker", headline: "Modo terminal", pitch: "Verde fosforescente, código em chuva e a entrada ACCESS GRANTED. Para quem vive no teclado." },
   gamer: { bg: "radial-gradient(110% 130% at 15% 0%, rgba(181,123,255,.42), transparent 60%), radial-gradient(90% 120% at 100% 100%, rgba(25,224,255,.26), transparent 60%), linear-gradient(135deg,#150d2e,#0a0716)", ring: "#b57bff", kicker: "Coleção Gamer", headline: "Aperte start", pitch: "Arena neon, controle girando, borda pixel e a entrada GAME ON!" },
@@ -35,8 +45,17 @@ export function SeasonDeco({ k }: { k: string }) {
       {[[190, 100, 70, "#ff7a1a"], [235, 70, 48, "#8fdcff"], [250, 140, 40, "#a06bff"], [150, 60, 28, "#ffd84a"]].map(([x, y, r, c], i) => <g key={i}><circle cx={x as number} cy={y as number} r={r as number} fill="none" stroke={c as string} strokeWidth="5" opacity=".55" /><circle cx={x as number} cy={y as number} r={(r as number) - 12} fill="none" stroke={c as string} strokeWidth="1.5" strokeDasharray="3 7" opacity=".9" /></g>)}
     </svg>
   );
-  if (k === "hacker" || k === "gamer" || k === "barbearia" || k === "rainha" || k === "anonovo") return (
-    <div className="absolute right-8 top-4 pointer-events-none hidden sm:block opacity-95"><CornerArt k={k === "hacker" ? "terminal" : k === "gamer" ? "gamepad" : k === "barbearia" ? "pole" : k === "anonovo" ? "newyear" : "crown"} size={128} /></div>
+  if (k === "pets") return (
+    <div className="absolute right-8 top-4 pointer-events-none hidden sm:flex gap-2 opacity-95">{(["cat", "dog", "fox"] as PetKind[]).map((p) => <PetArt key={p} kind={p} size={84} />)}</div>
+  );
+  if (k === "status") return (
+    <div className="absolute right-8 top-6 pointer-events-none hidden sm:grid gap-2 opacity-95 justify-items-end">{["status.playing", "status.music", "status.code"].map((x) => <StatusChip key={x} statusKey={x} />)}</div>
+  );
+  if (k === "banners") return (
+    <div className="absolute right-8 top-5 pointer-events-none hidden sm:grid gap-2 opacity-95">{["banner.aurora", "banner.sunset", "banner.neonrain"].map((x) => <div key={x} className="relative w-44 h-9 rounded-lg overflow-hidden border border-white/15"><BannerArt bannerKey={x} /></div>)}</div>
+  );
+  if (k === "hacker" || k === "gamer" || k === "barbearia" || k === "rainha" || k === "anonovo" || k === "brasil" || k === "carnaval" || k === "memes" || k === "anime") return (
+    <div className="absolute right-8 top-4 pointer-events-none hidden sm:block opacity-95"><CornerArt k={k === "hacker" ? "terminal" : k === "gamer" ? "gamepad" : k === "barbearia" ? "pole" : k === "anonovo" ? "newyear" : k === "brasil" ? "ball" : k === "carnaval" ? "mask" : k === "memes" ? "stonks" : k === "anime" ? "torii" : "crown"} size={128} /></div>
   );
   if (k === "halloween") return (
     <svg className="absolute right-0 top-0 h-[185px] w-[46%] opacity-90 pointer-events-none hidden sm:block [mask-image:linear-gradient(to_bottom,black_55%,transparent)]" viewBox="0 0 300 200" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
@@ -55,13 +74,18 @@ export function SeasonDeco({ k }: { k: string }) {
 }
 
 /** The real art of the collection's items in a row: the person sees what they are getting before opening anything. */
-export function Showcase({ items, me }: { items: ShopItemDTO[]; me: UserDTO }) {
+export function Showcase({ items, me, onPick }: { items: ShopItemDTO[]; me: UserDTO; onPick?: (i: ShopItemDTO) => void }) {
   const frame = first(items, "frame"), name = first(items, "name_effect"), badge = first(items, "badge"), ent = first(items, "entrance"), react = first(items, "reaction"), theme = first(items, "theme");
   const icons = ((react?.meta as any)?.icons ?? []) as string[];
   const frames = items.filter((i) => i.tipo === "frame");
   const tile = "rounded-2xl border border-white/10 bg-black/25 p-3 flex flex-col items-center justify-center gap-2 min-h-[112px] text-center";
   const label = (t: string) => <span className="text-[10px] uppercase tracking-wider text-white/55">{t}</span>;
   const vars = theme ? THEME_PREVIEW[THEME_OF[theme.key]] : undefined;
+  const pets = items.filter((i) => i.tipo === "pet"), sts = items.filter((i) => i.tipo === "status"), bns = items.filter((i) => i.tipo === "banner");
+  const pick = (i: ShopItemDTO, body: React.ReactNode, cls = "") => <button key={i.id} type="button" onClick={() => onPick?.(i)} aria-label={`Ver prévia de ${i.nome}`} className={`${tile} ${cls} hover:border-white/25 transition cursor-pointer`}>{body}</button>;
+  if (pets.length > 2) return <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5" aria-label="Todos os pets">{pets.map((p) => pick(p, <><div className="p-1"><PetArt kind={PET_OF[p.key] as PetKind} size={54} /></div><span className="text-xs font-semibold">{p.nome}</span>{label("Clique para ver")}</>, "min-h-[140px]"))}</div>;
+  if (sts.length > 2) return <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5" aria-label="Todos os status">{sts.map((x) => pick(x, <><StatusChip statusKey={x.key} /><span className="text-xs font-semibold">{x.nome}</span>{label("Passe o mouse")}</>, "min-h-[110px]"))}</div>;
+  if (bns.length > 2) return <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5" aria-label="Todos os banners">{bns.map((b) => pick(b, <><div className="bn-hover relative w-full h-14 rounded-lg overflow-hidden border border-white/10"><BannerArt bannerKey={b.key} /></div><span className="text-xs font-semibold">{b.nome}</span>{label("Passe o mouse")}</>, "min-h-[118px]"))}</div>;
   if (frames.length > 3 && !theme) return (                                      // a collection that is only frames (the auras): every one of them, big enough to see
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5" aria-label="Todas as auras">
       {frames.map((f) => <div key={f.id} className={tile + " min-h-[148px]"}><div className="p-3.5"><Avatar user={{ ...me, fx: { frame: f.key } }} size={52} /></div><span className="text-xs font-semibold">{f.nome}</span>{label("Passe o mouse")}</div>)}
@@ -83,10 +107,10 @@ export function Showcase({ items, me }: { items: ShopItemDTO[]; me: UserDTO }) {
 export function PreviewModal({ req, me, onClose }: { req: PreviewReq; me: UserDTO; onClose: () => void }) {
   const ctx = useShop()!, shop = ctx.shop!;
   const { items, collection } = req;
-  const frame = first(items, "frame"), name = first(items, "name_effect"), badge = first(items, "badge"), ent = first(items, "entrance"), theme = first(items, "theme"), react = first(items, "reaction");
+  const frame = first(items, "frame"), name = first(items, "name_effect"), badge = first(items, "badge"), ent = first(items, "entrance"), theme = first(items, "theme"), react = first(items, "reaction"), pet = first(items, "pet"), status = first(items, "status"), banner = first(items, "banner");
   const icons = ((react?.meta as any)?.icons ?? []) as string[];
   const vars = theme ? THEME_PREVIEW[THEME_OF[theme.key]] : undefined;
-  const sample = useMemo(() => ({ ...me, fx: { ...(frame ? { frame: frame.key } : {}), ...(name ? { nameEffect: name.key } : {}), ...(badge ? { badge: badge.key } : {}) } }), [me, frame, name, badge]);
+  const sample = useMemo(() => ({ ...me, fx: { ...(frame ? { frame: frame.key } : {}), ...(name ? { nameEffect: name.key } : {}), ...(badge ? { badge: badge.key } : {}), ...(pet ? { pet: pet.key } : {}), ...(status ? { status: status.key } : {}), ...(banner ? { banner: banner.key } : {}) } }), [me, frame, name, badge, pet, status, banner]);
   const missing = items.filter((i) => !shop.owned.includes(i.id)), lockedAll = missing.length > 0 && !shop.canGift && missing.every((i) => i.locked);
   const look = collection ? SEASON_STYLE[collection.key] : undefined;
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); } }; window.addEventListener("keydown", k, true); return () => window.removeEventListener("keydown", k, true); }, [onClose]);
@@ -113,9 +137,11 @@ export function PreviewModal({ req, me, onClose }: { req: PreviewReq; me: UserDT
         </div>
         <div className="p-4 sm:p-6 space-y-4">
           <div className="rounded-2xl border border-line p-5 sm:p-6 flex flex-col items-center gap-3" style={{ ...(vars ?? {}), background: vars ? "var(--color-bg)" : "rgba(255,255,255,.03)", color: vars ? "var(--color-ink)" : undefined } as React.CSSProperties} aria-label="Como fica em você">
+            {banner && <div className="relative h-24 w-full rounded-xl overflow-hidden"><BannerArt bannerKey={banner.key} live /></div>}
             <Avatar user={sample} size={104} live />
-            <div className="text-xl font-bold flex items-center gap-2 flex-wrap justify-center"><UserName user={sample} live />{badge && <ItemBadge user={sample} full />}</div>
-            {!frame && !name && !badge && !theme && !ent && !icons.length && <p className="text-sm text-muted">Sem prévia visual para este item.</p>}
+            <div className="text-xl font-bold flex items-center gap-2 flex-wrap justify-center"><UserName user={sample} live />{badge && <ItemBadge user={sample} full />}{status && <StatusChip statusKey={status.key} live />}</div>
+            {pet && <div className="flex flex-col items-center gap-1 pt-3"><PetWidget petKey={pet.key} size={92} /><span className="text-[11px] text-muted">Passe o mouse e clique para fazer carinho.</span></div>}
+            {!frame && !name && !badge && !theme && !ent && !icons.length && !pet && !status && !banner && <p className="text-sm text-muted">Sem prévia visual para este item.</p>}
             {theme && <p className="text-xs text-muted text-center">O tema muda as cores do app inteiro{(theme.meta as any)?.sleigh || (theme.meta as any)?.witch ? " e deixa um ícone no canto: " + (collection?.key === "halloween" ? "clique na abóbora e a bruxa passa, com som." : "clique na árvore e o Papai Noel passa no trenó, com o ho ho ho.") : (theme.meta as any)?.corner ? ". Clique no ícone do canto para ver a animação com som." : "."}</p>}
             {entranceOf && <button onClick={() => fire("entrance", { key: ent!.key, who: me.username })} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 hover:bg-white/20 px-3.5 py-1.5 text-xs font-semibold"><Play size={13} /> Ver a entrada de novo</button>}
             {icons.length > 0 && <div className="flex items-center gap-2 flex-wrap justify-center">{icons.map((ic) => <button key={ic} onClick={() => fire("giant", { icon: ic })} title={`${GIANT_LABEL[ic] ?? ic}: ver ao vivo`} className="rounded-xl p-2 hover:bg-white/10 transition"><GiantArt icon={ic} size={52} /></button>)}<span className="text-[11px] text-muted w-full text-center">Clique para ver cada reação atravessar a tela.</span></div>}

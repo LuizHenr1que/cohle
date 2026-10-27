@@ -63,9 +63,13 @@ try {
   await http("/shop/equipped", { slot: "frame", itemId: by("aura.fire") }, u.token, "PUT"); await load(); await inCall();
   const live = await ev(`!!document.querySelector('.fx-frame.fx-live .fx-aura')`); console.log("  aura ao vivo na tela:", live); if (!live) throw new Error("a aura não apareceu na chamada: a medição não vale");
   out.callAura = await measure(8); show("chamada, avatar com AURA DE FOGO ao vivo", out.callAura);
+  // an equipped pet sitting still must cost nothing (it only reacts to hover/click)
+  await http("/shop/equipped", { slot: "frame", itemId: null }, u.token, "PUT"); await http("/shop/equipped", { slot: "pet", itemId: by("pet.dragon") }, u.token, "PUT"); await load();
+  const hasPet = await ev(`!!document.querySelector('button[data-pet="pet.dragon"]')`); console.log("  pet na tela:", hasPet); if (!hasPet) throw new Error("o pet não apareceu: a medição não vale");
+  out.pet = await measure(8); show("pet equipado, parado", out.pet);
   const pass = [["cena: JS <= 1,5%", out.scene.script <= 1.5], ["neve de ambiente: JS <= 1%", out.ambient.script <= 1], ["aba oculta: JS ~ 0 (<= 0,3%)", out.hidden.script <= 0.3], ["efeitos desligados: JS ~ base (+0,3 p.p.)", out.off.script <= out.none.script + 0.3],
-    ["cena com CPU 4x mais lenta: sem travar (<= 3 tarefas longas)", out.slow.longTasks <= 3], [">= 30 fps com CPU 4x mais lenta", out.slow.fps >= 30], ["aura de fogo ao vivo na chamada: JS <= base da chamada + 1 p.p.", out.callAura.script <= out.callPlain.script + 1], ["aura ao vivo: sem tarefas longas", out.callAura.longTasks <= out.callPlain.longTasks + 1]];
+    ["cena com CPU 4x mais lenta: sem travar (<= 3 tarefas longas)", out.slow.longTasks <= 3], [">= 30 fps com CPU 4x mais lenta", out.slow.fps >= 30], ["aura de fogo ao vivo na chamada: JS <= base da chamada + 1 p.p.", out.callAura.script <= out.callPlain.script + 1], ["aura ao vivo: sem tarefas longas", out.callAura.longTasks <= out.callPlain.longTasks + 1], ["pet parado: JS ~ base (+0,3 p.p.) e sem tarefas longas", out.pet.script <= out.none.script + 0.3 && out.pet.longTasks === 0]];
   console.log(`\nDownload do app (produção, sem gzip do servidor de teste): ${files} arquivos, ${(bytes / 1024).toFixed(0)} KB`);
   for (const [n, ok] of pass) console.log(`${ok ? "PASS" : "FAIL"}  ${n}`);
   process.exitCode = pass.every((x) => x[1]) ? 0 : 1;
-} finally { await equip(false).catch(() => {}); ws.close(); chrome.kill(); }
+} finally { await equip(false).catch(() => {}); for (const slot of ["pet", "status", "banner"]) await http("/shop/equipped", { slot, itemId: null }, u.token, "PUT").catch(() => {}); ws.close(); chrome.kill(); }

@@ -6,6 +6,7 @@ import { nameOf } from "@cohle/shared";
 import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
 import { UserName } from "../shop/UserName";
+import { StatusLazy } from "../shop/lazy";
 import type { VoiceApi } from "./VoiceRoom";
 import { PersonPanel, panelAt, saveVol, loadVols, DEFAULT_VOL, type Moderation, type PanelPos, type Vol } from "./PersonPanel";
 
@@ -42,7 +43,7 @@ export function PersonRow({ user, isSelf, isOwner, channelName, inCall, speaking
       onMouseEnter={show} onMouseLeave={hide} onClick={() => { hide(); onClick(); }}
       className="group flex items-center gap-2 pl-9 pr-2 py-1 text-xs text-muted rounded-lg cursor-pointer hover:bg-white/5 hover:text-ink">
       <Avatar user={user} size={20} speaking={speaking} />
-      <span className="truncate">{isSelf ? <><UserName user={user} /> (você)</> : <UserName user={user} />}</span><DevBadge user={user} />
+      <span className="truncate">{isSelf ? <><UserName user={user} /> (você)</> : <UserName user={user} />}</span><DevBadge user={user} /><StatusLazy statusKey={user.fx?.status} compact />
       {user.deaf ? <HeadphoneOff size={12} className="shrink-0 text-accent" aria-label="Áudio desativado" /> : (user.micOff || user.muted) && <MicOff size={12} className="shrink-0 text-accent" aria-label="Microfone desativado" />}
       {onMessage && !isSelf && <button onClick={(e) => { e.stopPropagation(); hide(); onMessage(); }} title="Enviar mensagem" aria-label="Enviar mensagem"
         className={`${live ? "" : "ml-auto"} shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-accent transition`}><MessageCircle size={13} /></button>}

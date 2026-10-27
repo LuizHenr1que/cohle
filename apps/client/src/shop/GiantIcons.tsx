@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Flame, Gift, Heart, PartyPopper } from "lucide-react";
 import type { GiantIcon } from "./registry";
+import { Giant2 } from "./giants2";
 
 const Snowman = ({ size }: { size: number }) => (
   <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="45" r="15" fill="#f2f7ff" /><circle cx="32" cy="24" r="10.5" fill="#fff" />
@@ -69,7 +70,7 @@ export const GiantArt = memo(function GiantArt({ icon, size = 96 }: { icon: Gian
     case "firework": return <FireworkArt size={size} />;
     case "champagne": return <ChampagneArt size={size} />;
     case "clock": return <ClockArt size={size} />;
-    default: return null;
+    default: return Giant2({ icon, size });
   }
 });
-export const GIANT_LABEL: Record<string, string> = { heart: "Coração", fire: "Fogo", party: "Festa", gift: "Presente", snowman: "Boneco de neve", reindeer: "Rena", pumpkin: "Abóbora", ghost: "Fantasma", bat: "Morcego", terminal: "Terminal", bug: "Bug", lock: "Cadeado", gamepad: "Controle", trophy: "Troféu", pixelheart: "Coração pixel", scissors: "Tesoura", mustache: "Bigode", razor: "Navalha", crown: "Coroa", flower: "Flor", diamond: "Diamante", firework: "Fogos", champagne: "Champanhe", clock: "Relógio" };
+export const GIANT_LABEL: Record<string, string> = { heart: "Coração", fire: "Fogo", party: "Festa", gift: "Presente", snowman: "Boneco de neve", reindeer: "Rena", pumpkin: "Abóbora", ghost: "Fantasma", bat: "Morcego", terminal: "Terminal", bug: "Bug", lock: "Cadeado", gamepad: "Controle", trophy: "Troféu", pixelheart: "Coração pixel", scissors: "Tesoura", mustache: "Bigode", razor: "Navalha", crown: "Coroa", flower: "Flor", diamond: "Diamante", firework: "Fogos", champagne: "Champanhe", clock: "Relógio", soccer: "Bola", coffee: "Café", guitar: "Violão", mask: "Máscara", drum: "Tambor", streamer: "Serpentina", stonks: "Stonks", glasses: "Óculos", sakura: "Sakura", sparkle: "Brilho", fan: "Leque" };

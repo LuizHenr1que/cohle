@@ -153,6 +153,8 @@ const LOJA_SHOTS = {
   "natal": ["Cohle com o tema de Natal: neve, luzinhas, árvore e contagem para o Natal", "Tema de Natal: neve, luzinhas e uma árvore no canto. Clique nela e o Papai Noel passa no trenó."],
   "halloween": ["Cohle com o tema de Halloween: luzes laranja e roxas, abóbora no canto e contagem", "Tema de Halloween: luzes laranja e roxas e uma abóbora no canto. Clique nela e a bruxa passa de vassoura."],
   "hacker": ["Cohle com o tema Hacker: verde de terminal, luzes verdes e terminal no canto", "Tema Hacker: verde de terminal sobre preto. Clique no terminal para ver ACCESS GRANTED."],
+  "pets": ["Cartão do usuário com um dragãozinho pulando e soltando corações depois de um clique", "Os pets só reagem a você: passe o mouse e ele se mexe, clique e ele pula, solta corações e faz barulhinho. Parado, fica quietinho."],
+  "perfil": ["Perfil de uma pessoa com banner animado de aurora, status Ouvindo música e um gatinho", "O perfil com banner animado, status com vida e o pet pequeno. A capa e o status só se mexem com o perfil aberto."],
   "grupos": ["Barra lateral do Cohle com servidores organizados em grupos que se recolhem", "Muitos servidores? Agrupe. Cada grupo tem nome e cor, recolhe num ícone só e vale em qualquer aparelho."],
 };
 const APP_GALLERY = { img: "#shotImg", cap: "#shotCap", main: "#shotMain", stage: "#shotStage", tabs: "#app-real .shot-tabs", shots: SHOTS, first: "voz", prefix: "" };

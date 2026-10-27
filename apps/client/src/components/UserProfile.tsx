@@ -6,6 +6,7 @@ import { Avatar } from "./Avatar";
 import { DevBadge } from "./Badge";
 import { UserName, ItemBadge } from "../shop/UserName";
 import { bannerBg, monthYear } from "../lib/profile";
+import { BannerLazy, PetMiniLazy, StatusLazy } from "../shop/lazy";
 
 /** What the person is doing right now. The place is only sent when the viewer is in that server too. */
 function Activity({ a }: { a: ActivityDTO }) {
@@ -53,7 +54,8 @@ export function UserProfile({ id, onClose, onMessage, onEdit, onFriendsChanged, 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/65 p-4" onMouseDown={onClose}>
       <div onMouseDown={(e) => e.stopPropagation()} role="dialog" aria-label="Perfil" className="w-full max-w-md max-h-[92dvh] overflow-y-auto rounded-[1.75rem] border border-line bg-surface shadow-[0_30px_90px_rgba(0,0,0,0.6)]">
-        <div className="relative h-28 shrink-0" style={{ background: bannerBg(p?.bannerColor) }}>
+        <div className="relative h-28 shrink-0 overflow-hidden" style={{ background: p?.user.fx?.banner ? undefined : bannerBg(p?.bannerColor) }}>
+          <BannerLazy bannerKey={p?.user.fx?.banner} live />
           <button onClick={onClose} aria-label="Fechar" className="absolute top-3 right-3 p-2 rounded-full bg-black/40 hover:bg-black/60"><X size={16} /></button>
         </div>
         <div className="px-6 pb-6 -mt-12 relative z-10">
@@ -63,7 +65,7 @@ export function UserProfile({ id, onClose, onMessage, onEdit, onFriendsChanged, 
             <div className="ring-4 ring-surface rounded-full w-fit"><Avatar user={p.user} size={88} live /></div>
             <div className="mt-3 flex items-center flex-wrap gap-2">
               <h2 className="text-2xl font-extrabold tracking-tight break-words min-w-0"><UserName user={p.user} live /></h2>
-              <DevBadge user={p.user} full /><ItemBadge user={p.user} full />
+              <DevBadge user={p.user} full /><ItemBadge user={p.user} full /><StatusLazy statusKey={p.user.fx?.status} live /><PetMiniLazy petKey={p.user.fx?.pet} size={30} />
             </div>
             <p className="text-sm text-muted mt-0.5">@{p.user.username}{p.isSelf && " · este é o seu perfil"}</p>
             <Activity a={p.activity} />

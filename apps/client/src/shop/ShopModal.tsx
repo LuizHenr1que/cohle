@@ -9,7 +9,10 @@ import { Switch } from "../components/Switch";
 import { useShop } from "./ShopProvider";
 import { ItemBadge, UserName } from "./UserName";
 import { GIANT_LABEL, GiantArt } from "./GiantIcons";
-import { ENTRANCE_OF, RARITY_COLOR, THEME_OF, THEME_PREVIEW, SEASON_LOOK } from "./registry";
+import { PetArt, type PetKind } from "./pets";
+import { StatusChip } from "./StatusChip";
+import { BannerArt } from "./AnimatedBanner";
+import { ENTRANCE_OF, PET_OF, RARITY_COLOR, THEME_OF, THEME_PREVIEW, SEASON_LOOK } from "./registry";
 import { setPrefs, usePrefs } from "./prefs";
 import { PreviewModal, SeasonDeco, SEASON_STYLE, Showcase, type PreviewReq } from "./ShopShowcase";
 import { GiftModal, type GiftPre } from "./GiftModal";
@@ -32,6 +35,9 @@ function Preview({ item, me }: { item: ShopItemDTO; me: UserDTO }) {
   if (item.tipo === "frame") return <div className="grid place-items-center h-28"><Avatar user={{ ...sample, fx: { frame: item.key } }} size={72} live /></div>;
   if (item.tipo === "name_effect") return <div className="grid place-items-center h-28 text-2xl"><UserName user={{ ...sample, fx: { nameEffect: item.key } }} live /></div>;
   if (item.tipo === "badge") return <div className="grid place-items-center h-28"><ItemBadge user={{ fx: { badge: item.key } }} full /></div>;
+  if (item.tipo === "pet") return <div className="grid place-items-center h-28"><PetArt kind={PET_OF[item.key] as PetKind} size={76} /></div>;
+  if (item.tipo === "status") return <div className="grid place-items-center h-28 gap-2"><StatusChip statusKey={item.key} /><span className="text-[11px] text-muted">passe o mouse</span></div>;
+  if (item.tipo === "banner") return <div className="bn-hover relative h-28 rounded-xl overflow-hidden border border-white/10"><BannerArt bannerKey={item.key} /></div>;
   if (item.tipo === "theme") {
     const vars = THEME_PREVIEW[THEME_OF[item.key]] ?? {};
     return (
@@ -115,6 +121,7 @@ function VirtualGrid({ items, me, scroller }: { items: ShopItemDTO[]; me: UserDT
 function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: ShopItemDTO[]; me: UserDTO; hero?: boolean }) {
   const ctx = useShop()!, shop = ctx.shop!, open = useContext(OpenPreview), openGift = useContext(OpenGift);
   const mine = items.filter((i) => shop.owned.includes(i.id)), complete = mine.length === items.length;
+  const multi = items.length >= 6 && new Set(items.map((i) => i.tipo)).size <= 2;                 // pets, status, banners, auras: you pick ONE, there is no "full set"
   const missing = items.filter((i) => !shop.owned.includes(i.id)), lockedAll = missing.length > 0 && !shop.canGift && missing.every((i) => i.locked), anyLocked = items.some((i) => i.locked);
   const [busy, setBusy] = useState(""), [msg, setMsg] = useState("");
   const wearable = items.filter((i) => (SLOTS as readonly string[]).includes(i.tipo));
@@ -137,8 +144,8 @@ function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: S
           {msg && <p className="text-xs text-emerald-300" role="status">{msg}</p>}
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap">
-          <button onClick={seeSet} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center gap-1.5"><Play size={12} /> Ver prévia do conjunto</button>
-          <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>
+          {!multi && <button onClick={seeSet} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center gap-1.5"><Play size={12} /> Ver prévia do conjunto</button>}
+          {!multi && <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-3 py-2 text-xs font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>}
           {shop.canGift && <button onClick={() => openGift({ collectionId: c.id })} aria-label={`Presentear a coleção ${c.nome}`} className="rounded-xl px-3 py-2 text-xs font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25 inline-flex items-center gap-1.5"><Gift size={12} /> Presentear</button>}
           <button onClick={() => setExpanded(true)} aria-label={`Ver os itens de ${c.nome}`} className="rounded-xl px-3 py-2 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10">Ver itens</button>
         </div>
@@ -158,7 +165,7 @@ function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: S
           <p className="text-sm text-white/75 mt-1.5">{st?.pitch ?? c.descricao}</p>
           {c.sazonal && c.daysLeft !== null && <p className="mt-2 text-xs font-semibold text-amber-200">{lockedAll ? (c.daysLeft === 0 ? "Último dia da temporada." : `A temporada termina em ${c.daysLeft} dia${c.daysLeft === 1 ? "" : "s"}. Quem ganhou o conjunto, fica com ele.`) : (c.daysLeft === 0 ? "Último dia para pegar." : `Só ${c.daysLeft} dia${c.daysLeft === 1 ? "" : "s"} para pegar: depois sai da Loja. Quem pegou, fica.`)}</p>}
         </div>
-        <Showcase items={items} me={me} />
+        <Showcase items={items} me={me} onPick={(i) => open({ title: i.nome, subtitle: i.descricao, items: [i] })} />
         <div className="flex flex-col lg:flex-row gap-4 lg:items-end justify-between">
           <div className="space-y-1.5">
             <div className="flex items-center gap-3"><div className="h-2 w-44 rounded-full bg-white/10 overflow-hidden"><div className="h-full grad" style={{ width: `${(mine.length / Math.max(items.length, 1)) * 100}%` }} /></div><span className="text-xs font-semibold tabular-nums" aria-label="Progresso da coleção">{mine.length}/{items.length} itens</span></div>
@@ -166,13 +173,13 @@ function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: S
             {msg && <p className="text-xs text-emerald-300" role="status">{msg}</p>}
           </div>
           <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-            <button onClick={seeSet} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center justify-center gap-1.5"><Play size={14} /> Ver prévia do conjunto</button>
+            {!multi && <button onClick={seeSet} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/12 hover:bg-white/20 border border-white/15 inline-flex items-center justify-center gap-1.5"><Play size={14} /> Ver prévia do conjunto</button>}
             {!complete && (lockedAll
               ? <button disabled data-locked="true" aria-label={`${c.nome}: em breve (trancado)`} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/5 text-white/70 border border-dashed border-white/25 cursor-not-allowed inline-flex items-center justify-center gap-2"><Lock size={15} /> Em breve</button>
               : <button disabled={!!busy} onClick={claimAll} className="grad rounded-xl px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60">{busy === "claim" ? "Pegando..." : "Pegar o conjunto (Beta)"}</button>)}
             {shop.canGift && <button onClick={() => openGift({ collectionId: c.id })} aria-label={`Presentear a coleção ${c.nome}`} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25 inline-flex items-center justify-center gap-2"><Gift size={15} /> Presentear</button>}
             {shop.canGift && <button disabled={!!busy} onClick={async () => { setBusy("lock"); try { const r = await api.adminLock({ locked: !anyLocked ? true : false, collectionId: c.id }); setMsg(`${anyLocked ? "Destrancado" : "Trancado"}: ${r.changed} itens.`); await ctx.refresh(); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } }} aria-label={`${anyLocked ? "Destrancar" : "Trancar"} a coleção ${c.nome}`} className="rounded-xl px-3 py-2.5 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 inline-flex items-center justify-center gap-1.5">{anyLocked ? <LockOpen size={14} /> : <Lock size={14} />}{anyLocked ? "Destrancar" : "Trancar"}</button>}
-            {mine.length > 0 && <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>}
+            {!multi && mine.length > 0 && <button disabled={!!busy || wornAll} onClick={wear} className="rounded-xl px-4 py-2.5 text-sm font-semibold bg-white/10 hover:bg-white/15 disabled:opacity-60">{wornAll ? "Conjunto equipado" : "Equipar conjunto completo"}</button>}
             {complete && <button onClick={() => setExpanded(false)} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-white/70 hover:text-white hover:bg-white/10">Recolher</button>}
           </div>
         </div>

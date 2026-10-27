@@ -90,7 +90,7 @@ export function playSound(id: string) {
 }
 
 // ---- sounds of shop effects (same rule: synthesized, nothing downloaded) ----
-export type FxSound = "hohoho" | "whoosh" | "sleigh" | "boo" | "witch" | "glitch" | "gameon" | "snip" | "tada" | "pop" | "fireworks";
+export type FxSound = "hohoho" | "whoosh" | "sleigh" | "boo" | "witch" | "glitch" | "gameon" | "snip" | "tada" | "pop" | "fireworks" | "goal" | "drums" | "boom" | "slash" | "pet-cat" | "pet-dog" | "pet-fox" | "pet-dragon" | "pet-ghost" | "pet-robot";
 // Real recordings (CC0, see public/sfx/CREDITS.txt), ~30 KB in total, fetched only the first time they play. If one cannot load or play, the synthesized version below takes over.
 const SAMPLES: Partial<Record<FxSound, { file: string; vol: number }>> = { hohoho: { file: "sfx/santa-hohoho.mp3", vol: 0.9 }, boo: { file: "sfx/ghost-boo.mp3", vol: 0.85 } };
 const sampleCache = new Map<string, HTMLAudioElement>();
@@ -137,6 +137,29 @@ function synthFx(id: FxSound) {
     noise(c, { t: 0.1, d: 1.1, v: 0.1, kind: "highpass", freq: 4500 }); [1568, 2093, 2637].forEach((f, i) => tone(c, { f0: f, t: 0.35 + i * 0.09, d: 0.3, v: 0.04 }));
   } else if (id === "fireworks") {                                   // three launches: whistle up, boom, crackle
     [0, 0.55, 1.05].forEach((t, i) => { tone(c, { type: "sine", f0: 500 + i * 120, f1: 1700 + i * 200, t, d: 0.35, v: 0.05 }); tone(c, { type: "sine", f0: 110, f1: 38, t: t + 0.36, d: 0.5, v: 0.34 }); noise(c, { t: t + 0.36, d: 0.7, v: 0.22, kind: "lowpass", freq: 900 }); noise(c, { t: t + 0.42, d: 0.9, v: 0.1, kind: "highpass", freq: 5200 }); });
+  } else if (id === "goal") {                                        // a stadium: crowd swell, then an air horn
+    noise(c, { t: 0, d: 1.3, v: 0.2, kind: "bandpass", freq: 900, q: 0.5 }); noise(c, { t: 0.1, d: 1.1, v: 0.1, kind: "highpass", freq: 3000 });
+    tone(c, { type: "sawtooth", f0: 466, t: 0.35, d: 0.7, v: 0.08 }); tone(c, { type: "sawtooth", f0: 554, t: 0.35, d: 0.7, v: 0.07 });
+  } else if (id === "drums") {                                       // a samba beat: surdo + tamborim
+    [0, 0.25, 0.5, 0.75, 1.0].forEach((t, i) => { tone(c, { type: "sine", f0: i % 2 ? 130 : 95, f1: 55, t, d: 0.22, v: 0.3 }); });
+    [0.125, 0.375, 0.5, 0.625, 0.875, 1.0].forEach((t) => noise(c, { t, d: 0.07, v: 0.16, kind: "highpass", freq: 3800 }));
+  } else if (id === "boom") {                                        // a bass drop with a little horn
+    tone(c, { type: "sine", f0: 120, f1: 32, t: 0, d: 0.9, v: 0.4 }); noise(c, { t: 0, d: 0.5, v: 0.2, kind: "lowpass", freq: 700 });
+    tone(c, { type: "sawtooth", f0: 880, f1: 880, t: 0.12, d: 0.3, v: 0.05 }); tone(c, { type: "sawtooth", f0: 932, t: 0.12, d: 0.3, v: 0.05 });
+  } else if (id === "slash") {                                       // a blade: whoosh, then a metal ring
+    noise(c, { t: 0, d: 0.22, v: 0.3, kind: "bandpass", freq: 4200, q: 1.2 }); tone(c, { f0: 1760, t: 0.18, d: 0.8, v: 0.06 }); tone(c, { f0: 2349, t: 0.18, d: 0.7, v: 0.04 });
+  } else if (id === "pet-cat") {                                     // meow: pitch up then down
+    tone(c, { type: "triangle", f0: 520, f1: 880, t: 0, d: 0.2, v: 0.16 }); tone(c, { type: "triangle", f0: 880, f1: 480, t: 0.2, d: 0.3, v: 0.16 });
+  } else if (id === "pet-dog") {                                     // two barks
+    [0, 0.2].forEach((t) => { tone(c, { type: "sawtooth", f0: 340, f1: 170, t, d: 0.12, v: 0.12 }); noise(c, { t, d: 0.06, v: 0.1, kind: "bandpass", freq: 1200, q: 0.8 }); });
+  } else if (id === "pet-fox") {                                     // a squeaky chirp
+    tone(c, { f0: 1100, f1: 1900, t: 0, d: 0.14, v: 0.1 }); tone(c, { f0: 1900, f1: 1000, t: 0.14, d: 0.2, v: 0.1 }); tone(c, { f0: 1300, f1: 1800, t: 0.36, d: 0.12, v: 0.08 });
+  } else if (id === "pet-dragon") {                                   // a tiny roar and a puff of fire
+    tone(c, { type: "sawtooth", f0: 200, f1: 80, t: 0, d: 0.55, v: 0.16 }); noise(c, { t: 0.1, d: 0.6, v: 0.14, kind: "lowpass", freq: 1500 }); noise(c, { t: 0.4, d: 0.5, v: 0.1, kind: "highpass", freq: 2500 });
+  } else if (id === "pet-ghost") {                                   // a cute "uuuh"
+    tone(c, { f0: 420, f1: 300, t: 0, d: 0.6, v: 0.13 }); tone(c, { f0: 426, f1: 306, t: 0, d: 0.6, v: 0.1 });
+  } else if (id === "pet-robot") {                                   // beep boop
+    [[880, 0], [660, 0.1], [990, 0.2], [740, 0.3]].forEach(([f, t]) => tone(c, { type: "square", f0: f, t, d: 0.07, v: 0.05 }));
   } else if (id === "witch") {                                        // a short cackle: quick rising squeaks
     [0, 0.13, 0.26, 0.39].forEach((t, i) => tone(c, { type: "sawtooth", f0: 520 + i * 40, f1: 900 + i * 60, t, d: 0.1, v: 0.05 }));
   } else if (id === "sleigh") {                                       // bells

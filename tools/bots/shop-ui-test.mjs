@@ -109,7 +109,7 @@ try {
   // ---- the Loja as a sales window: banners, big preview, click-see-leave ----
   await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500); await tab("Coleções");
   const banners = await ev(`[...document.querySelectorAll('section[aria-label^="Coleção "]')].map(x=>x.getAttribute('aria-label').replace('Coleção ',''))`);
-  ok("Coleções: banners de Natal, Halloween, Ano Novo, Auras, Hacker, Gamer, Barbearia e Rainha", ["Natal", "Halloween", "Ano Novo", "Auras", "Hacker", "Gamer", "Barbearia", "Rainha"].every((n) => banners.includes(n)), banners.join(","));
+  ok("Coleções: banners de Natal, Halloween, Ano Novo, Auras, Hacker, Gamer, Barbearia e Rainha", ["Natal", "Halloween", "Ano Novo", "Auras", "Hacker", "Gamer", "Barbearia", "Rainha", "Pets", "Status animados", "Banners animados", "Brasil", "Memes", "Anime"].every((n) => banners.includes(n)), banners.join(","));
   ok("coleção completa vira faixa: 'Já é seu', 'Ativo' (equipada) e 8/8", await ev(`(()=>{const t=document.querySelector('[aria-label="Coleção Natal"]').innerText;return /Já é seu/i.test(t)&&/Ativo/i.test(t)&&/8\\/8 itens/.test(t)&&!/Neve caindo/.test(t)})()`));
   ok("banner de temporada que ainda não é seu vende: texto, edição limitada com dias e 'quem pegou, fica'", await ev(`(()=>{const t=document.querySelector('[aria-label="Coleção Halloween"]').innerText;return /Lua cheia/.test(t)&&/Edição Limitada · \\d+ dias?/.test(t)&&/Quem pegou, fica/.test(t)})()`));
   ok("banner mostra a arte real dos itens (moldura, nome, emblema, entrada, reações)", await ev(`(()=>{const sh=document.querySelector('[aria-label="Coleção Halloween"] [aria-label="O que vem no conjunto"]');return !!sh&&/moldura/i.test(sh.innerText)&&/emblema/i.test(sh.innerText)&&/entrada/i.test(sh.innerText)&&/rea[cç][oõ]es/i.test(sh.innerText)})()`));
@@ -140,8 +140,9 @@ try {
   ok("de volta ao Automático, as cenas voltam (aparelho normal)", (await ev(`!document.documentElement.classList.contains('lite')`)) && await waitFor(`document.querySelectorAll('.fx-lights').length===4`));
 
   // ---- filters and inventory ----
+  // the grid is virtualized (only the rows on screen exist): check the kind of every visible card, not the total
   await tab("Itens"); await click("Molduras");
-  ok("filtro por tipo: só molduras (Natal, Halloween, 8 auras, Hacker, Gamer, Barbearia e Rainha)", await waitFor(`(()=>{const c=[...document.querySelectorAll('[data-item]')].map(x=>x.dataset.item);return c.length===20&&c.every(k=>/frame|aura/.test(k))})()`));
+  ok("filtro por tipo: só molduras (todas as cartas visíveis são molduras)", await waitFor(`(()=>{const c=[...document.querySelectorAll('[data-item]')].map(x=>x.dataset.item);return c.length>=8&&c.every(k=>/frame|aura/.test(k))})()`));
   await click("Todos"); await click("Épico"); await sleep(600);
   ok("filtro por raridade: só épicos", await waitFor(`(()=>{const c=[...document.querySelectorAll('[data-item]')];return c.length>=1&&c.every(x=>/Épico/i.test(x.innerText))})()`));
   await tab("Inventário"); ok("inventário lista o que eu tenho", (await ev(`document.querySelectorAll('[data-item]').length`)) >= 8);

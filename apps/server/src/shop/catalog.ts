@@ -20,6 +20,13 @@ export const COLLECTIONS: CatalogCollection[] = [
   { key: "gamer", nome: "Gamer", categoria: "gamer", sazonal: false, descricao: "Arena neon, controle, pixel art e a entrada GAME ON. Aperte start." },
   { key: "barbearia", nome: "Barbearia", categoria: "barbearia", sazonal: false, descricao: "Poste de barbeiro girando, tesoura de ouro, bigode e a entrada Na régua!" },
   { key: "rainha", nome: "Rainha", categoria: "rainha", sazonal: false, descricao: "Reino rosé: coroa, flores, brilho de diamante e a entrada Chegou a Rainha!" },
+  { key: "pets", nome: "Pets", categoria: "pets", sazonal: false, descricao: "Um bichinho no canto do seu cartão que reage ao carinho: passe o mouse e ele se mexe, clique e ele pula, solta corações e faz barulhinho." },
+  { key: "status", nome: "Status animados", categoria: "status", sazonal: false, descricao: "Um status com vida ao lado do seu nome: jogando, ouvindo música, dormindo, codando e mais. Só se mexe no hover e no perfil." },
+  { key: "banners", nome: "Banners animados", categoria: "banners", sazonal: false, descricao: "A capa do seu perfil em movimento: aurora, chuva neon, ondas, estrelas, lava, sakura, pôr do sol e código verde." },
+  { key: "brasil", nome: "Brasil", categoria: "brasil", sazonal: false, descricao: "Verde, amarelo e azul: louros, bola no canto, a entrada GOOOOL! e muito orgulho." },
+  { key: "carnaval", nome: "Carnaval", categoria: "carnaval", sazonal: true, inicio: "2027-01-25T00:00:00-03:00", fim: "2027-02-20T00:00:00-03:00", descricao: "Confete, glitter e uma máscara no canto: clique nela e o bloco sai pela tela. Entrada Bora pro bloco!" },
+  { key: "memes", nome: "Memes", categoria: "memes", sazonal: false, descricao: "Óculos de pixel, aura +1000, texto Impact e a entrada SEXTOUUU!. Arte 100% original, só zoeira." },
+  { key: "anime", nome: "Anime", categoria: "anime", sazonal: false, descricao: "Estilo anime com pétalas, olhar brilhante e um portal torii no canto. Sem personagens oficiais: só o clima." },
   {
     key: "halloween", nome: "Halloween", categoria: "halloween", sazonal: true, inicio: "2026-10-10T00:00:00-03:00", fim: "2026-11-03T00:00:00-03:00", bonus: "halloween.witch",
     descricao: "Lua cheia, luzes laranja e roxas e uma abóbora no canto: clique nela e a bruxa de vassoura passa. Equipe tema + moldura + entrada do conjunto para a bruxa deixar um rastro de faíscas.",
@@ -111,6 +118,74 @@ export const ITEMS: CatalogItem[] = [
   { key: "anonovo.name.gold", tipo: "name_effect", nome: "Nome de ouro", raridade: "raro", categoria: "anonovo", collection: "anonovo", descricao: "Dourado brilhante com reflexo.", meta: {style: "nygold"} },
   { key: "anonovo.name.fireworks", tipo: "name_effect", nome: "Nome de fogos", raridade: "epico", categoria: "anonovo", collection: "anonovo", descricao: "Cores de fogos de artifício.", meta: {style: "nyfireworks"} },
   { key: "anonovo.reactions", tipo: "reaction", nome: "Reações de Ano Novo", raridade: "raro", categoria: "anonovo", collection: "anonovo", descricao: "Fogos, champanhe e relógio para a reação gigante.", meta: {icons: ["firework", "champagne", "clock"]} },
+
+  // ---- Pets (interactive: hover wiggle, click jump + sound; nothing by itself) ----
+  { key: "pet.cat", tipo: "pet", nome: "Gatinho", raridade: "raro", categoria: "pets", collection: "pets", descricao: "Um gatinho laranja que ronrona e pede carinho.", meta: {pet: "cat"} },
+  { key: "pet.dog", tipo: "pet", nome: "Cachorrinho", raridade: "raro", categoria: "pets", collection: "pets", descricao: "Um cachorrinho que abana o rabo e late quando você clica.", meta: {pet: "dog"} },
+  { key: "pet.fox", tipo: "pet", nome: "Raposa", raridade: "epico", categoria: "pets", collection: "pets", descricao: "Uma raposa esperta e fofoqueira.", meta: {pet: "fox"} },
+  { key: "pet.dragon", tipo: "pet", nome: "Dragãozinho", raridade: "lendario", categoria: "pets", collection: "pets", descricao: "Um dragãozinho que solta fogo (de brinquedo) quando recebe carinho.", meta: {pet: "dragon"} },
+  { key: "pet.ghost", tipo: "pet", nome: "Fantasminha", raridade: "epico", categoria: "pets", collection: "pets", descricao: "Um fantasminha fofo que assombra com carinho.", meta: {pet: "ghost"} },
+  { key: "pet.robot", tipo: "pet", nome: "Robozinho", raridade: "epico", categoria: "pets", collection: "pets", descricao: "Um robozinho com LED que pisca e processa carinho.", meta: {pet: "robot"} },
+
+  // ---- Status animados ----
+  { key: "status.playing", tipo: "status", nome: "Jogando", raridade: "comum", categoria: "status", collection: "status", descricao: "Controle pulando ao lado do seu nome.", meta: {status: "playing"} },
+  { key: "status.busy", tipo: "status", nome: "Ocupado", raridade: "comum", categoria: "status", collection: "status", descricao: "Pulsa em vermelho: melhor não incomodar.", meta: {status: "busy"} },
+  { key: "status.music", tipo: "status", nome: "Ouvindo música", raridade: "raro", categoria: "status", collection: "status", descricao: "Barrinhas de equalizador dançando.", meta: {status: "music"} },
+  { key: "status.sleep", tipo: "status", nome: "Dormindo", raridade: "raro", categoria: "status", collection: "status", descricao: "Uma lua com zzz subindo.", meta: {status: "sleep"} },
+  { key: "status.code", tipo: "status", nome: "Codando", raridade: "raro", categoria: "status", collection: "status", descricao: "Colchetes com cursor piscando.", meta: {status: "code"} },
+  { key: "status.live", tipo: "status", nome: "Ao vivo", raridade: "epico", categoria: "status", collection: "status", descricao: "Ponto vermelho pulsando: você está transmitindo.", meta: {status: "live"} },
+  { key: "status.afk", tipo: "status", nome: "Já volto", raridade: "comum", categoria: "status", collection: "status", descricao: "Um cafezinho esperando você voltar.", meta: {status: "afk"} },
+  { key: "status.study", tipo: "status", nome: "Estudando", raridade: "comum", categoria: "status", collection: "status", descricao: "Um livro aberto, brilhando de leve.", meta: {status: "study"} },
+
+  // ---- Banners animados (capa do perfil) ----
+  { key: "banner.aurora", tipo: "banner", nome: "Aurora", raridade: "epico", categoria: "banners", collection: "banners", descricao: "Luzes verdes e roxas dançando no céu.", meta: {banner: "aurora"} },
+  { key: "banner.neonrain", tipo: "banner", nome: "Chuva neon", raridade: "raro", categoria: "banners", collection: "banners", descricao: "Fios de luz neon caindo.", meta: {banner: "neonrain"} },
+  { key: "banner.waves", tipo: "banner", nome: "Ondas", raridade: "comum", categoria: "banners", collection: "banners", descricao: "Ondas azuis deslizando.", meta: {banner: "waves"} },
+  { key: "banner.stars", tipo: "banner", nome: "Estrelas", raridade: "raro", categoria: "banners", collection: "banners", descricao: "Céu estrelado com uma estrela cadente.", meta: {banner: "stars"} },
+  { key: "banner.lava", tipo: "banner", nome: "Lava", raridade: "epico", categoria: "banners", collection: "banners", descricao: "Bolhas de lava subindo.", meta: {banner: "lava"} },
+  { key: "banner.sakura", tipo: "banner", nome: "Sakura", raridade: "raro", categoria: "banners", collection: "banners", descricao: "Pétalas de cerejeira caindo.", meta: {banner: "sakura"} },
+  { key: "banner.sunset", tipo: "banner", nome: "Pôr do sol", raridade: "lendario", categoria: "banners", collection: "banners", descricao: "Sol se pondo atrás das colinas.", meta: {banner: "sunset"} },
+  { key: "banner.matrix", tipo: "banner", nome: "Código verde", raridade: "epico", categoria: "banners", collection: "banners", descricao: "Chuva de código verde.", meta: {banner: "matrix"} },
+
+  // ---- Brasil ----
+  { key: "brasil.theme", tipo: "theme", nome: "Brasil", raridade: "epico", categoria: "brasil", collection: "brasil", descricao: "Verde, amarelo e azul nas bordas, uma bola no canto: clique nela e comemore.", meta: {theme: "brasil", lights: true, corner: "ball"} },
+  { key: "brasil.frame.laurel", tipo: "frame", nome: "Louros", raridade: "raro", categoria: "brasil", collection: "brasil", descricao: "Coroa de louros verde com estrelas amarelas.", meta: {style: "laurel"} },
+  { key: "brasil.frame.arc", tipo: "frame", nome: "Arco verde-amarelo", raridade: "comum", categoria: "brasil", collection: "brasil", descricao: "Arcos verde e amarelo em volta do avatar.", meta: {style: "bflag"} },
+  { key: "brasil.badge.fan", tipo: "badge", nome: "Torcedor", raridade: "raro", categoria: "brasil", collection: "brasil", descricao: "Para quem veste a camisa.", meta: {icon: "trophy"} },
+  { key: "brasil.entrance.gol", tipo: "entrance", nome: "GOOOOL!", raridade: "epico", categoria: "brasil", collection: "brasil", descricao: "Ao entrar na sala: GOOOOL! com bola, troféu e cafezinho voando.", meta: {fx: "gol", sound: "goal"} },
+  { key: "brasil.name.verde", tipo: "name_effect", nome: "Verde e amarelo", raridade: "raro", categoria: "brasil", collection: "brasil", descricao: "Degradê verde e amarelo.", meta: {style: "brverde"} },
+  { key: "brasil.name.azul", tipo: "name_effect", nome: "Azul estrelado", raridade: "comum", categoria: "brasil", collection: "brasil", descricao: "Azul profundo com brilho de estrela.", meta: {style: "brazul"} },
+  { key: "brasil.reactions", tipo: "reaction", nome: "Reações do Brasil", raridade: "raro", categoria: "brasil", collection: "brasil", descricao: "Bola, café e violão para a reação gigante.", meta: {icons: ["soccer", "coffee", "guitar"]} },
+
+  // ---- Carnaval ----
+  { key: "carnaval.theme", tipo: "theme", nome: "Bloco de rua", raridade: "epico", categoria: "carnaval", collection: "carnaval", descricao: "Confete e serpentina nas bordas e uma máscara no canto: clique nela e o bloco sai.", meta: {theme: "carnaval", lights: true, corner: "mask"} },
+  { key: "carnaval.frame.mask", tipo: "frame", nome: "Máscara", raridade: "raro", categoria: "carnaval", collection: "carnaval", descricao: "Uma máscara de carnaval com glitter.", meta: {style: "cmask"} },
+  { key: "carnaval.frame.feather", tipo: "frame", nome: "Penas", raridade: "epico", categoria: "carnaval", collection: "carnaval", descricao: "Penas coloridas em arco no avatar.", meta: {style: "cfeather"} },
+  { key: "carnaval.badge.folia", tipo: "badge", nome: "Folião", raridade: "raro", categoria: "carnaval", collection: "carnaval", descricao: "Quem pulou o carnaval inteiro.", meta: {icon: "music"} },
+  { key: "carnaval.entrance.bloco", tipo: "entrance", nome: "Bora pro bloco!", raridade: "epico", categoria: "carnaval", collection: "carnaval", descricao: "Ao entrar na sala: Bora pro bloco! com máscaras, tambores e serpentinas.", meta: {fx: "bloco", sound: "drums"} },
+  { key: "carnaval.name.confete", tipo: "name_effect", nome: "Confete", raridade: "comum", categoria: "carnaval", collection: "carnaval", descricao: "Cores de confete no nome.", meta: {style: "cconfete"} },
+  { key: "carnaval.name.glitter", tipo: "name_effect", nome: "Glitter", raridade: "raro", categoria: "carnaval", collection: "carnaval", descricao: "Dourado e rosa com brilho.", meta: {style: "cglitter"} },
+  { key: "carnaval.reactions", tipo: "reaction", nome: "Reações de Carnaval", raridade: "raro", categoria: "carnaval", collection: "carnaval", descricao: "Máscara, tambor e serpentina para a reação gigante.", meta: {icons: ["mask", "drum", "streamer"]} },
+
+  // ---- Memes ----
+  { key: "meme.theme", tipo: "theme", nome: "Meme Lab", raridade: "epico", categoria: "memes", collection: "memes", descricao: "Roxo e verde-limão de laboratório, uma seta de stonks no canto: clique nela.", meta: {theme: "memes", lights: true, corner: "stonks"} },
+  { key: "meme.frame.shades", tipo: "frame", nome: "Óculos de pixel", raridade: "raro", categoria: "memes", collection: "memes", descricao: "Óculos escuros de pixel no seu avatar.", meta: {style: "shades"} },
+  { key: "meme.frame.plus", tipo: "frame", nome: "Aura +1000", raridade: "epico", categoria: "memes", collection: "memes", descricao: "Um selo +1000 de aura em volta do avatar.", meta: {style: "plus1000"} },
+  { key: "meme.badge.sextou", tipo: "badge", nome: "Sextou", raridade: "raro", categoria: "memes", collection: "memes", descricao: "O dia mais esperado da semana.", meta: {icon: "laugh"} },
+  { key: "meme.entrance.sextou", tipo: "entrance", nome: "SEXTOUUU!", raridade: "epico", categoria: "memes", collection: "memes", descricao: "Ao entrar na sala: SEXTOUUU! com caveiras, stonks e óculos.", meta: {fx: "sextou", sound: "boom"} },
+  { key: "meme.name.impact", tipo: "name_effect", nome: "Texto Impact", raridade: "raro", categoria: "memes", collection: "memes", descricao: "Branco com contorno preto, clássico de meme.", meta: {style: "impact"} },
+  { key: "meme.name.comic", tipo: "name_effect", nome: "Comic dourado", raridade: "comum", categoria: "memes", collection: "memes", descricao: "Letras de gibi douradas.", meta: {style: "comic"} },
+  { key: "meme.reactions", tipo: "reaction", nome: "Reações de Meme", raridade: "raro", categoria: "memes", collection: "memes", descricao: "Caveira, stonks e óculos nerd para a reação gigante.", meta: {icons: ["skull", "stonks", "glasses"]} },
+
+  // ---- Anime ----
+  { key: "anime.theme", tipo: "theme", nome: "Sakura Dojo", raridade: "epico", categoria: "anime", collection: "anime", descricao: "Noite azul com pétalas rosa e um portal torii no canto: clique nele.", meta: {theme: "anime", lights: true, corner: "torii"} },
+  { key: "anime.frame.charms", tipo: "frame", nome: "Amuletos", raridade: "raro", categoria: "anime", collection: "anime", descricao: "Amuletos de papel girando em volta do avatar.", meta: {style: "charms"} },
+  { key: "anime.frame.glint", tipo: "frame", nome: "Olhar brilhante", raridade: "epico", categoria: "anime", collection: "anime", descricao: "Faíscas de brilho como nos olhos de anime.", meta: {style: "glint"} },
+  { key: "anime.badge.senpai", tipo: "badge", nome: "Senpai", raridade: "raro", categoria: "anime", collection: "anime", descricao: "Reconhecido pela turma.", meta: {icon: "swords"} },
+  { key: "anime.entrance.yatta", tipo: "entrance", nome: "Yatta!", raridade: "epico", categoria: "anime", collection: "anime", descricao: "Ao entrar na sala: Yatta! com pétalas, estrelas e leques.", meta: {fx: "yatta", sound: "slash"} },
+  { key: "anime.name.toquio", tipo: "name_effect", nome: "Neon Tóquio", raridade: "raro", categoria: "anime", collection: "anime", descricao: "Rosa e ciano de rua de Tóquio à noite.", meta: {style: "atoquio"} },
+  { key: "anime.name.sumi", tipo: "name_effect", nome: "Tinta sumi", raridade: "comum", categoria: "anime", collection: "anime", descricao: "Tinta preta com contorno branco.", meta: {style: "asumi"} },
+  { key: "anime.reactions", tipo: "reaction", nome: "Reações de Anime", raridade: "raro", categoria: "anime", collection: "anime", descricao: "Sakura, brilho e leque para a reação gigante.", meta: {icons: ["sakura", "sparkle", "fan"]} },
 ];
 
 /** Reaction icons everybody can send as a "giant reaction"; packs add more. */

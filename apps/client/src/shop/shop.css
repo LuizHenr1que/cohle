@@ -73,3 +73,15 @@
 /* fireworks (only after a click on the bottle): particles fly out with transform + opacity */
 @keyframes fx-burst { 0% { transform: translate(0, 0) scale(1); opacity: 1 } 70% { opacity: 1 } 100% { transform: translate(var(--bx), var(--by)) scale(.3); opacity: 0 } }
 @keyframes fx-flash { 0% { transform: scale(.2); opacity: .9 } 100% { transform: scale(2.4); opacity: 0 } }
+
+/* ---- name effects of Brasil, Carnaval, Memes and Anime ---- */
+.fx-name-brverde { background-image: linear-gradient(90deg, #00c46a, #ffdf00, #00c46a); }
+.fx-name-brazul { background-image: linear-gradient(90deg, #5aa8ff, #ffffff, #1d6fe0); }
+.fx-name-cconfete { background-image: linear-gradient(90deg, #ff4f6d, #ffd166, #3ddc84, #19c2ff, #b57bff, #ff4fd8); }
+.fx-name-cglitter { background-image: linear-gradient(90deg, #ffd166, #ff8fcf, #fff3c9, #ff4fd8, #ffd166); }
+.fx-name-cglitter::after { content: attr(data-text); position: absolute; left: 0; top: 0; white-space: nowrap; opacity: 0; background-image: linear-gradient(90deg, #ff8fcf, #ffd166, #ff4fd8, #fff3c9, #ff8fcf); background-clip: text; -webkit-background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.fx-name-cglitter:hover::after, .fx-name-cglitter.fx-live::after { animation: fx-fade 1.2s ease-in-out infinite; }
+.fx-name-impact { background: none; -webkit-text-fill-color: #fff; color: #fff; -webkit-text-stroke: 1px #000; paint-order: stroke fill; font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif; font-weight: 400; letter-spacing: .02em; text-transform: uppercase; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000; }
+.fx-name-comic { background-image: linear-gradient(90deg, #f59e0b, #fde68a, #f59e0b); font-family: "Comic Sans MS", "Comic Neue", "Chalkboard SE", cursive; }
+.fx-name-atoquio { background-image: linear-gradient(90deg, #ff8fb8, #a5f3fc, #ff8fb8); }
+.fx-name-asumi { background: none; -webkit-text-fill-color: #111; color: #111; -webkit-text-stroke: 0; text-shadow: 0 0 1px #fff, 0 0 1px #fff, 1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff; font-weight: 800; }

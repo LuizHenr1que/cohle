@@ -27,7 +27,7 @@ const by = (k) => items.find((i) => i.key === k).id;
 const wear = (u, o) => Promise.all(Object.entries(o).map(([slot, k]) => http("/shop/equipped", { slot, itemId: k ? by(k) : null }, u.token, "PUT")));
 await wear(caio, { frame: "aura.fire", name_effect: "gamer.name.neon", badge: "gamer.badge.player1" });
 await wear(duda, { frame: "aura.sakura", name_effect: "queen.name.rose", badge: "queen.badge.crown" });
-await wear(leo, { frame: "hacker.frame.code", name_effect: "hacker.name.glitch", badge: "hacker.badge.root" });
+await wear(leo, { frame: "hacker.frame.code", name_effect: "hacker.name.glitch", badge: "hacker.badge.root", banner: "banner.aurora", status: "status.music", pet: "pet.cat" });
 const ch = main.channels.find((c) => c.type === "TEXT").id;
 const say = async (u, txt) => { const s = io(API, { auth: { token: u.token }, transports: ["websocket"] }); await new Promise((r) => s.on("connect", r)); s.emit("channel:join", ch); await sleep(400); s.emit("message:send", { channelId: ch, content: txt }, () => {}); await sleep(900); s.close(); };
 await say(caio, "bora jogar hoje à noite?"); await say(duda, "eu entro depois das 20h, guarda uma vaga pra mim"); await say(mia, "fechado! já tô com a aura nova"); await say(leo, "a Loja nova ficou demais, olha meu nome");
@@ -58,8 +58,13 @@ try {
   for (const [name, col, set] of [["natal", "natal", { theme: "natal.theme", frame: "natal.frame.garland", name_effect: "natal.name.lights", badge: "natal.badge.spirit", entrance: "natal.entrance.hohoho" }], ["halloween", "halloween", { theme: "halloween.theme", frame: "halloween.frame.pumpkin", name_effect: "halloween.name.pumpkin", badge: "halloween.badge.spooky", entrance: "halloween.entrance.boo" }], ["hacker", "hacker", { theme: "hacker.theme", frame: "hacker.frame.code", name_effect: "hacker.name.terminal", badge: "hacker.badge.root", entrance: "hacker.entrance.access" }]]) {
     await wear(mia, set); await login(mia); await openChat(); await shot(name, 1500);
   }
-  // 8: servers in groups
-  await wear(mia, { theme: null, frame: "aura.gold", name_effect: "barber.name.gold", badge: null, entrance: null });
+  // 8: the pet reacting to a click, and a profile with animated banner + status + pet
+  await wear(mia, { theme: null, frame: "aura.fire", name_effect: "gamer.name.neon", badge: "gamer.badge.player1", entrance: null, pet: "pet.dragon", status: "status.code" });
+  await login(mia); await openChat();
+  await ev(`document.querySelector('button[data-pet="pet.dragon"]').click()`); await shot("pets", 330);
+  await ev(`[...document.querySelectorAll('main button')].find(b=>b.innerText.trim()==='Leo')?.click()`); await waitFor(`!!document.querySelector('[role=dialog][aria-label="Perfil"] [data-banner]') && /Ouvindo música/.test(document.body.innerText)`, 12000); await shot("perfil", 900);
+  // 9: servers in groups
+  await wear(mia, { theme: null, frame: "aura.gold", name_effect: "barber.name.gold", badge: null, entrance: null, pet: "pet.cat", status: "status.study" });
   const sid = (n) => (n === "Galera do Jogo" ? main : others.find((o) => o.name === n)).id;
   await http("/me/prefs", { serverGroups: [{ id: "g1", name: "Jogos", color: "#b57bff", serverIds: [sid("Galera do Jogo"), sid("Campeonato")], open: true }, { id: "g2", name: "Vida real", color: "#3ddc84", serverIds: [sid("Estudos"), sid("Trabalho"), sid("Família")], open: false }] }, mia.token, "PUT");
   await login(mia, { rail: true }); await openChat(); await shot("grupos", 1200);

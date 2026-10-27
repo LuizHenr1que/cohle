@@ -167,6 +167,23 @@ ok("o dono destranca um item e aí qualquer pessoa pega (sem deploy)", r.s === 2
 r = await http("/shop/admin/lock", { locked: true, collectionId: gamer.id }, owner.token, "PUT"); await sleep(450);
 ok("trancar de novo por coleção", r.s === 200 && r.d.changed === 8 && (await shop(Gf)).items.filter((i) => i.collectionId === gamer.id).every((i) => i.locked));
 await prisma.shopItem.updateMany({ data: { locked: false } }); await sleep(450);          // the rest of the suite claims items again
+// ---- Pets, animated statuses and banners, and the new collections (Brasil, Carnaval, Memes, Anime) ----
+const Pz = await mk("pet"); let spz = await shop(Pz);
+const sizes = Object.fromEntries(spz.collections.map((c) => [c.key, c.itemIds.length]));
+ok("coleções novas na vitrine: Pets 6, Status 8, Banners 8, Brasil 8, Memes 8, Anime 8", sizes.pets === 6 && sizes.status === 8 && sizes.banners === 8 && sizes.brasil === 8 && sizes.memes === 8 && sizes.anime === 8, JSON.stringify(sizes));
+ok("Carnaval (temporada de fevereiro) ainda não aparece na vitrine", !spz.collections.some((c) => c.key === "carnaval"));
+const adm = (await http("/shop/admin/catalog", null, owner.token)).d;
+ok("o dono vê o Carnaval inteiro (8 itens) para poder presentear antes da temporada", adm.collections.find((c) => c.key === "carnaval")?.itemIds.length === 8);
+ok("pets são do tipo pet, status do tipo status e banners do tipo banner", spz.items.filter((i) => i.key.startsWith("pet.")).every((i) => i.tipo === "pet") && spz.items.filter((i) => i.key.startsWith("status.")).every((i) => i.tipo === "status") && spz.items.filter((i) => i.key.startsWith("banner.")).every((i) => i.tipo === "banner"));
+r = await http("/shop/gifts", { to: "@" + Pz.user.username, itemIds: ["pet.dragon", "status.music", "banner.aurora", "brasil.theme", "meme.frame.shades"].map((k) => item(spz, k).id) }, owner.token);
+ok("o dono presenteia pet, status, banner, tema e moldura de uma vez", r.s === 200 && r.d.given === 5, JSON.stringify(r.d).slice(0, 100));
+spz = await shop(Pz);
+ok("equipar pet, status e banner nos slots certos", (await equip(Pz, "pet", item(spz, "pet.dragon").id)).s === 200 && (await equip(Pz, "status", item(spz, "status.music").id)).s === 200 && (await equip(Pz, "banner", item(spz, "banner.aurora").id)).s === 200);
+const pzfx = (await http("/me", null, Pz.token)).d.fx ?? {};
+ok("os outros recebem as chaves pet, status e banner (só chaves, sem texto livre)", pzfx.pet === "pet.dragon" && pzfx.status === "status.music" && pzfx.banner === "banner.aurora", JSON.stringify(pzfx));
+ok("pet no slot de moldura é recusado (400)", (await equip(Pz, "frame", item(spz, "pet.dragon").id)).s === 400);
+ok("quem não ganhou o pet não consegue equipar (403)", (await equip(Pz, "pet", item(spz, "pet.cat").id)).s === 403);
+ok("equipar o tema Brasil e a moldura de meme funciona", (await equip(Pz, "theme", item(spz, "brasil.theme").id)).s === 200 && (await equip(Pz, "frame", item(spz, "meme.frame.shades").id)).s === 200);
 // ---- the real sounds: small files that exist ----
 for (const f of ["santa-hohoho.mp3", "ghost-boo.mp3"]) { const rr = await fetch(`http://localhost:5173/sfx/${f}`); const buf = Buffer.from(await rr.arrayBuffer()); ok(`som real ${f}: existe, é áudio e é leve (< 40 KB)`, rr.status === 200 && /audio|mpeg/.test(rr.headers.get("content-type") ?? "") && buf.length > 3000 && buf.length < 40_000, `${rr.status} ${buf.length} bytes`); }
 // ---- preferences ----

@@ -67,3 +67,10 @@ Coleção sazonal de 8 itens: tema **Virada**, molduras Aro dourado e Confete, e
 - **Quem recebe:** vê a tela "Você ganhou um presente!" uma vez (remetente, recado e itens), com "Equipar agora" e "Ver na Loja"; online, aparece na hora (`shop:gift`). `UserItem.seen` controla isso.
 - **Destrancar sem deploy:** botão "Destrancar" por coleção na tela (dono) ou `PUT /shop/admin/lock` com `itemIds` ou `collectionId`. SQL: `update "ShopItem" set locked = false where key = 'natal.theme';`.
 - Testes: `shop-test.mjs` (API: trava, autorização, presentes, recado, pulo de itens que já tem, evento ao vivo, destrancar) e `shop-gift-ui-test.mjs` (tela, web e Electron).
+
+## Pets, status animados e banners animados
+- **Pets** (`pet.cat/dog/fox/dragon/ghost/robot`, slot `pet`): ficam pousados na borda do seu cartão de usuário (só você vê o widget; os outros veem o pet pequeno e parado no seu perfil). **Só reagem a você:** hover = balança; clique = pula, solta corações, fala no balão e faz um barulhinho; 5 cliques em 5 s = dança. Respeitam "Sons" desligados e o Modo leve. Código em `shop/pets.tsx` + `pets.css`, carregado sob demanda só para quem tem pet.
+- **Status animados** (`status.*`, slot `status`): chip ao lado do nome no perfil (animado com o perfil aberto), nas linhas de pessoas e no seu cartão (parado; anima no hover). `shop/StatusChip.tsx`.
+- **Banners animados** (`banner.*`, slot `banner`): a capa do perfil vira aurora, chuva neon, ondas, estrelas, lava, sakura, pôr do sol ou código verde (só `transform`/`opacity`, só com o perfil aberto). `shop/AnimatedBanner.tsx`.
+- **Coleções novas:** Brasil, Memes, Anime (permanentes) e Carnaval (sazonal, 25/01 a 20/02/2027), cada uma com 8 itens como as outras. Coleções de escolha (Pets, Status, Banners, Auras) mostram todos os itens em grade clicável e não têm "conjunto completo".
+- Tudo nasce **trancado** e o dono presenteia (ou destranca). Testes: `shop-pet-ui-test.mjs` (web e Electron) e o bloco de pets/status/banners no `shop-test.mjs`.

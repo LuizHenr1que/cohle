@@ -36,6 +36,7 @@ import { playSound, soundLabel, soundboardOn } from "../lib/soundboard";
 import { useMedia } from "../lib/hooks";
 import { ServerIcon } from "./ServerIcon";
 import { ServerList } from "./ServerList";
+import { OwnPet, StatusLazy } from "../shop/lazy";
 import { setPrefs, usePrefs } from "../shop/prefs";
 import { Logo } from "./Logo";
 import { ServerModal } from "./ServerModal";
@@ -363,17 +364,20 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
           </div>
         )}
 
-        <button onClick={() => setPrefsOpen(true)} title="Configurações e perfil" className="mt-2 flex items-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl p-2 text-left transition">
+        <div className="relative mt-2">
+          <div className="absolute -top-[46px] right-12 z-[3]"><OwnPet /></div>
+          <button onClick={() => setPrefsOpen(true)} title="Configurações e perfil" className="flex items-center gap-2 bg-white/5 hover:bg-white/10 rounded-2xl p-2 text-left transition">
           <div className="relative">
             <Avatar user={self} size={34} />
             <span className={`absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface ${online.has(self.id) ? "bg-emerald-400" : "bg-muted"}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm truncate flex items-center gap-1.5"><UserName user={self} /><DevBadge user={self} /></div>
+            <div className="text-sm truncate flex items-center gap-1.5"><UserName user={self} /><DevBadge user={self} /><StatusLazy statusKey={self.fx?.status} compact /></div>
             <div className="text-[11px] text-muted">{online.has(self.id) ? "Online" : "Offline"}</div>
           </div>
           <Settings size={16} className="text-muted" />
-        </button>
+          </button>
+        </div>
       </aside>
       </div>
       )}

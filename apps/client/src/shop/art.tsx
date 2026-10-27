@@ -1,4 +1,5 @@
 // Small static scenery of the themes without a season: the picture in the corner of the screen (and the same art, bigger, on the collection banner). No animation, no cost.
+import { Corner2Svg } from "./corner2";
 const G = "#3dff7a";
 export function CornerArt({ k, className, size = 104, onTap, label }: { k: string; className?: string; size?: number; onTap?: () => void; label?: string }) {
   const art = CornerSvg({ k, size });
@@ -31,5 +32,5 @@ function CornerSvg({ k, size }: { k: string; size: number }) {
       <g className="tw-a">{[[46, 8, "#ffd166"], [54, 16, "#ff4f6d"], [50, 4, "#19c2ff"], [58, 8, "#3ddc84"], [44, 14, "#ff8fcf"]].map(([x, y, c], i) => <circle key={i} cx={x as number} cy={y as number} r="2.2" fill={c as string} />)}</g>
       <g className="tw-b" stroke="#ffd166" strokeWidth="1.8" strokeLinecap="round"><path d="M12 12 l4 4 M20 6 v5 M8 22 h5" /></g></svg>
   );
-  return null;
+  return Corner2Svg({ k, size });
 }

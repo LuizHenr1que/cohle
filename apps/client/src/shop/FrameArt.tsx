@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { FRAME_OF } from "./registry";
+import { Frame2Art } from "./frames2";
 
 const LIGHT = ["#ff5c5c", "#ffd166", "#3ddc84", "#5cc8ff"];
 /** The art around an avatar. Plain SVG (viewBox 0..100, the avatar fills the middle), nothing animates unless the wrapper is hovered / live. */
@@ -136,7 +137,7 @@ export const FrameArt = memo(function FrameArt({ frame }: { frame: string }) {
       </svg>
     );
   }
-  return null;
+  return kind ? Frame2Art({ kind }) : null;                       // Brasil, Carnaval, Memes and Anime frames
 });
 
 /** The eight auras. Groups marked spin / spin2 / puls / flick / zap-* only move while the avatar is hovered or live (see shop.css). */

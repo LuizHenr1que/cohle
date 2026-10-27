@@ -1,0 +1,29 @@
+/* Pets: nothing here runs on its own. Only hover (wiggle) and a click (jump / dance, hearts, bubble). transform + opacity only. */
+.pet-wrap { position: relative; display: inline-block; }
+.pet-btn { display: block; width: 100%; height: 100%; padding: 0; background: none; border: 0; cursor: pointer; transform-origin: 50% 90%; -webkit-tap-highlight-color: transparent; }
+.pet-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 14px; }
+.pet-svg { display: block; overflow: visible; }
+.pet-btn:hover .pet-svg { animation: pet-wiggle .7s ease-in-out; }
+.pet-btn:hover .pet-tail { animation: pet-tail .5s ease-in-out 2; transform-box: fill-box; transform-origin: 0 100%; }
+.pet-btn:hover .pet-wing { animation: pet-flap .45s ease-in-out 2; transform-box: fill-box; transform-origin: 50% 100%; }
+.pet-btn.pet-jump { animation: pet-jump .6s cubic-bezier(.3, 1.6, .5, 1); }
+.pet-btn.pet-dance { animation: pet-dance 1.25s ease-in-out; }
+.pet-btn.pet-jump .pet-eyes, .pet-btn.pet-dance .pet-eyes { animation: pet-blink .3s ease-in-out; transform-box: fill-box; transform-origin: 50% 50%; }
+.pet-btn.pet-jump .pet-flame, .pet-btn.pet-dance .pet-flame { animation: pet-flame .6s ease-out; transform-box: fill-box; transform-origin: 50% 0; }
+.pet-btn.pet-jump .pet-led, .pet-btn.pet-dance .pet-led { animation: pet-blink .25s steps(1) 4; }
+.pet-bubble { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 4px; white-space: nowrap; font-size: 11px; font-weight: 700; line-height: 1; padding: 6px 9px; border-radius: 12px; background: #fff; color: #1b1220; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); animation: pet-pop .25s cubic-bezier(.3, 1.6, .5, 1) both; pointer-events: none; z-index: 2; }
+.pet-bubble::after { content: ""; position: absolute; left: 50%; top: 100%; width: 8px; height: 8px; background: #fff; transform: translate(-50%, -4px) rotate(45deg); }
+.pet-heart { position: absolute; bottom: 50%; pointer-events: none; animation: pet-heart 1.3s ease-out both; z-index: 1; }
+.pet-mini { display: inline-block; vertical-align: middle; }
+.pet-mini:hover .pet-svg { animation: pet-wiggle .7s ease-in-out; }
+@keyframes pet-wiggle { 0%, 100% { transform: rotate(0) } 25% { transform: rotate(-7deg) } 75% { transform: rotate(7deg) } }
+@keyframes pet-tail { 0%, 100% { transform: rotate(0) } 50% { transform: rotate(14deg) } }
+@keyframes pet-flap { 0%, 100% { transform: scaleY(1) } 50% { transform: scaleY(.6) } }
+@keyframes pet-jump { 0% { transform: translateY(0) scale(1, 1) } 25% { transform: translateY(0) scale(1.1, .88) } 55% { transform: translateY(-16px) scale(.94, 1.1) } 80% { transform: translateY(0) scale(1.08, .92) } 100% { transform: translateY(0) scale(1, 1) } }
+@keyframes pet-dance { 0%, 100% { transform: translateY(0) rotate(0) } 15% { transform: translateY(-12px) rotate(-12deg) } 30% { transform: translateY(0) rotate(0) } 45% { transform: translateY(-12px) rotate(12deg) } 60% { transform: translateY(0) rotate(0) } 75% { transform: translateY(-14px) rotate(-8deg) } 90% { transform: translateY(0) rotate(0) } }
+@keyframes pet-blink { 0%, 100% { transform: scaleY(1) } 50% { transform: scaleY(.1) } }
+@keyframes pet-flame { 0% { transform: scale(1) } 40% { transform: scale(2.2, 2.8) } 100% { transform: scale(1) } }
+@keyframes pet-pop { from { opacity: 0; transform: translateX(-50%) scale(.6) } to { opacity: 1; transform: translateX(-50%) scale(1) } }
+@keyframes pet-heart { 0% { transform: translate(0, 0) scale(.6); opacity: 0 } 15% { opacity: 1 } 100% { transform: translate(var(--hx, 6px), -46px) scale(1.15); opacity: 0 } }
+.lite .pet-btn:hover .pet-svg, .lite .pet-btn:hover .pet-tail, .lite .pet-btn:hover .pet-wing { animation: none; }
+@media (prefers-reduced-motion: reduce) { .pet-btn, .pet-btn * , .pet-heart { animation: none !important; } .pet-heart { display: none; } }
