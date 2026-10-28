@@ -6,6 +6,7 @@ import { equipSchema, equipSetSchema, giftSchema, lockSchema, prefsSchema, serve
   type CollectionDTO, type FxDTO, type GiftDTO, type GiftResultDTO, type GiftTargetDTO, type PrefsDTO, type ShopDTO, type ShopItemDTO, type Slot, type UserDTO } from "@cohle/shared";
 import { COLLECTIONS, ITEMS, BASE_GIANT } from "./catalog.js";
 import { roleOf } from "../admin.js";
+import { giftEmail, sendMail } from "../email.js";
 
 type Deps = {
   prisma: PrismaClient; io: () => IOServer; auth: (req: any, reply: any) => Promise<any>; uid: (req: any) => string;
@@ -131,7 +132,7 @@ export function setupShop(app: FastifyInstance, d: Deps) {
     if (!d.rate(me, "claim", 30, 60_000)) return reply.code(429).send({ error: "slow down" });
     const c = await catalog(), it = c.items.find((i) => i.id === id);
     if (!it || !it.ativo) return reply.code(404).send({ error: "not found" });
-    if (it.locked !== false && !(await isOwnerAccount(me))) return reply.code(403).send({ error: "item locked" });                  // "Em breve": only the owner account can take it; everybody else gets it as a gift
+    if (it.locked !== false) return reply.code(403).send({ error: "item locked" });                  // "Em breve": nobody claims it; the owner gives gifts (also to themselves)
     const col = c.collections.find((x) => x.id === it.collectionId);
     if (col && !seasonActive(col)) { const has = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: me, itemId: id } } }); if (!has) return reply.code(403).send({ error: "out of season" }); }
     if (!(it.isFreeBeta || it.price === 0)) return reply.code(402).send({ error: "payment required" });         // checkout is not built yet: this is where it will plug in
@@ -140,6 +141,7 @@ export function setupShop(app: FastifyInstance, d: Deps) {
   });
 
   // ---- gifts and locks (owner only) ----
+  const giftMailAt = new Map<string, number>();
   const targetOf = (u: any): GiftTargetDTO => ({ id: u.id, username: u.username, displayName: u.displayName ?? null, email: u.email });
   app.get("/shop/gift-targets", { preHandler: d.auth }, async (req: any, reply) => {
     const me = d.uid(req); if (!(await isOwnerAccount(me))) return reply.code(403).send({ error: "owner only" });
@@ -170,7 +172,12 @@ export function setupShop(app: FastifyInstance, d: Deps) {
     const fresh = items.filter((i) => !have.has(i.id));
     if (fresh.length) await prisma.userItem.createMany({ data: fresh.map((i) => ({ userId: target.id, itemId: i.id, source: "gift", giftedBy: me, giftNote: p.data.note || null, seen: false })), skipDuplicates: true });
     forget(target.id);
-    if (fresh.length) { const from = await prisma.user.findUnique({ where: { id: me }, select: { username: true, displayName: true } }); d.io().to(`user:${target.id}`).emit("shop:gift", { from: from?.displayName || from?.username || "Cohle", count: fresh.length }); }
+    if (fresh.length) {
+      const from = await prisma.user.findUnique({ where: { id: me }, select: { username: true, displayName: true } }), fromName = from?.displayName || from?.username || "Cohle";
+      d.io().to(`user:${target.id}`).emit("shop:gift", { from: fromName, count: fresh.length });                // online: a toast, a badge and (window not focused) a system notification
+      const last = giftMailAt.get(target.id) ?? 0;                                                              // offline: one e-mail every 10 minutes per person, however many gifts
+      if (target.emailVerifiedAt && Date.now() - last > 10 * 60_000) { giftMailAt.set(target.id, Date.now()); void sendMail({ ...giftEmail(target.displayName || target.username, fromName, fresh.length, fresh.map((i) => i.nome), p.data.note || null), to: target.email }).catch(() => {}); }
+    }
     const res: GiftResultDTO = { ok: true, given: fresh.length, skipped: items.length - fresh.length, to: targetOf(target) };
     return res;
   });

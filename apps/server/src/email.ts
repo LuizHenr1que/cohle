@@ -125,3 +125,20 @@ export function welcomeEmail(name: string): Mail {
     text: `Bem-vindo ao Cohle, ${name}\n\nSua conta está pronta e o e-mail confirmado. Crie um servidor, chame a galera e entre numa sala de voz.\n\nBaixe o aplicativo: ${SITE}/#baixar\n`,
   };
 }
+
+/** "You got a gift": sent when the owner gives items to someone (at most one e-mail per person every 10 minutes, see shop.ts). */
+export function giftEmail(name: string, from: string, count: number, itemNames: string[], note: string | null): Mail {
+  const n = esc(name), f = esc(from), shown = itemNames.slice(0, 6), more = itemNames.length - shown.length;
+  const list = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 14px">${shown.map((x) => `<tr><td style="padding:0 10px 8px 0;vertical-align:top;width:10px"><div style="width:8px;height:8px;border-radius:50%;background:${C.accent};margin-top:7px"></div></td><td style="padding:0 0 8px 0;color:#f3e6ea;font-size:15px;line-height:22px">${esc(x)}</td></tr>`).join("")}${more > 0 ? `<tr><td></td><td style="color:#b9a3ab;font-size:14px;padding-bottom:8px">e mais ${more}</td></tr>` : ""}</table>`;
+  return {
+    to: "", kind: "gift", subject: "Você ganhou um presente no Cohle",
+    html: layout({
+      preheader: `${from} te enviou ${count} ${count === 1 ? "item" : "itens"} da Loja`, title: "Você ganhou um presente!",
+      body: p(`Oi, ${n}! <b>${f}</b> te enviou <b>${count} ${count === 1 ? "item" : "itens"}</b> da Loja do Cohle:`) + list
+        + (note ? p(`<i>“${esc(note)}”</i>`) : "")
+        + button(`${SITE}/app/`, "Abrir o Cohle e ver o presente")
+        + small("Os itens já estão na sua conta: é só abrir o Cohle, equipar e usar. Se você não reconhece este e-mail, pode ignorá-lo."),
+    }),
+    text: `Você ganhou um presente!\n\n${from} te enviou ${count} ${count === 1 ? "item" : "itens"} da Loja do Cohle: ${shown.join(", ")}${more > 0 ? ` e mais ${more}` : ""}.${note ? `\n\n“${note}”` : ""}\n\nAbra o Cohle: ${SITE}/app/\n`,
+  };
+}

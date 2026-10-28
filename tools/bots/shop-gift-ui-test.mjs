@@ -47,8 +47,16 @@ try {
   // ---- the owner gives a gift through the screen ----
   await login(owner); await openShop();
   ok("o dono vê 'Presentear alguém' e 'Presentear' em cada item", await waitFor(`[...document.querySelectorAll('button')].some(b=>/Presentear alguém/.test(b.innerText)) && !!document.querySelector('[data-item] button[aria-label^="Presentear "]')`));
+  await tab("Itens"); await ev(`[...document.querySelectorAll('[role=group][aria-label="Coleção"] button')].find(b=>b.innerText.trim()==='Banners animados')?.click()`); await sleep(1000);
+  { const info = await ev(`(()=>{const c=[...document.querySelectorAll('[data-item]')], notMine=c.filter((x)=>!/Já é seu/.test(x.innerText));return JSON.stringify({total:c.length,notMine:notMine.length,semCadeado:notMine.filter(x=>!x.querySelector('button[data-locked="true"]')).map(x=>x.dataset.item+':'+x.innerText.replace(/\\n/g,' ').slice(-60)),pegar:c.filter(x=>/Pegar \\(Beta\\)/.test(x.innerText)).map(x=>x.dataset.item)})})()`); const o = JSON.parse(info); ok("o dono também vê 'Em breve' e nenhum botão 'Pegar' (ele usa presenteando)", o.total > 0 && o.notMine > 0 && o.semCadeado.length === 0 && o.pegar.length === 0, info.slice(0, 400)); }
+
+  ok("os cartões do dono (mais altos, com 'Presentear') não se sobrepõem", await ev(`(()=>{const r=[...document.querySelectorAll('[data-item]')].map(x=>x.getBoundingClientRect());if(r.length<4)return false;for(let i=0;i<r.length;i++)for(let j=i+1;j<r.length;j++){const a=r[i],b=r[j];const ox=Math.min(a.right,b.right)-Math.max(a.left,b.left),oy=Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top);if(ox>2&&oy>2)return false}return true})()`));
+  await shot(`gift-0-dono-itens-${TAG}`); await tab("Vitrine");
   await ev(`[...document.querySelectorAll('button')].find(b=>/Presentear alguém/.test(b.innerText)).click()`);
   ok("abre a janela Presentear e carrega o catálogo completo", await waitFor(`!!document.querySelector('[role=dialog][aria-label="Presentear"]') && document.querySelectorAll('[aria-label="Itens para presentear"] li').length > 40`));
+  await ev(`document.querySelector('button[aria-label="Presentear a mim mesmo"]').click()`);
+  ok("'Para mim' escolhe a própria conta dona como destinatária", await waitFor(`/\\(você\\)/.test(document.querySelector('[role=dialog][aria-label="Presentear"]').innerText)`, 4000));
+  await ev(`[...document.querySelectorAll('[role=dialog][aria-label="Presentear"] button')].find(b=>b.innerText.trim()==='trocar').click()`);
   await setVal('input[aria-label="Buscar pessoa"]', `vis_${run}`);
   ok("buscar por @usuário acha a pessoa", await waitFor(`!!document.querySelector('[role=listbox] [role=option]') && /vis_${run}/.test(document.querySelector('[role=listbox]').innerText)`));
   await ev(`document.querySelector('[role=listbox] [role=option]').click()`);
@@ -75,8 +83,12 @@ try {
 
   // ---- live: online when the gift arrives ----
   await http("/shop/gifts", { to: "@" + V.user.username, itemIds: [(await http("/shop/admin/catalog", null, owner.token)).d.items.find((i) => i.key === "gamer.badge.player1").id], note: "ao vivo!" }, owner.token);
-  ok("com a pessoa online, o presente aparece na hora (sem recarregar)", await waitFor(`!!document.querySelector('[role=dialog][aria-label="Você ganhou um presente"]') && /ao vivo!/.test(document.body.innerText)`, 8000));
+  ok("com a pessoa online, aparece um aviso discreto 'Você ganhou um presente!' (sem janela no meio da tela)", await waitFor(`!!document.querySelector('[role=status][aria-label="Novo presente"]') && !document.querySelector('[role=dialog][aria-label="Você ganhou um presente"]')`, 8000));
+  ok("o botão da Loja ganha o selo com a quantidade de presentes", await waitFor(`document.querySelector('[data-gift-badge]')?.getAttribute('data-gift-badge')==='1'`, 6000));
+  await ev(`[...document.querySelectorAll('[role=status][aria-label="Novo presente"] button')].find(b=>b.innerText.trim()==='Abrir').click()`);
+  ok("clicar em Abrir mostra o presente com o recado", await waitFor(`!!document.querySelector('[role=dialog][aria-label="Você ganhou um presente"]') && /ao vivo!/.test(document.body.innerText)`, 8000));
   await ev(`[...document.querySelectorAll('[role=dialog][aria-label="Você ganhou um presente"] button')].find(b=>/Fechar/.test(b.innerText)).click()`);
+  ok("depois de aberto, o selo some", await waitFor(`!document.querySelector('[data-gift-badge]') && !document.querySelector('[role=status][aria-label="Novo presente"]')`, 8000));
   await openShop(); await tab("Inventário");
   ok("o item presenteado aparece no Inventário como 'Já é seu'", await waitFor(`/Já é seu/.test(document.querySelector('[data-item="gamer.badge.player1"]')?.innerText||'')`, 6000));
   ok("sem erros de JavaScript", errors.length === 0, errors.slice(0, 2).join(" | ").slice(0, 240));

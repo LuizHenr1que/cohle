@@ -14,6 +14,8 @@ export interface ShopCtx {
   claim: (item: ShopItemDTO) => Promise<void>;
   equip: (slot: Slot, item: ShopItemDTO | null) => Promise<void>;
   equipSet: (collectionId: string) => Promise<boolean>;
+  /** a gift that arrived while the app was open: shown as a quiet toast, never as a window in the middle of a game or a call */ liveGift: { from: string; count: number } | null; dismissLive: () => void;
+  /** the "Você ganhou um presente!" window (opens by itself once when the app opens with unopened gifts, or when the person clicks the toast / the Loja badge) */ giftOpen: boolean; setGiftOpen: (v: boolean) => void;
 }
 const Ctx = createContext<ShopCtx | null>(null);
 export const useShop = () => useContext(Ctx);
@@ -23,16 +25,22 @@ export function ShopProvider({ socket, children }: { socket: () => Socket | null
   const [shop, setShop] = useState<ShopDTO>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [liveGift, setLiveGift] = useState<{ from: string; count: number } | null>(null), [giftOpen, setGiftOpen] = useState(false), firstLoad = useRef(true);
   const prevTheme = useRef<ThemeId | null>(null);
 
   const refresh = useCallback(async () => {
-    try { const s = await api.shop(); setShop(s); setCategories(s.items); mergeRemote(s.prefs); setError(""); }
+    try { const s = await api.shop(); setShop(s); setCategories(s.items); mergeRemote(s.prefs); setError(""); if (firstLoad.current) { firstLoad.current = false; if (s.unseenGifts.length) setGiftOpen(true); } }
     catch (e: any) { setError(e?.message ?? "Não foi possível abrir a loja."); } finally { setLoading(false); }
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   // the equipped items changed on another device
   useEffect(() => {
-    let off = () => {}; const t = setInterval(() => { const s = socket(); if (!s) return; clearInterval(t); const h = () => void refresh(); s.on("shop:equipped", h); s.on("shop:gift", h); off = () => { s.off("shop:equipped", h); s.off("shop:gift", h); }; }, 300);
+    let off = () => {}; const t = setInterval(() => { const s = socket(); if (!s) return; clearInterval(t); const h = () => void refresh(); s.on("shop:equipped", h);
+      const g = (e: { from?: string; count?: number }) => {
+        void refresh(); const info = { from: String(e?.from ?? "Cohle"), count: Number(e?.count ?? 1) }; setLiveGift(info);
+        try { if ((document.hidden || !document.hasFocus()) && typeof Notification !== "undefined" && Notification.permission === "granted") new Notification("Você ganhou um presente!", { body: `${info.from} te enviou ${info.count} ${info.count === 1 ? "item" : "itens"} da Loja do Cohle.`, tag: "cohle-gift" }); } catch { /* the toast and the badge are enough */ }
+      };
+      s.on("shop:gift", g); off = () => { s.off("shop:equipped", h); s.off("shop:gift", g); }; }, 300);
     return () => { clearInterval(t); off(); };
   }, [refresh, socket]);
 
@@ -56,6 +64,7 @@ export function ShopProvider({ socket, children }: { socket: () => Socket | null
   const claim = useCallback(async (item: ShopItemDTO) => { await api.claimItem(item.id); await refresh(); }, [refresh]);
   const equip = useCallback(async (slot: Slot, item: ShopItemDTO | null) => { await api.equipItem(slot, item?.id ?? null); await refresh(); meChanged(); }, [refresh]);
   const equipSet = useCallback(async (collectionId: string) => { const r = await api.equipSet(collectionId); await refresh(); meChanged(); return r.complete; }, [refresh]);
-  const value = useMemo<ShopCtx>(() => ({ shop, loading, error, keys, refresh, claim, equip, equipSet }), [shop, loading, error, keys, refresh, claim, equip, equipSet]);
+  const dismissLive = useCallback(() => setLiveGift(null), []);
+  const value = useMemo<ShopCtx>(() => ({ shop, loading, error, keys, refresh, claim, equip, equipSet, liveGift, dismissLive, giftOpen, setGiftOpen }), [shop, loading, error, keys, refresh, claim, equip, equipSet, liveGift, dismissLive, giftOpen]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -66,6 +66,7 @@ Coleção sazonal de 8 itens: tema **Virada**, molduras Aro dourado e Confete, e
 - **Presentear (só o dono):** botão "Presentear" em cada item e coleção, e "Presentear alguém" no aviso do topo. Janela: busca a pessoa por @usuário, nome ou e-mail, marca itens ou "coleção inteira", recado de até 140 caracteres. Funciona com item trancado ou fora de temporada (dá para presentear Ano Novo antes de 20/12). `POST /shop/gifts`, `GET /shop/gift-targets`, `GET /shop/admin/catalog` (todos 403 para quem não é dono; o dono é a conta com `OWNER_EMAILS`/`verticeappempresa@gmail.com` confirmada).
 - **Quem recebe:** vê a tela "Você ganhou um presente!" uma vez (remetente, recado e itens), com "Equipar agora" e "Ver na Loja"; online, aparece na hora (`shop:gift`). `UserItem.seen` controla isso.
 - **Destrancar sem deploy:** botão "Destrancar" por coleção na tela (dono) ou `PUT /shop/admin/lock` com `itemIds` ou `collectionId`. SQL: `update "ShopItem" set locked = false where key = 'natal.theme';`.
+- **Aviso (v18):** online, aparece um aviso discreto no canto (`role=status`, "Abrir"), o botão da Loja no rail mostra o selo `data-gift-badge` e, com a janela sem foco, sai `Notification` do sistema; a janela só abre sozinha ao abrir o app com presentes não vistos. Offline: e-mail `giftEmail` (só com e-mail confirmado, no máximo 1 a cada 10 min por pessoa).
 - Testes: `shop-test.mjs` (API: trava, autorização, presentes, recado, pulo de itens que já tem, evento ao vivo, destrancar) e `shop-gift-ui-test.mjs` (tela, web e Electron).
 
 ## Pets, status animados e banners animados

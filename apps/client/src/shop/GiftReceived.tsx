@@ -11,7 +11,7 @@ export default function GiftReceived({ gifts, onOpenShop }: { gifts: GiftDTO[]; 
   const [busy, setBusy] = useState(false);
   const items = useMemo(() => gifts.map((g) => ({ g, it: shop.items.find((i) => i.id === g.itemId) })).filter((x): x is { g: GiftDTO; it: ShopItemDTO } => !!x.it), [gifts, shop.items]);
   const from = gifts[0]?.from ?? "Cohle", note = gifts.find((g) => g.note)?.note;
-  const close = async (then?: () => void) => { setBusy(true); try { await api.giftsSeen(); await ctx.refresh(); } catch { /* it comes back next time */ } setBusy(false); then?.(); };
+  const close = async (then?: () => void) => { setBusy(true); try { await api.giftsSeen(); await ctx.refresh(); } catch { /* it comes back next time */ } setBusy(false); ctx.setGiftOpen(false); then?.(); };
   const wearAll = async () => {
     setBusy(true);
     try { const seen = new Set<string>(); for (const { it } of items) { if (!(SLOTS as readonly string[]).includes(it.tipo) || seen.has(it.tipo)) continue; seen.add(it.tipo); await api.equipItem(it.tipo as Slot, it.id); } window.dispatchEvent(new CustomEvent("cohle:me-changed")); } catch { /* the Loja screen shows details */ }

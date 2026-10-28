@@ -48,12 +48,14 @@ const clickIn = (section, txt) => ev(`(()=>{const sec=document.querySelector(${J
 const shot = async (f) => { if (ATTACH) { await cmd("Page.bringToFront"); await cmd("Emulation.setFocusEmulationEnabled", { enabled: true }); } await sleep(900); writeFileSync(`${OUT}/${f}.png`, Buffer.from((await cmd("Page.captureScreenshot", { format: "png" })).data, "base64")); };
 const noSide = () => ev(`document.documentElement.scrollWidth <= window.innerWidth + 1`);
 const loaded = (re) => ev(`performance.getEntriesByType('resource').some(r=>${re}.test(r.name))`);
+// the grid is virtual (only the rows near the screen exist): scroll until the item's card is rendered
+const reveal = async (key) => { for (let i = 0; i < 40; i++) { if (await ev(`!!document.querySelector('[data-item="${key}"]')`)) { await ev(`document.querySelector('[data-item="${key}"]').scrollIntoView({block:'center'})`); await sleep(250); return true; } await ev(`(()=>{let e=document.querySelector('[data-item]');while(e&&!(e.scrollHeight>e.clientHeight+8&&/(auto|scroll)/.test(getComputedStyle(e).overflowY)))e=e.parentElement;if(e)e.scrollTop+=380})()`); await sleep(150); } return false; };
 const tab = async (name) => { await ev(`[...document.querySelectorAll('[role=tab]')].find(b=>b.innerText.includes(${JSON.stringify(name)}))?.click()`); await sleep(900); };
 const effects = () => ev(`({ lights: document.querySelectorAll('.fx-lights').length, tree: !!document.querySelector('.fx-tree'), canvas: !!document.querySelector('[id^="fx-snow-"] canvas'), count: /Faltam \\d+ dias? para o Natal|Natal/.test(document.body.innerText) })`);
 try {
   await cmd("Runtime.enable"); await cmd("Page.enable");
   // counts every sound the page starts (sample elements and synthesized oscillators/noise): the rule is that none starts without a click
-  await cmd("Page.addScriptToEvaluateOnNewDocument", { source: `window.__snd=0;window.__stk=[];const pl=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__snd++;window.__stk.push('audio '+this.src.split('/').pop()+' '+new Error().stack.split('\\n').slice(2,5).join(' | '));return pl.apply(this,arguments)};for(const k of ['createOscillator','createBufferSource']){const o=AudioContext.prototype[k];AudioContext.prototype[k]=function(){window.__snd++;window.__stk.push(k+' '+new Error().stack.split('\\n').slice(2,6).join(' | '));return o.apply(this,arguments)}}0` });
+  await cmd("Page.addScriptToEvaluateOnNewDocument", { source: `window.__snd=0;window.__stk=[];addEventListener('click',(e)=>{if(e.target.closest?.('[data-pet]'))window.__stk.push('PETCLICK trusted='+e.isTrusted+' at='+Math.round(performance.now()))},true);const pl=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__snd++;window.__stk.push('audio '+this.src.split('/').pop()+' '+new Error().stack.split('\\n').slice(2,5).join(' | '));return pl.apply(this,arguments)};for(const k of ['createOscillator','createBufferSource']){const o=AudioContext.prototype[k];AudioContext.prototype[k]=function(){window.__snd++;window.__stk.push(k+' '+new Error().stack.split('\\n').slice(2,6).join(' | '));return o.apply(this,arguments)}}0` });
   if (ATTACH) { await cmd("Page.bringToFront"); await cmd("Emulation.setFocusEmulationEnabled", { enabled: true }); }
   await cmd("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }).catch(() => {});
   await cmd("Page.navigate", { url: "http://localhost:5173/" }); await sleep(1500);
@@ -73,8 +75,9 @@ try {
   await shot(`shop-1-vitrine-${TAG}`);
 
   // ---- claim, wear one piece ----
+  await reveal("natal.frame.garland");
   await ev(`[...document.querySelectorAll('[data-item="natal.frame.garland"] button')].find(b=>/Pegar \\(Beta\\)/.test(b.innerText)).click()`);
-  ok("'Pegar (Beta)' pega o item", await waitFor(`/Equipar/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'') && !/Pegar grátis/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`));
+  ok("'Pegar (Beta)' pega o item", await waitFor(`/Equipar/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'') && !/Pegar grátis/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`), (await ev(`document.querySelector('[data-item="natal.frame.garland"]')?.innerText||('(sem cartão) '+[...document.querySelectorAll('[data-item]')].map(c=>c.dataset.item).join(',')+' tab='+document.querySelector('[role=tab][aria-selected=true]')?.innerText)`)).replace(/\n/g," | ").slice(0,160) + " | " + await ev(`document.querySelector('[role=alert],[data-error]')?.innerText||''`));
   await ev(`[...document.querySelectorAll('[data-item="natal.frame.garland"] button')].find(b=>b.innerText.trim()==='Equipar').click()`);
   ok("equipar a moldura: o servidor passa a entregar a chave aos outros", await waitFor(`/Equipado/.test(document.querySelector('[data-item="natal.frame.garland"]')?.innerText||'')`) && (await http("/me", null, A.token)).d.fx?.frame === "natal.frame.garland");
   ok("a moldura aparece no meu avatar (sem recarregar)", await waitFor(`!!document.querySelector('.fx-frame svg.fx-art')`));
@@ -149,6 +152,7 @@ try {
 
   // ---- live preview of an entrance ("Ver ao vivo") ----
   await tab("Vitrine");
+  await reveal("natal.entrance.hohoho");
   await ev(`[...document.querySelectorAll('[data-item="natal.entrance.hohoho"] button')].find(b=>/Ver ao vivo/.test(b.innerText)).click()`);
   ok("'Ver ao vivo' mostra a entrada Ho ho ho na tela", await waitFor(`/Ho ho ho!/.test(document.querySelector('.fx-ent-text')?.innerText||'')`, 6000));
   ok("e a entrada some sozinha", await waitFor(`!document.querySelector('.fx-ent-text')`, 8000));
@@ -197,6 +201,7 @@ try {
   ok("Halloween: clicou na abóbora, a bruxa de vassoura passa e toca o som", await waitFor(`!!document.querySelector('.fx-cross svg circle[fill="#8bd17c"]')`, 6000) && (await ev(`window.__snd`)) > 0);
   await ev(`document.querySelector('button[title="Loja"]').click()`); await sleep(1500);
   ok("Halloween: a vitrine mostra as duas temporadas", await waitFor(`!!document.querySelector('[aria-label="Coleção Halloween"]') && !!document.querySelector('[aria-label="Coleção Natal"]')`, 8000));
+  await tab("Itens"); await reveal("halloween.entrance.boo");
   await ev(`[...document.querySelectorAll('[data-item="halloween.entrance.boo"] button')].find(b=>/Ver ao vivo/.test(b.innerText)).click()`);
   ok("Halloween: 'Ver ao vivo' mostra Buuu! com morcegos e fantasmas", await waitFor(`/Buuu!/.test(document.querySelector('.fx-ent-text')?.innerText||'')`, 6000));
   await shot(`shop-7-buuu-${TAG}`);

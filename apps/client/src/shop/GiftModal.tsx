@@ -1,13 +1,13 @@
 // "Presentear": only the owner account sees it (the server refuses anyone else). Pick a person, pick items or a whole collection, add a note, send.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Gift, Search, X } from "lucide-react";
-import { GIFT_ITEMS_MAX, GIFT_NOTE_MAX, RARITY_LABEL, type CollectionDTO, type GiftTargetDTO, type ShopItemDTO } from "@cohle/shared";
+import { GIFT_ITEMS_MAX, GIFT_NOTE_MAX, RARITY_LABEL, type CollectionDTO, type GiftTargetDTO, type ShopItemDTO, type UserDTO } from "@cohle/shared";
 import { api } from "../api";
 import { RARITY_COLOR } from "./registry";
 
 export type GiftPre = { itemIds?: string[]; collectionId?: string; to?: GiftTargetDTO };
 
-export function GiftModal({ pre, onClose, onDone }: { pre?: GiftPre; onClose: () => void; onDone: () => void }) {
+export function GiftModal({ me, pre, onClose, onDone }: { me: UserDTO; pre?: GiftPre; onClose: () => void; onDone: () => void }) {
   const [cat, setCat] = useState<{ items: ShopItemDTO[]; collections: CollectionDTO[] }>();
   const [q, setQ] = useState(""), [found, setFound] = useState<GiftTargetDTO[]>([]), [to, setTo] = useState<GiftTargetDTO | undefined>(pre?.to);
   const [picked, setPicked] = useState<Set<string>>(new Set(pre?.itemIds ?? []));
@@ -49,10 +49,11 @@ export function GiftModal({ pre, onClose, onDone }: { pre?: GiftPre; onClose: ()
 
         <div className="space-y-1.5"><span className="text-xs text-muted">Para quem</span>
           {to ? <div className="flex items-center gap-3 rounded-xl border border-line px-3 py-2"><span className="size-8 rounded-full grad grid place-items-center text-white font-bold text-sm">{(to.displayName || to.username)[0]?.toUpperCase()}</span>
-            <div className="min-w-0 flex-1"><div className="font-semibold truncate">{to.displayName || to.username}</div><div className="text-xs text-muted truncate">@{to.username} · {to.email}</div></div>
+            <div className="min-w-0 flex-1"><div className="font-semibold truncate">{to.displayName || to.username}</div><div className="text-xs text-muted truncate">@{to.username}{to.email ? ` · ${to.email}` : ""}{to.id === me.id ? " (você)" : ""}</div></div>
             <button onClick={() => { setTo(undefined); setQ(""); }} className="text-xs text-accent2 hover:underline">trocar</button></div>
-          : <div className="relative"><Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" /><input value={q} onChange={(e) => setQ(e.target.value)} autoFocus aria-label="Buscar pessoa" placeholder="@usuário, nome ou e-mail" className="w-full rounded-xl bg-white/5 border border-line pl-9 pr-3 py-2.5 outline-none focus:border-accent" />
-            {found.length > 0 && <ul className="mt-1 rounded-xl border border-line divide-y divide-line overflow-hidden" role="listbox" aria-label="Pessoas encontradas">{found.map((u) => <li key={u.id}><button type="button" role="option" aria-selected={false} onClick={() => setTo(u)} className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/5"><span className="size-7 rounded-full grad grid place-items-center text-white font-bold text-xs">{(u.displayName || u.username)[0]?.toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block text-sm font-medium truncate">{u.displayName || u.username}</span><span className="block text-xs text-muted truncate">@{u.username} · {u.email}</span></span></button></li>)}</ul>}</div>}
+          : <div className="space-y-1.5"><button type="button" onClick={() => setTo({ id: me.id, username: me.username, displayName: me.displayName ?? null, email: "" })} aria-label="Presentear a mim mesmo" className="rounded-lg px-3 py-1.5 text-xs font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25">Para mim</button>
+          <div className="relative"><Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" /><input value={q} onChange={(e) => setQ(e.target.value)} autoFocus aria-label="Buscar pessoa" placeholder="@usuário, nome ou e-mail" className="w-full rounded-xl bg-white/5 border border-line pl-9 pr-3 py-2.5 outline-none focus:border-accent" />
+            {found.length > 0 && <ul className="mt-1 rounded-xl border border-line divide-y divide-line overflow-hidden" role="listbox" aria-label="Pessoas encontradas">{found.map((u) => <li key={u.id}><button type="button" role="option" aria-selected={false} onClick={() => setTo(u)} className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-white/5"><span className="size-7 rounded-full grad grid place-items-center text-white font-bold text-xs">{(u.displayName || u.username)[0]?.toUpperCase()}</span><span className="min-w-0 flex-1"><span className="block text-sm font-medium truncate">{u.displayName || u.username}</span><span className="block text-xs text-muted truncate">@{u.username} · {u.email}</span></span></button></li>)}</ul>}</div></div>}
         </div>
 
         <div className="space-y-1.5"><div className="flex items-center gap-2"><span className="text-xs text-muted flex-1">O que dar ({picked.size} selecionado{picked.size === 1 ? "" : "s"})</span>

@@ -111,13 +111,13 @@ export function PreviewModal({ req, me, onClose }: { req: PreviewReq; me: UserDT
   const icons = ((react?.meta as any)?.icons ?? []) as string[];
   const vars = theme ? THEME_PREVIEW[THEME_OF[theme.key]] : undefined;
   const sample = useMemo(() => ({ ...me, fx: { ...(frame ? { frame: frame.key } : {}), ...(name ? { nameEffect: name.key } : {}), ...(badge ? { badge: badge.key } : {}), ...(pet ? { pet: pet.key } : {}), ...(status ? { status: status.key } : {}), ...(banner ? { banner: banner.key } : {}) } }), [me, frame, name, badge, pet, status, banner]);
-  const missing = items.filter((i) => !shop.owned.includes(i.id)), lockedAll = missing.length > 0 && !shop.canGift && missing.every((i) => i.locked);
+  const missing = items.filter((i) => !shop.owned.includes(i.id)), lockedAll = missing.length > 0 && missing.every((i) => i.locked);
   const look = collection ? SEASON_STYLE[collection.key] : undefined;
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopImmediatePropagation(); onClose(); } }; window.addEventListener("keydown", k, true); return () => window.removeEventListener("keydown", k, true); }, [onClose]);
   const entranceOf = ent ? ENTRANCE_OF[ent.key] : undefined;
   useEffect(() => { if (!entranceOf) return; const t = setTimeout(() => fire("entrance", { key: ent!.key, who: me.username }), 450); return () => clearTimeout(t); }, [entranceOf, me.username]);       // the entrance plays by itself when the preview opens
   const act = async () => {
-    try { for (const i of missing) if (!i.locked || shop.canGift) await ctx.claim(i); } catch { /* the shop screen shows the error on retry */ }
+    try { for (const i of missing) if (!i.locked) await ctx.claim(i); } catch { /* the shop screen shows the error on retry */ }
   };
   const wear = async () => {
     try {
@@ -151,7 +151,7 @@ export function PreviewModal({ req, me, onClose }: { req: PreviewReq; me: UserDT
             {missing.length > 0
               ? (lockedAll
                 ? <button disabled data-locked="true" aria-label="Em breve (trancado)" className="flex-1 rounded-xl py-3 font-semibold bg-white/5 text-white/70 border border-dashed border-white/25 cursor-not-allowed inline-flex items-center justify-center gap-2"><Lock size={16} /> Em breve</button>
-                : <button onClick={act} className="grad flex-1 rounded-xl py-3 font-semibold text-white hover:brightness-110">{collection ? `Pegar o conjunto (${missing.filter((i) => !i.locked || shop.canGift).length})` : "Pegar (Beta)"}</button>)
+                : <button onClick={act} className="grad flex-1 rounded-xl py-3 font-semibold text-white hover:brightness-110">{collection ? `Pegar o conjunto (${missing.filter((i) => !i.locked).length})` : "Pegar (Beta)"}</button>)
               : <div className="flex-1 inline-flex items-center justify-center gap-1.5 text-sm text-emerald-300 font-semibold rounded-xl bg-emerald-500/10 py-3"><Check size={16} /> {collection ? "Você tem o conjunto completo" : "Você já tem este item"}</div>}
             {missing.length === 0 && (collection || items[0]?.tipo !== "reaction") && <button onClick={wear} className="flex-1 rounded-xl py-3 font-semibold bg-white/10 hover:bg-white/15">{collection ? "Equipar conjunto completo" : "Equipar"}</button>}
             <button onClick={onClose} className="rounded-xl py-3 px-5 font-semibold text-muted hover:text-ink hover:bg-white/5">Sair</button>

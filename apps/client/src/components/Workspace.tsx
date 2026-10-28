@@ -20,7 +20,7 @@ import { RetentionNote } from "./chat/RetentionNote";
 import { toggled } from "../lib/chat";
 import { ShopProvider } from "../shop/ShopProvider";
 import { UserName } from "../shop/UserName";
-import { ShopLayer } from "../shop/ShopLayer";
+import { ShopLayer, ShopRailBadge } from "../shop/ShopLayer";
 import { useStickToBottom } from "../lib/stick";
 import { ArrowDown, Store } from "lucide-react";
 const AdminPanel = lazy(() => import("./AdminPanel"));
@@ -304,7 +304,7 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
         <ServerList servers={servers} serverId={serverId} dmOpen={dmOpen} railOpen={railOpen} groups={prefs.serverGroups} onGroups={(g) => setPrefs({ serverGroups: g })}
           onSelect={(s) => { setHome(false); setDmOpen(false); setServerId(s.id); setChannel(undefined); }} />
         <div className={`h-px bg-line my-1 shrink-0 ${railOpen ? "w-full" : "w-8"}`} />
-        {rb({ title: "Loja", icon: <Store size={20} />, onClick: () => setShopOpen(true), cls: "bg-white/5 text-accent2 hover:bg-white/10" })}
+        {rb({ title: "Loja", icon: <Store size={20} />, onClick: () => setShopOpen(true), cls: "bg-white/5 text-accent2 hover:bg-white/10", badge: <ShopRailBadge railOpen={railOpen} /> })}
         {rb({ title: "Criar servidor", icon: <Plus size={18} />, onClick: () => setServerModal("create"), cls: "bg-white/5 text-accent2 hover:bg-white/10" })}
         {rb({ title: "Entrar com convite", icon: <Link2 size={18} />, onClick: () => setServerModal("join"), cls: "bg-white/5 text-accent hover:bg-white/10" })}
         <div className="flex-1" />
