@@ -1,6 +1,6 @@
 {
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile --filter @cohle/client...",
-  "buildCommand": "cd ../.. && pnpm --filter @cohle/client exec vite build --base=/app/ --outDir ../landing/app --emptyOutDir",
+  "buildCommand": "cd ../.. && VITE_API_URL=https://cohle-api.onrender.com pnpm --filter @cohle/client exec vite build --base=/app/ --outDir ../landing/app --emptyOutDir",
   "outputDirectory": ".",
   "cleanUrls": true,
   "headers": [

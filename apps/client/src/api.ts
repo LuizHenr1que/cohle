@@ -1,12 +1,14 @@
 import { io, type Socket } from "socket.io-client";
 import type { GiftResultDTO, GiftTargetDTO, ShopItemDTO, CollectionDTO, PrefsDTO, ShopDTO, Slot, ReactionDTO, ReactionKey, AttachmentDTO, FriendSuggestionDTO, UsernameCheckDTO, AdminAccessRow, AdminOverviewDTO, AdminSeriesDTO, AdminUsageDTO, AdminUserRow, AccountDTO, FriendsDTO, ProfileDTO, DirectMessageDTO, DmConversationDTO, ServerDTO, MessageDTO, UserDTO, MemberDTO, BanDTO, ServerTemplate } from "@cohle/shared";
 
-// The server address is chosen inside the app (login screen) so one installer works against any Cohle server.
-const DEFAULT_API: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+const PRODUCTION_API = "https://cohle-api.onrender.com";
+// `vite` (dev) talks to the local API so the tests can sign in. Every packaged build talks only to production,
+// even if a previous session saved localhost under "alterar servidor".
+const DEFAULT_API: string = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : PRODUCTION_API);
 const SERVER_KEY = "cohle:server";
-/** Release builds are locked to their server: no address on screen, no way to point the app elsewhere (nothing to phish). */
-export const SERVER_LOCKED = !!import.meta.env.VITE_API_URL && !import.meta.env.VITE_TEST_LOGIN;
-export const API: string = SERVER_LOCKED ? DEFAULT_API : (() => { try { return localStorage.getItem(SERVER_KEY) || DEFAULT_API; } catch { return DEFAULT_API; } })();
+/** No address on screen. Only the internal installer (VITE_TEST_LOGIN) can point somewhere else. */
+export const SERVER_LOCKED = !import.meta.env.DEV && import.meta.env.VITE_TEST_LOGIN !== "1";
+export const API: string = SERVER_LOCKED ? (import.meta.env.VITE_API_URL || PRODUCTION_API) : (() => { try { return localStorage.getItem(SERVER_KEY) || DEFAULT_API; } catch { return DEFAULT_API; } })();
 
 export const normalizeServerUrl = (raw: string) => {
   let u = raw.trim().replace(/\/+$/, "");
