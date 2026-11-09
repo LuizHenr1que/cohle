@@ -109,33 +109,41 @@ export function setupShop(app: FastifyInstance, d: Deps) {
     return p ? { effectsOff: p.effectsOff, soundsOff: p.soundsOff, seasonalAuto: p.seasonalAuto, hidePolitical: p.hidePolitical, lite: p.lite as PrefsDTO["lite"], serverGroups: Array.isArray(p.serverGroups) ? (p.serverGroups as unknown as PrefsDTO["serverGroups"]) : [] } : { ...DEFAULT_PREFS };
   };
 
-  /** Only the company's master account (confirmed e-mail) can give gifts and unlock items. */
-  const isOwnerAccount = async (userId: string) => { const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerifiedAt: true, role: true } }); return !!u && roleOf(u) === "OWNER"; };
+  /** OWNER is the company account (gifts and locks). ADMIN and OWNER can claim any item. */
+  const accountRole = async (userId: string) => {
+    const u = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, emailVerifiedAt: true, role: true } });
+    return u ? roleOf(u) : "USER" as const;
+  };
+  const isOwnerAccount = async (userId: string) => (await accountRole(userId)) === "OWNER";
 
   // ---- routes ----
   app.get("/shop", { preHandler: d.auth }, async (req: any): Promise<ShopDTO> => {
     const me = d.uid(req), now = new Date();
     const betaTester = await ensureBeta(me).catch(() => false);
-    const [c, owned, equipped, prefs, canGift] = await Promise.all([catalog(), prisma.userItem.findMany({ where: { userId: me }, select: { itemId: true, seen: true, giftedBy: true, giftNote: true } }), equippedMap(me), prefsOf(me), isOwnerAccount(me)]);
+    const [c, owned, equipped, prefs, role] = await Promise.all([catalog(), prisma.userItem.findMany({ where: { userId: me }, select: { itemId: true, seen: true, giftedBy: true, giftNote: true } }), equippedMap(me), prefsOf(me), accountRole(me)]);
+    const canGift = role === "OWNER", canTake = role === "ADMIN" || role === "OWNER";
     const ownedSet = new Set(owned.map((o) => o.itemId));
     const visibleCols = new Set(c.collections.filter((x) => seasonActive(x, now)).map((x) => x.id));
-    // the storefront shows items of collections in season (and loose ones); what you own always stays in your inventory
-    const items = c.items.filter((i) => ownedSet.has(i.id) || (i.ativo && (!i.collectionId || visibleCols.has(i.collectionId))));
-    const cols = c.collections.filter((x) => visibleCols.has(x.id) || items.some((i) => i.collectionId === x.id && ownedSet.has(i.id)));
+    // the storefront shows items of collections in season (and loose ones); what you own always stays in your inventory.
+    // staff also sees locked and out-of-season items, so they can take any of them.
+    const items = c.items.filter((i) => ownedSet.has(i.id) || (i.ativo && (canTake || !i.collectionId || visibleCols.has(i.collectionId))));
+    const cols = c.collections.filter((x) => visibleCols.has(x.id) || items.some((i) => i.collectionId === x.id));
     const unseenRows = owned.filter((o) => !o.seen), givers = unseenRows.length ? await prisma.user.findMany({ where: { id: { in: [...new Set(unseenRows.map((o) => o.giftedBy).filter(Boolean) as string[])] } }, select: { id: true, username: true, displayName: true } }) : [];
     const unseenGifts: GiftDTO[] = unseenRows.map((o) => { const g = givers.find((x) => x.id === o.giftedBy); return { itemId: o.itemId, from: g ? (g.displayName || g.username) : "Cohle", note: o.giftNote ?? null }; });
-    return { items: items.map(toItem), collections: cols.map((x) => toCollection(x, items, now)), owned: [...ownedSet], equipped, bonus: bonusOf(equipped, c), prefs, now: now.toISOString(), betaTester, canGift, unseenGifts };
+    return { items: items.map(toItem), collections: cols.map((x) => toCollection(x, items, now)), owned: [...ownedSet], equipped, bonus: bonusOf(equipped, c), prefs, now: now.toISOString(), betaTester, canGift, canTake, unseenGifts };
   });
 
   app.post("/shop/items/:id/claim", { preHandler: d.auth }, async (req: any, reply) => {
     const me = d.uid(req), id = String(req.params.id);
-    if (!d.rate(me, "claim", 30, 60_000)) return reply.code(429).send({ error: "slow down" });
+    const staff = (await accountRole(me)) !== "USER";
+    if (!staff && !d.rate(me, "claim", 30, 60_000)) return reply.code(429).send({ error: "slow down" });
+    if (staff && !d.rate(me, "claim", 400, 60_000)) return reply.code(429).send({ error: "slow down" });
     const c = await catalog(), it = c.items.find((i) => i.id === id);
     if (!it || !it.ativo) return reply.code(404).send({ error: "not found" });
-    if (it.locked !== false) return reply.code(403).send({ error: "item locked" });                  // "Em breve": nobody claims it; the owner gives gifts (also to themselves)
+    if (!staff && it.locked !== false) return reply.code(403).send({ error: "item locked" });       // "Em breve": regular accounts cannot claim it
     const col = c.collections.find((x) => x.id === it.collectionId);
-    if (col && !seasonActive(col)) { const has = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: me, itemId: id } } }); if (!has) return reply.code(403).send({ error: "out of season" }); }
-    if (!(it.isFreeBeta || it.price === 0)) return reply.code(402).send({ error: "payment required" });         // checkout is not built yet: this is where it will plug in
+    if (!staff && col && !seasonActive(col)) { const has = await prisma.userItem.findUnique({ where: { userId_itemId: { userId: me, itemId: id } } }); if (!has) return reply.code(403).send({ error: "out of season" }); }
+    if (!staff && !(it.isFreeBeta || it.price === 0)) return reply.code(402).send({ error: "payment required" });
     await prisma.userItem.upsert({ where: { userId_itemId: { userId: me, itemId: id } }, create: { userId: me, itemId: id, source: "beta" }, update: {} });
     return { ok: true };
   });

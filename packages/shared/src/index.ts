@@ -79,7 +79,11 @@ export const createServerSchema = z.object({
   template: z.enum(SERVER_TEMPLATES).optional(),
 });
 export const updateServerSchema = z.object({ name: z.string().min(2).max(40).optional(), iconUrl: iconSchema.nullable().optional() });
-export const updateChannelSchema = z.object({ name: z.string().min(1).max(40) });
+export const updateChannelSchema = z.object({
+  name: z.string().min(1).max(40).optional(),
+  locked: z.boolean().optional(),
+  userLimit: z.number().int().min(1).max(99).nullable().optional(),
+}).refine((o) => o.name !== undefined || o.locked !== undefined || o.userLimit !== undefined, { message: "empty" });
 export const createChannelSchema = z.object({
   name: z.string().min(1).max(40),
   type: z.enum(["TEXT", "VOICE"]),
@@ -132,7 +136,7 @@ export interface FriendsDTO { friends: FriendDTO[]; incoming: FriendRequestDTO[]
 export const friendRequestSchema = z.object({ handle: z.string().trim().min(2).max(200) });
 export interface UsernameCheckDTO { available: boolean; reason?: HandleProblem | "taken"; }
 export interface AccountDTO { email: string; createdAt: string; emailVerified: boolean; findByEmail: boolean; }
-export interface ChannelDTO { id: string; serverId: string; name: string; type: "TEXT" | "VOICE"; }
+export interface ChannelDTO { id: string; serverId: string; name: string; type: "TEXT" | "VOICE"; locked?: boolean; userLimit?: number | null; }
 export interface ServerDTO {
   id: string; name: string; inviteCode: string; iconUrl: string | null; ownerId: string; channels: ChannelDTO[];
 }

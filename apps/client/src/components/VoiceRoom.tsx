@@ -6,7 +6,7 @@ import {
 } from "livekit-client";
 import {
   Mic, MicOff, Video, VideoOff, MonitorUp, PhoneOff, Volume2, VolumeX, Headphones, HeadphoneOff,
-  ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, Ban, UserX, PhoneMissed, ShieldAlert, Menu, Eye, EyeOff, AudioLines, Check, ChevronUp, MessageSquare,
+  ScreenShare, Maximize2, Minimize2, X, MonitorPlay, Lock, LockOpen, Ban, UserX, PhoneMissed, ShieldAlert, Menu, Eye, EyeOff, AudioLines, Check, ChevronUp, MessageSquare,
 } from "lucide-react";
 import type { ChannelDTO, UserDTO } from "@cohle/shared";
 import { nameOf } from "@cohle/shared";
@@ -23,6 +23,9 @@ import { PersonPanel, panelAt, Slider, DEFAULT_VOL, loadVols, VOL_KEY, type Vol,
 import { ScreenPicker, QUALITY_PRESETS, type Quality } from "./ScreenPicker";
 import { fitTiles, useSize } from "../lib/hooks";
 import { NOISE_MODES, NoiseProcessor, captureOptions, isNeural, loadNoiseMode, saveNoiseMode, type NoiseMode } from "../lib/noise";
+import { mixOutCall } from "../lib/shareMix";
+
+const ROOM_LIMITS = [2, 5, 10, 15, 25, 50];
 
 type UserLike = Pick<UserDTO, "username" | "displayName" | "avatarUrl" | "micOff" | "deaf" | "badge" | "fx">;
 /** What the sidebar (hover card, clicking a person) can ask of the call it is looking at. */
@@ -202,6 +205,8 @@ export function VoiceRoom({ onGiant, channel, users, serverId, isOwner, onLeave,
   onLeave: () => void; onSpeakers: (ids: string[]) => void; onSharing: (on: boolean) => void; onMenu?: () => void;
 }) {
   const roomRef = useRef<Room>();
+  const shareMix = useRef<{ stop: (end?: boolean) => void } | null>(null);
+  const stopShareMix = (end = false) => { shareMix.current?.stop(end); shareMix.current = null; };
   const stageRef = useRef<HTMLDivElement>(null);
   const audioHost = useRef<HTMLDivElement>(null);
   const [areaRef, area] = useSize<HTMLDivElement>();           // space available for tiles / stage
@@ -283,7 +288,7 @@ export function VoiceRoom({ onGiant, channel, users, serverId, isOwner, onLeave,
     room.on(RoomEvent.TrackPublished, (pub, p) => { applyPolicy(pub, p); bump(); });
     room.on(RoomEvent.ParticipantConnected, (p) => { sounds.userJoin(); p.trackPublications.forEach((pub) => applyPolicy(pub, p)); applyVolumes(); bump(); });
     room.on(RoomEvent.ParticipantDisconnected, (p) => { sounds.userLeave(); setSpeakers((prev) => (prev.includes(p.identity) ? prev.filter((i) => i !== p.identity) : prev)); bump(); });   // someone who left can't be "talking"
-    room.on(RoomEvent.LocalTrackUnpublished, (pub) => { if (pub.source === Track.Source.ScreenShare) onSharing(false); });
+    room.on(RoomEvent.LocalTrackUnpublished, (pub) => { if (pub.source === Track.Source.ScreenShare) { stopShareMix(true); onSharing(false); } });
     room.on(RoomEvent.ActiveSpeakersChanged, (s) => {
       const ids = s.map((x) => x.identity).sort();
       setSpeakers((prev) => (sameIds(prev, ids) ? prev : ids));            // skip re-render when nothing changed
@@ -309,7 +314,7 @@ export function VoiceRoom({ onGiant, channel, users, serverId, isOwner, onLeave,
         bump();
       } catch (e: any) { setStatus("error"); setErr(e.message ?? "falha ao conectar"); sounds.error(); }
     })();
-    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", bye); room.disconnect(); sounds.leaveSelf(); };
+    return () => { stopShareMix(true); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", bye); room.disconnect(); sounds.leaveSelf(); };
   }, [channel.id]);
 
   useEffect(() => { onSpeakers(speakers); }, [speakers]);
@@ -474,6 +479,32 @@ export function VoiceRoom({ onGiant, channel, users, serverId, isOwner, onLeave,
     tick((n) => n + 1);
   };
 
+  async function installShareMix() {
+    stopShareMix(false);
+    const room = roomRef.current, who = room?.localParticipant;
+    const raw = who?.getTrackPublication(Track.Source.ScreenShareAudio)?.audioTrack as LocalAudioTrack | undefined;
+    if (!room || !who || !raw) return;
+    const mix = mixOutCall(raw.mediaStreamTrack, () => {
+      const list: { track: MediaStreamTrack; volume: number }[] = [];
+      room.remoteParticipants.forEach((p) => {
+        const t = p.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+        if (!t) return;
+        const v = volsRef.current[p.identity] ?? DEFAULT_VOL;
+        list.push({ track: t, volume: deafRef.current || v.m ? 0 : v.v });
+      });
+      return list;
+    });
+    shareMix.current = mix;
+    try {
+      await who.unpublishTrack(raw, false);
+      await who.publishTrack(mix.track, { source: Track.Source.ScreenShareAudio });
+    } catch (e) {
+      stopShareMix(false);
+      await who.publishTrack(raw, { source: Track.Source.ScreenShareAudio }).catch(() => {});
+      throw e;
+    }
+  }
+
   async function startShare(id: string, audio: boolean, quality: Quality) {
     setPicking(false);
     const q = QUALITY_PRESETS[quality];
@@ -484,6 +515,7 @@ export function VoiceRoom({ onGiant, channel, users, serverId, isOwner, onLeave,
         { audio, resolution: { width: q.width, height: q.height, frameRate: q.fps }, contentHint: "motion" },
         { screenShareEncoding: { maxBitrate: q.bitrate, maxFramerate: q.fps } },
       );
+      if (audio) await installShareMix();
       onSharing(true); sounds.screenOn(); setErr("");
     } catch (e: any) { setErr(friendlyMediaError(e, "screen")); sounds.error(); }
     tick((n) => n + 1);
@@ -525,7 +557,23 @@ export function VoiceRoom({ onGiant, channel, users, serverId, isOwner, onLeave,
       <header className="px-3 sm:px-6 py-3 sm:py-4 border-b border-line flex items-center gap-2 sm:gap-3 min-w-0">
         {onMenu && <button onClick={onMenu} aria-label="Abrir menu" className="shrink-0 -ml-1 p-2 rounded-xl hover:bg-white/10"><Menu size={20} /></button>}
         <Volume2 size={18} className="text-muted shrink-0 hidden sm:block" />
+        {channel.locked && <Lock size={14} className="text-accent shrink-0" />}
         <span className="font-semibold truncate">{channel.name}</span>
+        {isOwner && (
+          <span className="inline-flex items-center gap-1 shrink-0">
+            <button title={channel.locked ? "Destrancar a sala" : "Trancar a sala"} aria-label={channel.locked ? "Destrancar a sala" : "Trancar a sala"}
+              className={`p-1.5 rounded-lg ${channel.locked ? "text-accent bg-accent/15" : "text-muted hover:text-ink hover:bg-white/10"}`}
+              onClick={() => api.updateChannel(channel.id, { locked: !channel.locked }).catch((e: any) => { setErr(e.message); sounds.error(); })}>
+              {channel.locked ? <Lock size={14} /> : <LockOpen size={14} />}
+            </button>
+            <select aria-label="Limite de pessoas" value={channel.userLimit ?? ""}
+              onChange={(e) => api.updateChannel(channel.id, { userLimit: e.target.value ? Number(e.target.value) : null }).catch((x: any) => { setErr(x.message); sounds.error(); })}
+              className="rounded-lg bg-white/5 border border-line px-1.5 py-1 text-[11px] outline-none max-w-[6.5rem]">
+              <option value="">Sem limite</option>
+              {ROOM_LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </span>
+        )}
         {onToggleChat && (
           <button onClick={onToggleChat} title={chatOpen ? "Fechar o chat" : "Abrir o chat"} className={`relative ml-auto shrink-0 inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium transition ${chatOpen ? "bg-accent/20 text-ink" : "bg-white/5 text-muted hover:text-ink hover:bg-white/10"}`}>
             <MessageSquare size={15} /> <span className="hidden sm:inline">Chat</span>

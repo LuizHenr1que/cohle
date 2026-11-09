@@ -35,7 +35,9 @@ export const DEFAULT_PREFS: PrefsDTO = { effectsOff: false, soundsOff: false, se
 export interface ShopDTO {
   items: ShopItemDTO[]; collections: CollectionDTO[]; owned: string[];
   equipped: Partial<Record<Slot, string>>; /** item ids */ bonus: string | null; prefs: PrefsDTO; now: string; betaTester: boolean;
-  /** only the owner account can give gifts */ canGift: boolean; /** gifts not opened yet */ unseenGifts: GiftDTO[];
+  /** only the owner account can give gifts */ canGift: boolean;
+  /** admin and owner can claim any item, even while the shop is locked */ canTake: boolean;
+  /** gifts not opened yet */ unseenGifts: GiftDTO[];
 }
 export interface GiftDTO { itemId: string; from: string; note: string | null; }
 export interface GiftTargetDTO { id: string; username: string; displayName: string | null; email: string; }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Crown, Hash, Volume2, Trash2, RefreshCw, Copy, Check, LogOut, UserMinus, Plus, MicOff, Mic, Ban, Undo2, MessageCircle } from "lucide-react";
+import { Crown, Hash, Volume2, Trash2, RefreshCw, Copy, Check, LogOut, UserMinus, Plus, MicOff, Mic, Ban, Undo2, MessageCircle, Lock, LockOpen } from "lucide-react";
 import type { ServerDTO, MemberDTO, BanDTO, UserDTO } from "@cohle/shared";
 import { nameOf } from "@cohle/shared";
 import { api } from "../api";
@@ -103,13 +103,24 @@ export function ServerSettings({ server, selfId, online, rev, onClose, onAddChan
             {server.channels.map((c) => {
               const draft = renaming[c.id];
               return (
-                <div key={c.id} className="flex items-center gap-3 rounded-2xl bg-white/5 border border-line px-4 py-2.5">
+                <div key={c.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-white/5 border border-line px-4 py-2.5">
                   {c.type === "VOICE" ? <Volume2 size={16} className="text-muted" /> : <Hash size={16} className="text-muted" />}
                   <input className="flex-1 bg-transparent outline-none min-w-0" value={draft ?? c.name}
                     onChange={(e) => setRenaming({ ...renaming, [c.id]: e.target.value })} />
+                  {c.type === "VOICE" && (<>
+                    <button title={c.locked ? "Destrancar a sala" : "Trancar a sala"} aria-label={c.locked ? "Destrancar a sala" : "Trancar a sala"}
+                      className={`p-2 rounded-xl ${c.locked ? "text-accent bg-accent/15" : "text-muted hover:text-ink hover:bg-white/10"}`}
+                      onClick={() => run(() => api.updateChannel(c.id, { locked: !c.locked }))}>{c.locked ? <Lock size={15} /> : <LockOpen size={15} />}</button>
+                    <select aria-label="Limite de pessoas" value={c.userLimit ?? ""}
+                      onChange={(e) => run(() => api.updateChannel(c.id, { userLimit: e.target.value ? Number(e.target.value) : null }))}
+                      className="rounded-xl bg-white/5 border border-line px-2 py-1.5 text-xs outline-none">
+                      <option value="">Sem limite</option>
+                      {[2, 5, 10, 15, 25, 50].map((n) => <option key={n} value={n}>{n} pessoas</option>)}
+                    </select>
+                  </>)}
                   {draft !== undefined && draft.trim() && draft !== c.name && (
                     <button className="text-xs text-accent2 hover:underline"
-                      onClick={() => run(async () => { await api.updateChannel(c.id, draft.trim()); setRenaming(({ [c.id]: _, ...r }) => r); })}>Salvar</button>
+                      onClick={() => run(async () => { await api.updateChannel(c.id, { name: draft.trim() }); setRenaming(({ [c.id]: _, ...r }) => r); })}>Salvar</button>
                   )}
                   {confirm === c.id ? (
                     <button className="text-xs text-red-400 font-semibold" onClick={() => run(async () => { await api.deleteChannel(c.id); setConfirm(undefined); })}>Confirmar exclusão</button>

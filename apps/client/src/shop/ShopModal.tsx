@@ -67,7 +67,7 @@ function Card({ item, me }: { item: ShopItemDTO; me: UserDTO }) {
   const owned = shop.owned.includes(item.id), worn = (SLOTS as readonly string[]).includes(item.tipo) && shop.equipped[item.tipo as Slot] === item.id;
   const col = shop.collections.find((c) => c.id === item.collectionId);
   const open = useContext(OpenPreview), openGift = useContext(OpenGift);
-  const locked = item.locked && !owned;                                   // "Em breve": nobody claims it (there is no claiming yet); the owner gives gifts, also to themselves
+  const locked = item.locked && !owned && !shop.canTake;                  // "Em breve" for everyone except admin and the owner, who can claim it
   const show = () => open({ title: item.nome, subtitle: item.descricao, items: [item], collection: undefined });
   const act = async () => {
     setBusy(true); setErr("");
@@ -122,11 +122,11 @@ function Collection({ c, items, me, hero = false }: { c: CollectionDTO; items: S
   const ctx = useShop()!, shop = ctx.shop!, open = useContext(OpenPreview), openGift = useContext(OpenGift);
   const mine = items.filter((i) => shop.owned.includes(i.id)), complete = mine.length === items.length;
   const multi = items.length >= 6 && new Set(items.map((i) => i.tipo)).size <= 2;                 // pets, status, banners, auras: you pick ONE, there is no "full set"
-  const missing = items.filter((i) => !shop.owned.includes(i.id)), lockedAll = missing.length > 0 && missing.every((i) => i.locked), anyLocked = items.some((i) => i.locked);
+  const missing = items.filter((i) => !shop.owned.includes(i.id)), lockedAll = !shop.canTake && missing.length > 0 && missing.every((i) => i.locked), anyLocked = items.some((i) => i.locked);
   const [busy, setBusy] = useState(""), [msg, setMsg] = useState("");
   const wearable = items.filter((i) => (SLOTS as readonly string[]).includes(i.tipo));
   const wornAll = wearable.length > 0 && wearable.every((i) => shop.equipped[i.tipo as Slot] === i.id);
-  const claimAll = async () => { setBusy("claim"); setMsg(""); try { for (const i of items) if (!shop.owned.includes(i.id) && !i.locked) await ctx.claim(i); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
+  const claimAll = async () => { setBusy("claim"); setMsg(""); try { for (const i of items) if (!shop.owned.includes(i.id) && (shop.canTake || !i.locked)) await ctx.claim(i); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
   const wear = async () => { setBusy("wear"); setMsg(""); try { const done = await ctx.equipSet(c.id); setMsg(done && c.bonus ? "Conjunto completo equipado: bônus liberado!" : "Equipei o que você tem desta coleção."); } catch (e: any) { setMsg(e?.message ?? "Não foi possível."); } finally { setBusy(""); } };
   const [expanded, setExpanded] = useState(false);
   const st = SEASON_STYLE[c.key], tint = SEASON_LOOK[c.key]?.tint ?? "rgba(230,57,70,0.28)";
@@ -241,7 +241,7 @@ export default function ShopModal({ me, onClose }: { me: UserDTO; onClose: () =>
           {shop && shop.items.some((i) => i.locked && !shop.owned.includes(i.id)) && (
             <div role="note" aria-label="Loja trancada" className="mb-4 flex items-center gap-3 flex-wrap rounded-2xl border border-dashed border-white/20 bg-white/[0.04] px-4 py-3">
               <span className="size-9 rounded-xl grid place-items-center bg-white/10 text-white/80 shrink-0"><Lock size={17} /></span>
-              <p className="flex-1 min-w-[220px] text-sm text-white/80"><b>A Loja está trancada por enquanto.</b> Veja tudo à vontade e use a prévia: os itens chegam em breve. {shop.canGift ? "Só você (conta dona) presenteia, inclusive para você mesmo (botão \"Para mim\")." : "Por enquanto só o dono do Cohle presenteia: quem ganha um item já pode usar."}</p>
+              <p className="flex-1 min-w-[220px] text-sm text-white/80"><b>A Loja está trancada por enquanto.</b> Veja tudo à vontade e use a prévia: os itens chegam em breve. {shop.canTake ? "Como administrador, você pode pegar qualquer item." : ""} {shop.canGift ? "Só você (conta dona) presenteia, inclusive para você mesmo (botão \"Para mim\")." : "Por enquanto só o dono do Cohle presenteia: quem ganha um item já pode usar."}</p>
               {shop.canGift && <button onClick={() => setGift({})} className="rounded-xl px-4 py-2 text-sm font-semibold text-amber-200 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/25 inline-flex items-center gap-2"><Gift size={15} /> Presentear alguém</button>}
             </div>
           )}

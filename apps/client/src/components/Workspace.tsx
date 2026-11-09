@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { PanelLeftClose, PanelLeftOpen, MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu, Compass } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, MessageCircle, Hash, Volume2, Plus, LogOut, Send, Link2, Settings, ScreenShare, Sparkles, UserPlus, Crown, SlidersHorizontal, Zap, Menu, Compass, Lock } from "lucide-react";
 import type { ServerDTO, ChannelDTO, MessageDTO, UserDTO, VoiceStateDTO, AttachmentDTO, ReactionKey, MessageGoneEvent, MessageReactionsEvent } from "@cohle/shared";
 import { nameOf, KEEP_MESSAGES } from "@cohle/shared";
 import { api, connectSocket, friendlyError } from "../api";
@@ -198,9 +198,19 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
   };
   const deleteMessage = (m: ChatItem) => { setMessages((l) => l.filter((x) => x.id !== m.id)); api.deleteMessage(m.id).catch(() => channel && api.messages(channel.id).then(setMessages).catch(() => {})); };
   function joinVoice(c: ChannelDTO) {
+    if (voice?.id === c.id) { setNavOpen(false); setView("call"); setDmOpen(false); setHome(false); return; }
+    const here = voiceUsers[c.id] ?? [];
+    const inside = here.some((u) => u.id === self.id);
+    if (!inside && c.locked) { setNotice("Esta sala está trancada."); return; }
+    if (!inside && c.userLimit && here.length >= c.userLimit) { setNotice(`Esta sala está cheia (${c.userLimit}).`); return; }
     setNavOpen(false); setView("call"); setDmOpen(false); setHome(false);
-    if (voice?.id === c.id) return;                         // already in this call: just bring it back on screen
-    setVoice(c); socket.current?.emit("voice:join", c.id);
+    const prev = voice;
+    setVoice(c);
+    socket.current?.emit("voice:join", c.id, (a: { error?: string }) => {
+      if (!a?.error) return;
+      setNotice(a.error);
+      setVoice(prev);
+    });
   }
   // clicking a person: their live replaces whatever we were watching, joining their call first if needed
   function openPerson(c: ChannelDTO, u: UserDTO) {
@@ -239,8 +249,9 @@ export function Workspace({ me, onLogout, fx, onToggleFx, lite, onToggleLite }: 
       <div key={c.id}>
         <button onClick={() => joinVoice(c)}
           className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm transition ${voice?.id === c.id && view === "call" ? "bg-accent/15 text-ink" : "text-muted hover:bg-white/5"}`}>
-          <Volume2 size={16} /> {c.name}
-          {inside.length > 0 && <span className="ml-auto text-xs text-accent2">{inside.length}</span>}
+          <Volume2 size={16} /> {c.locked && <Lock size={12} className="text-accent shrink-0" />}
+          <span className="truncate">{c.name}</span>
+          {(inside.length > 0 || c.userLimit) && <span className="ml-auto text-xs text-accent2 tabular-nums">{inside.length}{c.userLimit ? `/${c.userLimit}` : ""}</span>}
         </button>
         {inside.map((u) => (
           <PersonRow key={u.id} user={u} isSelf={u.id === self.id} isOwner={server?.ownerId === u.id} channelName={c.name}

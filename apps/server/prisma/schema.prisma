@@ -73,12 +73,14 @@ model Member {
 }
 
 model Channel {
-  id       String      @id @default(cuid())
-  serverId String
-  name     String
-  type     ChannelType
-  server   Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  messages Message[]
+  id        String      @id @default(cuid())
+  serverId  String
+  name      String
+  type      ChannelType
+  locked    Boolean     @default(false) // voice room: nobody new can enter
+  userLimit Int?        // voice room: max people (null = no limit)
+  server    Server      @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  messages  Message[]
 }
 
 model Message {

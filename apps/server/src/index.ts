@@ -93,7 +93,10 @@ const serverInclude = {
 const toServer = (s: any): ServerDTO => ({
   id: s.id, name: s.name, inviteCode: s.inviteCode, iconUrl: s.iconVersion > 0 ? `/server-icons/${s.id}?v=${s.iconVersion}` : null,
   ownerId: s.members?.[0]?.userId ?? "",
-  channels: s.channels.map((c: any) => ({ id: c.id, serverId: c.serverId, name: c.name, type: c.type })),
+  channels: s.channels.map((c: any) => ({
+    id: c.id, serverId: c.serverId, name: c.name, type: c.type,
+    ...(c.type === "VOICE" ? { locked: !!c.locked, userLimit: c.userLimit ?? null } : {}),
+  })),
 });
 const isOwner = async (userId: string, serverId: string) =>
   (await prisma.member.findUnique({ where: { userId_serverId: { userId, serverId } } }))?.role === "OWNER";
@@ -559,7 +562,7 @@ app.post("/servers/:id/channels", { preHandler: auth }, async (req: any, reply) 
   if (!(await isOwner(uid(req), req.params.id))) return reply.code(403).send({ error: "só o dono pode criar canais" });
   const c = await prisma.channel.create({ data: { ...p.data, serverId: req.params.id } });
   touch(c.serverId);
-  return { id: c.id, serverId: c.serverId, name: c.name, type: c.type };
+  return { id: c.id, serverId: c.serverId, name: c.name, type: c.type, ...(c.type === "VOICE" ? { locked: false, userLimit: null } : {}) };
 });
 
 app.patch("/channels/:id", { preHandler: auth }, async (req: any, reply) => {
@@ -567,9 +570,13 @@ app.patch("/channels/:id", { preHandler: auth }, async (req: any, reply) => {
   if (!p.success) return reply.code(400).send({ error: "invalid input" });
   const ch = await prisma.channel.findUnique({ where: { id: req.params.id } });
   if (!ch || !(await isOwner(uid(req), ch.serverId))) return reply.code(403).send({ error: "só o dono pode fazer isso" });
-  const c = await prisma.channel.update({ where: { id: ch.id }, data: { name: p.data.name } });
+  if ((p.data.locked !== undefined || p.data.userLimit !== undefined) && ch.type !== "VOICE") return reply.code(400).send({ error: "invalid input" });
+  const c = await prisma.channel.update({
+    where: { id: ch.id },
+    data: { ...(p.data.name !== undefined ? { name: p.data.name } : {}), ...(p.data.locked !== undefined ? { locked: p.data.locked } : {}), ...(p.data.userLimit !== undefined ? { userLimit: p.data.userLimit } : {}) },
+  });
   touch(c.serverId);
-  return { id: c.id, serverId: c.serverId, name: c.name, type: c.type };
+  return { id: c.id, serverId: c.serverId, name: c.name, type: c.type, ...(c.type === "VOICE" ? { locked: c.locked, userLimit: c.userLimit } : {}) };
 });
 
 app.delete("/channels/:id", { preHandler: auth }, async (req: any, reply) => {
@@ -733,6 +740,8 @@ app.delete("/friends/:userId", { preHandler: auth }, async (req: any) => {
 app.post("/channels/:id/voice-token", { preHandler: auth }, async (req: any, reply) => {
   const ch = await memberOfChannel(uid(req), req.params.id);
   if (!ch || ch.type !== "VOICE") return reply.code(403).send({ error: "forbidden" });
+  const blocked = voiceBlock(ch, uid(req));
+  if (blocked) return reply.code(403).send({ error: blocked });
   const user = await prisma.user.findUniqueOrThrow({ where: { id: uid(req) }, ...lightUser });
   const member = await prisma.member.findUnique({ where: { userId_serverId: { userId: user.id, serverId: ch.serverId } } });
   const at = new AccessToken(process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!, {
@@ -747,6 +756,13 @@ const io = new IOServer(app.server, { cors: { origin: true } });
 const online = new Map<string, number>();
 // channelId -> { serverId, users by id }
 const voice = new Map<string, { serverId: string; users: Map<string, UserDTO> }>();
+// Already inside: a reconnect is not a new entry. Locked and full rooms refuse everyone else.
+const voiceBlock = (ch: { id: string; locked: boolean; userLimit: number | null }, userId: string) => {
+  if (voice.get(ch.id)?.users.has(userId)) return null;
+  if (ch.locked) return "Esta sala está trancada.";
+  if (ch.userLimit && (voice.get(ch.id)?.users.size ?? 0) >= ch.userLimit) return "Esta sala está cheia.";
+  return null;
+};
 const voiceOf = new Map<string, string>(); // userId -> channelId
 registerAdmin(app, { prisma, auth, uid, live: () => ({ online: online.size, voice: voiceOf.size, rooms: voice.size }), isOnline: (id) => online.has(id) });
 const voiceDTO = (channelId: string) => { const v = voice.get(channelId); return { channelId, users: [...(v?.users.values() ?? [])].map((u) => { const fx = shop.fxOf(u.id, v!.serverId); return fx ? { ...u, fx } : u; }) }; };
@@ -895,10 +911,12 @@ io.on("connection", (socket) => {
     await ready;
     socket.emit("voice:snapshot", [...voice.entries()].filter(([, v]) => serverIds.has(v.serverId)).map(([id]) => voiceDTO(id)));
   });
-  socket.on("voice:join", async (channelId: string) => {
+  socket.on("voice:join", async (channelId: string, ack?: Function) => {
     await ready;
     const ch = await memberOfChannel(userId, channelId);
-    if (!ch || ch.type !== "VOICE") return;
+    if (!ch || ch.type !== "VOICE") { ack?.({ error: "forbidden" }); return; }
+    const block = voiceBlock(ch, userId);
+    if (block) { ack?.({ error: block }); return; }
     if (voiceOf.get(userId) && voiceOf.get(userId) !== channelId) leaveVoice(userId);
     let v = voice.get(channelId);
     if (!v) { v = { serverId: ch.serverId, users: new Map() }; voice.set(channelId, v); }
@@ -916,6 +934,7 @@ io.on("connection", (socket) => {
     if (!callSince.has(userId)) callSince.set(userId, Date.now());
     io.to(`server:${ch.serverId}`).emit("voice:state", voiceDTO(channelId));
     void shop.announceEntrance(userId, channelId, [...v.users.keys()]).catch(() => {});
+    ack?.({ ok: true });
   });
   // a "giant reaction" for everybody in my call
   socket.on("fx:giant", (icon: unknown) => { const ch = voiceOf.get(userId), v = ch ? voice.get(ch) : undefined; if (v) void shop.giant(userId, icon, ch, [...v.users.keys()]).catch(() => {}); });
